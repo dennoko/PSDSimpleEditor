@@ -5,25 +5,48 @@ using UnityEditor;
 namespace PSDSimpleEditor
 {
     /// <summary>
-    /// カスタムシェーダーを使い、全レイヤーを GPU 上で順次合成して
-    /// 最終的な合成結果を Texture2D として返す。
+    /// レイヤーツリーを LayerBlend.shader で GPU 合成し、最終結果の Texture2D を返す。
+    ///
+    /// RT の流れ:
+    ///   ・トップレベルはピンポン RT (_rtA/_rtB)。cur = 現在の合成結果、next = 次の書き込み先。
+    ///     1 レイヤー合成するごとに Graphics.Blit(cur, next, _mat) → Swap(cur, next)。
+    ///   ・分離グループ (PassThrough 以外) は RT プールから 2 枚借りて透明クリア後に
+    ///     子を再帰合成し、平坦化結果を「1 枚のレイヤー」として親バッファへ合成する。
+    ///   ・クリッピングは、ベース層を透明 RT へ単独描画 (Normal ブレンド) して実効 α を
+    ///     得た RT を _ClipMaskTex としてクリッピング層へ渡す。
+    ///
+    /// 色空間: RT は全て RenderTextureReadWrite.Linear、戻り Texture2D も linear:true。
+    /// 合成中は GL.sRGBWrite = false にして sRGB 変換が混入しないようにする
+    /// (Linear カラースペースプロジェクトでの二重変換対策。REWRITE_SPEC.md §3 色空間)。
     /// </summary>
     public class LayerCompositor
     {
         const string ShaderPath = "Assets/Editor/PSDSimpleEditor/LayerBlend.shader";
 
-        readonly Material       _mat;
-        readonly RenderTexture  _rtA;
-        readonly RenderTexture  _rtB;
-        readonly int            _canvasW;
-        readonly int            _canvasH;
+        readonly int _canvasW;
+        readonly int _canvasH;
 
-        public bool IsValid => _mat != null;
+        Material _mat;
+
+        // トップレベルのピンポン RT
+        RenderTexture _rtA, _rtB;
+
+        // グループ合成・クリップマスク用の RT プール (全てキャンバスサイズ)
+        readonly Stack<RenderTexture> _pool = new Stack<RenderTexture>();
+
+        // SoCo / Color Overlay 用 1×1 ソリッドテクスチャのキャッシュ (色ごと)
+        readonly Dictionary<Color, Texture2D> _solidCache = new Dictionary<Color, Texture2D>();
+
+        public bool IsValid => _mat != null && _rtA != null && _rtB != null;
+
+        // ════════════════════════════════════════════════════════════════
+        //  初期化 / 解放
+        // ════════════════════════════════════════════════════════════════
 
         public LayerCompositor(int canvasW, int canvasH)
         {
-            _canvasW = canvasW;
-            _canvasH = canvasH;
+            _canvasW = Mathf.Max(1, canvasW);
+            _canvasH = Mathf.Max(1, canvasH);
 
             var shader = AssetDatabase.LoadAssetAtPath<Shader>(ShaderPath);
             if (shader == null)
@@ -33,88 +56,491 @@ namespace PSDSimpleEditor
             }
 
             _mat = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
-            _rtA = CreateRT(canvasW, canvasH);
-            _rtB = CreateRT(canvasW, canvasH);
+            _rtA = CreateRT();
+            _rtB = CreateRT();
         }
 
-        static RenderTexture CreateRT(int w, int h)
+        public void Dispose()
         {
-            var rt = new RenderTexture(w, h, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB)
+            if (_mat != null) { Object.DestroyImmediate(_mat); _mat = null; }
+            ReleaseRT(ref _rtA);
+            ReleaseRT(ref _rtB);
+
+            while (_pool.Count > 0)
             {
-                hideFlags = HideFlags.HideAndDontSave
-            };
-            rt.Create();
-            return rt;
+                var rt = _pool.Pop();
+                if (rt != null) { rt.Release(); Object.DestroyImmediate(rt); }
+            }
+
+            foreach (var tex in _solidCache.Values)
+                if (tex != null) Object.DestroyImmediate(tex);
+            _solidCache.Clear();
         }
+
+        // ════════════════════════════════════════════════════════════════
+        //  Public: 合成実行
+        // ════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// layers を下から上へ合成し、最終結果を Texture2D で返す。
-        /// layers は「index 0 = 最下層」の順であることを前提とする。
+        /// layers (index 0 = 最下層) を昇順に合成して Texture2D (RGBA32, linear) を返す。
+        /// 返却テクスチャの破棄は呼び出し側の責任。
         /// </summary>
         public Texture2D Composite(List<PSDLayer> layers)
         {
             if (!IsValid) return null;
 
-            // ── 作業 RT をクリア ──
-            ClearRT(_rtA);
+            // sRGB 変換の混入を防ぐ (Linear RT へバイト値そのまま書き込む)
+            bool prevSRGBWrite = GL.sRGBWrite;
+            var  prevActive    = RenderTexture.active;
+            GL.sRGBWrite = false;
 
-            _mat.SetVector("_CanvasSize", new Vector4(_canvasW, _canvasH, 0, 0));
-
-            RenderTexture src = _rtA;
-            RenderTexture dst = _rtB;
-
-            foreach (var layer in layers)
+            try
             {
-                if (!layer.UIVisible) continue;
+                ClearRT(_rtA);
+                RenderTexture cur = _rtA, next = _rtB;
 
-                if (layer.IsAdjustmentLayer)
+                if (layers != null)
+                    CompositeList(layers, ref cur, ref next);
+
+                // cur が最終結果 → Texture2D (linear) へ転写
+                var result = new Texture2D(_canvasW, _canvasH, TextureFormat.RGBA32, false, linear: true)
+                { hideFlags = HideFlags.HideAndDontSave };
+                RenderTexture.active = cur;
+                result.ReadPixels(new Rect(0, 0, _canvasW, _canvasH), 0, 0);
+                result.Apply(false);
+                return result;
+            }
+            finally
+            {
+                RenderTexture.active = prevActive;
+                GL.sRGBWrite = prevSRGBWrite;
+            }
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        //  レイヤーリストの合成 (グループ再帰 + クリッピング群の検出)
+        // ════════════════════════════════════════════════════════════════
+
+        void CompositeList(List<PSDLayer> layers, ref RenderTexture cur, ref RenderTexture next)
+        {
+            int i = 0;
+            while (i < layers.Count)
+            {
+                var baseLayer = layers[i];
+
+                // 直後に連続する IsClipping==true 群を特定する。
+                // baseLayer 自身がクリッピング層の場合 (リスト先頭の孤児) は群を作らず
+                // 通常レイヤーとして扱う (クリップ対象なし)。
+                int runEnd = i + 1;
+                if (!baseLayer.IsClipping)
+                    while (runEnd < layers.Count && layers[runEnd].IsClipping) runEnd++;
+
+                // ベース層が非表示ならクリッピング群ごとスキップ
+                if (!baseLayer.UIVisible) { i = runEnd; continue; }
+
+                bool hasClipRun = runEnd > i + 1;
+
+                if (baseLayer.Children != null)
                 {
-                    // 調整レイヤー: ピクセル合成なし、色調補正のみ適用
-                    bool hasAny = layer.Adjustment.HasBrightnessContrast
-                               || layer.Adjustment.HasHueSaturation;
-                    if (!hasAny) continue;
-
-                    SetAdjustmentUniforms(layer);
-                    _mat.SetInt("_IsAdjustment", 1);
-                    Graphics.Blit(src, dst, _mat);
+                    CompositeGroup(layers, i, runEnd, ref cur, ref next);
                 }
                 else
                 {
-                    if (layer.Texture == null) continue;
+                    // ── 通常レイヤー (+ クリッピング群) ──
+                    RenderTexture clipMask = null;
+                    if (hasClipRun)
+                        clipMask = RenderLayerAlpha(baseLayer, null); // ベース層の実効 α
 
-                    SetAdjustmentUniforms(layer);
-                    _mat.SetInt    ("_IsAdjustment", 0);
-                    _mat.SetTexture("_LayerTex", layer.Texture);
-                    _mat.SetVector ("_LayerRect",
-                        new Vector4(layer.Left, layer.Top, layer.Width, layer.Height));
-                    _mat.SetFloat  ("_Opacity",   layer.UIOpacity);
-                    _mat.SetInt    ("_BlendMode", (int)layer.BlendMode);
-                    Graphics.Blit(src, dst, _mat);
+                    // ベース層自身は通常どおり (自身の BlendMode で) 合成
+                    DrawLayer(baseLayer, null, ref cur, ref next);
+
+                    for (int j = i + 1; j < runEnd; j++)
+                    {
+                        var c = layers[j];
+                        if (!c.UIVisible) continue;
+                        DrawClipRunMember(c, clipMask, ref cur, ref next);
+                    }
+
+                    ReleaseToPool(clipMask);
                 }
 
-                // ピンポンバッファの入れ替え
-                var tmp = src; src = dst; dst = tmp;
+                i = runEnd;
+            }
+        }
+
+        // ─── グループ (+ 直後のクリッピング群) の合成 ────────────────────────
+
+        void CompositeGroup(List<PSDLayer> layers, int groupIdx, int runEnd,
+                            ref RenderTexture cur, ref RenderTexture next)
+        {
+            var group = layers[groupIdx];
+
+            if (group.GroupBlendMode == BlendMode.PassThrough)
+            {
+                // ── パススルー: 子を現在のバッファへ直接再帰合成 ──
+                // 簡略化: パススルーグループの UIOpacity (< 1) とグループ自身のマスクは無視する
+                CompositeList(group.Children, ref cur, ref next);
+
+                // 簡略化: パススルーグループをベースとするクリッピング層は
+                // ベース α を確定できないためクリップなしで通常合成する
+                for (int j = groupIdx + 1; j < runEnd; j++)
+                {
+                    var c = layers[j];
+                    if (!c.UIVisible) continue;
+                    DrawClipRunMember(c, null, ref cur, ref next);
+                }
+                return;
             }
 
-            // ── src (最終結果) を Texture2D に転写 ──
-            var result     = new Texture2D(_canvasW, _canvasH, TextureFormat.RGBA32, false);
-            var prevActive = RenderTexture.active;
-            RenderTexture.active = src;
-            result.ReadPixels(new Rect(0, 0, _canvasW, _canvasH), 0, 0);
-            result.Apply();
-            RenderTexture.active = prevActive;
+            // ── 分離グループ: 透明 RT に子を合成 → 1 枚のレイヤーとして合成 ──
+            var gCur  = AcquireRT(clearToTransparent: true);
+            var gNext = AcquireRT(clearToTransparent: false);
+            CompositeList(group.Children, ref gCur, ref gNext);
 
+            // クリッピング群がある場合、グループの実効 α (平坦化結果 × 不透明度 × マスク) を先に取得
+            RenderTexture clipMask = null;
+            if (runEnd > groupIdx + 1)
+                clipMask = RenderTextureAlpha(gCur, group, null);
+
+            // グループ全体を 1 枚のレイヤーとして合成
+            // (_LayerRect = 全面 / _BlendMode = GroupBlendMode / _Opacity = UIOpacity / グループ自身のマスク適用)
+            BlitAsFullCanvasLayer(gCur, group, ToShaderBlendMode(group.GroupBlendMode), null, ref cur, ref next);
+
+            for (int j = groupIdx + 1; j < runEnd; j++)
+            {
+                var c = layers[j];
+                if (!c.UIVisible) continue;
+                DrawClipRunMember(c, clipMask, ref cur, ref next);
+            }
+
+            ReleaseToPool(clipMask);
+            ReleaseToPool(gCur);
+            ReleaseToPool(gNext);
+        }
+
+        // ─── クリッピング群メンバー 1 枚の合成 ───────────────────────────────
+
+        void DrawClipRunMember(PSDLayer layer, RenderTexture clipMask,
+                               ref RenderTexture cur, ref RenderTexture next)
+        {
+            if (layer.Children != null)
+            {
+                // 簡略化: クリッピング指定されたグループは常に分離合成し、
+                // 平坦化結果 1 枚にクリップマスクを適用して合成する (PassThrough は Normal 扱い)
+                var gCur  = AcquireRT(clearToTransparent: true);
+                var gNext = AcquireRT(clearToTransparent: false);
+                CompositeList(layer.Children, ref gCur, ref gNext);
+                BlitAsFullCanvasLayer(gCur, layer, ToShaderBlendMode(layer.GroupBlendMode), clipMask, ref cur, ref next);
+                ReleaseToPool(gCur);
+                ReleaseToPool(gNext);
+                return;
+            }
+
+            DrawLayer(layer, clipMask, ref cur, ref next);
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        //  単層描画 (調整レイヤー / SoCo / ピクセルレイヤー / Color Overlay)
+        // ════════════════════════════════════════════════════════════════
+
+        void DrawLayer(PSDLayer layer, RenderTexture clipMask,
+                       ref RenderTexture cur, ref RenderTexture next)
+        {
+            // ── 調整レイヤー (ピクセルなし・SoCo なし) ──
+            if (layer.IsAdjustmentLayer && !layer.Adjustment.HasSolidColor)
+            {
+                bool hasAdj = layer.Adjustment.HasBrightnessContrast
+                           || layer.Adjustment.HasHueSaturation;
+                // 補正項目を持たない調整レイヤーは素通し (バッファは変化しないため描画自体を省略)
+                if (!hasAdj) return;
+
+                var ap = NewParams();
+                ap.IsAdjustment = true;
+                ap.Opacity      = layer.UIOpacity;
+                SetMaskFrom(ref ap, layer);
+                ap.ClipMaskTex  = clipMask;
+                SetAdjustmentsFrom(ref ap, layer);
+                ApplyParams(ap);
+                Graphics.Blit(cur, next, _mat);
+                Swap(ref cur, ref next);
+                return;
+            }
+
+            // ── SoCo ベタ塗りレイヤー: 1×1 ソリッドを全面レイヤーとして合成 ──
+            if (layer.Adjustment.HasSolidColor)
+            {
+                var sp = NewParams();
+                sp.LayerTex  = GetSolidTexture(layer.Adjustment.SolidColor);
+                sp.LayerRect = FullCanvasRect;
+                sp.Opacity   = layer.UIOpacity;
+                sp.BlendMode = ToShaderBlendMode(layer.BlendMode);
+                SetMaskFrom(ref sp, layer);
+                sp.ClipMaskTex = clipMask;
+                SetAdjustmentsFrom(ref sp, layer);
+                ApplyParams(sp);
+                Graphics.Blit(cur, next, _mat);
+                Swap(ref cur, ref next);
+                return;
+            }
+
+            // ── ピクセルレイヤー ──
+            if (layer.Texture == null) return; // 描画できるものがない
+
+            var p = NewParams();
+            p.LayerTex  = layer.Texture;
+            p.LayerRect = LayerRectOf(layer);
+            p.Opacity   = layer.UIOpacity;
+            p.BlendMode = ToShaderBlendMode(layer.BlendMode);
+            SetMaskFrom(ref p, layer);
+            p.ClipMaskTex = clipMask;
+            SetAdjustmentsFrom(ref p, layer);
+
+            // ── Color Overlay (best effort) ──
+            if (layer.Effects != null && layer.Effects.HasColorOverlay)
+            {
+                // 1) レイヤー本体を temp へ合成
+                var temp = AcquireRT(clearToTransparent: false);
+                ApplyParams(p);
+                Graphics.Blit(cur, temp, _mat);
+
+                // 2) レイヤーの実効 α 形状 (マスク・不透明度・クリップ込み) を取得
+                var shape = RenderLayerAlpha(layer, clipMask);
+
+                // 3) オーバーレイ色を実効 α でクリップして temp → next へ合成
+                var op = NewParams();
+                op.LayerTex    = GetSolidTexture(layer.Effects.OverlayColor);
+                op.LayerRect   = FullCanvasRect;
+                op.Opacity     = layer.Effects.OverlayOpacity;
+                op.BlendMode   = ToShaderBlendMode(layer.Effects.OverlayBlendMode);
+                op.ClipMaskTex = shape;
+                ApplyParams(op);
+                Graphics.Blit(temp, next, _mat);
+                Swap(ref cur, ref next);
+
+                ReleaseToPool(temp);
+                ReleaseToPool(shape);
+                return;
+            }
+
+            ApplyParams(p);
+            Graphics.Blit(cur, next, _mat);
+            Swap(ref cur, ref next);
+        }
+
+        // グループ平坦化結果などキャンバス全面のテクスチャを 1 枚のレイヤーとして合成する
+        void BlitAsFullCanvasLayer(Texture tex, PSDLayer layer, int blendMode, RenderTexture clipMask,
+                                   ref RenderTexture cur, ref RenderTexture next)
+        {
+            var p = NewParams();
+            p.LayerTex  = tex;
+            p.LayerRect = FullCanvasRect;
+            p.Opacity   = layer.UIOpacity;
+            p.BlendMode = blendMode;
+            SetMaskFrom(ref p, layer);
+            p.ClipMaskTex = clipMask;
+            SetAdjustmentsFrom(ref p, layer);
+            ApplyParams(p);
+            Graphics.Blit(cur, next, _mat);
+            Swap(ref cur, ref next);
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        //  クリップマスク用: 実効 α の単独描画
+        // ════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// レイヤーを透明 RT へ Normal ブレンドで単独描画し、実効 α
+        /// (レイヤー α × マスク × 不透明度 × clipMask) を持つ RT を返す。
+        /// 返却 RT は使用後 ReleaseToPool すること。
+        /// </summary>
+        RenderTexture RenderLayerAlpha(PSDLayer layer, RenderTexture clipMask)
+        {
+            Texture tex;
+            Vector4 rect;
+            if (layer.Adjustment.HasSolidColor)
+            {
+                tex  = GetSolidTexture(layer.Adjustment.SolidColor);
+                rect = FullCanvasRect;
+            }
+            else if (layer.Texture != null)
+            {
+                tex  = layer.Texture;
+                rect = LayerRectOf(layer);
+            }
+            else
+            {
+                // ピクセルを持たないベース層 (調整レイヤー等) → 実効 α は全面 0
+                return AcquireRT(clearToTransparent: true);
+            }
+
+            var clearBg = AcquireRT(clearToTransparent: true);
+            var result  = AcquireRT(clearToTransparent: false);
+
+            var p = NewParams();
+            p.LayerTex  = tex;
+            p.LayerRect = rect;
+            p.Opacity   = layer.UIOpacity;
+            p.BlendMode = 0; // Normal (α の算出にブレンド関数は影響しない)
+            SetMaskFrom(ref p, layer);
+            p.ClipMaskTex = clipMask;
+            ApplyParams(p);
+            Graphics.Blit(clearBg, result, _mat);
+
+            ReleaseToPool(clearBg);
             return result;
         }
 
-        void SetAdjustmentUniforms(PSDLayer layer)
+        /// <summary>
+        /// 平坦化済みグループなど全面テクスチャの実効 α (× 不透明度 × マスク) を持つ RT を返す。
+        /// </summary>
+        RenderTexture RenderTextureAlpha(Texture tex, PSDLayer layer, RenderTexture clipMask)
         {
-            // 各パラメータをシェーダーが期待する -1..1 の範囲に正規化
-            _mat.SetFloat("_Brightness", layer.UIBrightness / 150f);   // -150..150 → -1..1
-            _mat.SetFloat("_Contrast",   layer.UIContrast   / 100f);   // -100..100 → -1..1
-            _mat.SetFloat("_Hue",        layer.UIHue        / 180f);   // -180..180 → -1..1
-            _mat.SetFloat("_Saturation", layer.UISaturation / 100f);   // -100..100 → -1..1
-            _mat.SetFloat("_Lightness",  layer.UILightness  / 100f);   // -100..100 → -1..1
+            var clearBg = AcquireRT(clearToTransparent: true);
+            var result  = AcquireRT(clearToTransparent: false);
+
+            var p = NewParams();
+            p.LayerTex  = tex;
+            p.LayerRect = FullCanvasRect;
+            p.Opacity   = layer.UIOpacity;
+            p.BlendMode = 0; // Normal
+            SetMaskFrom(ref p, layer);
+            p.ClipMaskTex = clipMask;
+            ApplyParams(p);
+            Graphics.Blit(clearBg, result, _mat);
+
+            ReleaseToPool(clearBg);
+            return result;
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        //  uniform 一括設定 (Material はステートフルなため毎回全 uniform を明示設定)
+        // ════════════════════════════════════════════════════════════════
+
+        /// <summary>1 回の Blit に必要な全 uniform 値。未設定スロットは安全な既定値になる。</summary>
+        struct DrawParams
+        {
+            public Texture LayerTex;     // null → 黒テクスチャ (未使用スロットの掃除)
+            public Vector4 LayerRect;    // (L, T, W, H) PSD 座標
+            public float   Opacity;      // 0..1
+            public int     BlendMode;    // BlendMode enum の int 値 (シェーダー分岐番号)
+            public bool    IsAdjustment;
+            public Texture MaskTex;      // null → _HasMask = 0
+            public Vector4 MaskRect;
+            public float   MaskDefault;  // 0..1
+            public Texture ClipMaskTex;  // null → _HasClipMask = 0
+            public float   Brightness, Contrast, Hue, Saturation, Lightness; // 正規化済み -1..1
+        }
+
+        static DrawParams NewParams()
+        {
+            return new DrawParams
+            {
+                LayerTex    = null,
+                LayerRect   = new Vector4(0, 0, 1, 1),
+                Opacity     = 1f,
+                BlendMode   = 0,
+                IsAdjustment = false,
+                MaskTex     = null,
+                MaskRect    = new Vector4(0, 0, 1, 1),
+                MaskDefault = 1f,
+                ClipMaskTex = null,
+                Brightness = 0f, Contrast = 0f, Hue = 0f, Saturation = 0f, Lightness = 0f
+            };
+        }
+
+        /// <summary>
+        /// 全関連 uniform を毎回明示的に設定する (前レイヤーの値が残る事故の防止)。
+        /// </summary>
+        void ApplyParams(in DrawParams p)
+        {
+            _mat.SetVector("_CanvasSize", new Vector4(_canvasW, _canvasH, 0, 0));
+
+            // レイヤー
+            _mat.SetTexture("_LayerTex", p.LayerTex != null ? p.LayerTex : Texture2D.blackTexture);
+            _mat.SetVector ("_LayerRect", p.LayerRect);
+            _mat.SetFloat  ("_Opacity",   Mathf.Clamp01(p.Opacity));
+            _mat.SetInt    ("_BlendMode", p.BlendMode);
+            _mat.SetInt    ("_IsAdjustment", p.IsAdjustment ? 1 : 0);
+
+            // レイヤーマスク (無効マスクは CPU 側で MaskTex = null とし _HasMask = 0 にする)
+            bool hasMask = p.MaskTex != null;
+            _mat.SetInt    ("_HasMask",     hasMask ? 1 : 0);
+            _mat.SetTexture("_MaskTex",     hasMask ? p.MaskTex : (Texture)Texture2D.whiteTexture);
+            _mat.SetVector ("_MaskRect",    hasMask ? p.MaskRect : new Vector4(0, 0, 1, 1));
+            _mat.SetFloat  ("_MaskDefault", hasMask ? Mathf.Clamp01(p.MaskDefault) : 1f);
+
+            // クリッピングマスク
+            bool hasClip = p.ClipMaskTex != null;
+            _mat.SetInt    ("_HasClipMask", hasClip ? 1 : 0);
+            _mat.SetTexture("_ClipMaskTex", hasClip ? p.ClipMaskTex : (Texture)Texture2D.whiteTexture);
+
+            // 色調補正 (通常パスでもレイヤー色へ適用される。REWRITE_SPEC.md §3)
+            _mat.SetFloat("_Brightness", Mathf.Clamp(p.Brightness, -1f, 1f));
+            _mat.SetFloat("_Contrast",   Mathf.Clamp(p.Contrast,   -1f, 1f));
+            _mat.SetFloat("_Hue",        Mathf.Clamp(p.Hue,        -1f, 1f));
+            _mat.SetFloat("_Saturation", Mathf.Clamp(p.Saturation, -1f, 1f));
+            _mat.SetFloat("_Lightness",  Mathf.Clamp(p.Lightness,  -1f, 1f));
+        }
+
+        // レイヤーのマスク情報を DrawParams へ反映 (無効・テクスチャなしは「マスクなし」扱い)
+        static void SetMaskFrom(ref DrawParams p, PSDLayer layer)
+        {
+            if (!layer.HasMask || layer.MaskTexture == null || layer.MaskIsDisabled) return;
+            p.MaskTex     = layer.MaskTexture;
+            p.MaskRect    = new Vector4(
+                layer.MaskLeft, layer.MaskTop,
+                layer.MaskRight - layer.MaskLeft, layer.MaskBottom - layer.MaskTop);
+            p.MaskDefault = layer.MaskDefaultColor / 255f;
+        }
+
+        // UI 調整値を契約どおりの除数で正規化して反映 (REWRITE_SPEC.md §3)
+        static void SetAdjustmentsFrom(ref DrawParams p, PSDLayer layer)
+        {
+            p.Brightness = layer.UIBrightness / 150f;
+            p.Contrast   = layer.UIContrast   / 100f;
+            p.Hue        = layer.UIHue        / 180f;
+            p.Saturation = layer.UISaturation / 100f;
+            p.Lightness  = layer.UILightness  / 100f;
+        }
+
+        // PassThrough / Unknown はシェーダー上 Normal として扱う
+        static int ToShaderBlendMode(BlendMode mode)
+        {
+            if (mode == BlendMode.PassThrough || mode == BlendMode.Unknown)
+                return (int)BlendMode.Normal;
+            return (int)mode;
+        }
+
+        Vector4 FullCanvasRect => new Vector4(0, 0, _canvasW, _canvasH);
+
+        static Vector4 LayerRectOf(PSDLayer layer)
+            => new Vector4(layer.Left, layer.Top, layer.Width, layer.Height);
+
+        // ════════════════════════════════════════════════════════════════
+        //  RenderTexture / ソリッドテクスチャ ユーティリティ
+        // ════════════════════════════════════════════════════════════════
+
+        RenderTexture CreateRT()
+        {
+            // sRGB 変換を通さない Linear RT (REWRITE_SPEC.md §3 色空間【凍結】)
+            var rt = new RenderTexture(_canvasW, _canvasH, 0,
+                RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear)
+            { hideFlags = HideFlags.HideAndDontSave };
+            rt.Create();
+            return rt;
+        }
+
+        RenderTexture AcquireRT(bool clearToTransparent)
+        {
+            var rt = _pool.Count > 0 ? _pool.Pop() : CreateRT();
+            if (clearToTransparent) ClearRT(rt);
+            return rt;
+        }
+
+        void ReleaseToPool(RenderTexture rt)
+        {
+            if (rt == null) return;
+            _pool.Push(rt);
         }
 
         static void ClearRT(RenderTexture rt)
@@ -125,11 +551,31 @@ namespace PSDSimpleEditor
             RenderTexture.active = prev;
         }
 
-        public void Dispose()
+        static void Swap(ref RenderTexture a, ref RenderTexture b)
         {
-            if (_mat  != null) { Object.DestroyImmediate(_mat);           }
-            if (_rtA  != null) { _rtA.Release(); Object.DestroyImmediate(_rtA); }
-            if (_rtB  != null) { _rtB.Release(); Object.DestroyImmediate(_rtB); }
+            var t = a; a = b; b = t;
+        }
+
+        static void ReleaseRT(ref RenderTexture rt)
+        {
+            if (rt == null) return;
+            rt.Release();
+            Object.DestroyImmediate(rt);
+            rt = null;
+        }
+
+        // SoCo / Color Overlay 用の 1×1 ソリッドテクスチャ (色ごとにキャッシュ)
+        Texture2D GetSolidTexture(Color color)
+        {
+            if (_solidCache.TryGetValue(color, out var cached) && cached != null)
+                return cached;
+
+            var tex = new Texture2D(1, 1, TextureFormat.RGBA32, false, linear: true)
+            { hideFlags = HideFlags.HideAndDontSave };
+            tex.SetPixel(0, 0, color);
+            tex.Apply(false);
+            _solidCache[color] = tex;
+            return tex;
         }
     }
 }

@@ -1,56 +1,86 @@
-// PSD Simple Editor - Layer Blend Shader
-// ブレンドモード (通常/乗算/スクリーン/オーバーレイ) と
-// 色調補正 (明るさ/コントラスト/色相/彩度/明度) を GPU 上で処理する。
+// ─────────────────────────────────────────────────────────────────────────────
+// PSD Simple Editor — LayerBlend.shader
+//
+// 1 パスで「レイヤー画像 + レイヤーマスク + クリッピングマスク + 色調補正」を
+// 背景 (_MainTex) に合成するシェーダー。
+//
+// 契約 (REWRITE_SPEC.md §2, §3):
+//   - uniform の名前・型・意味は凍結 (C# コンポジターが依存)
+//   - _BlendMode の分岐番号 = BlendMode enum の int 値 (0..27, 未知は Normal)
+//   - 演算はすべてサンプリング値そのまま (sRGB 値)。gamma/linear 変換禁止
+//   - 合成式はストレートアルファの Photoshop / W3C compositing 準拠:
+//       αo = αs + αb·(1-αs)
+//       Co = ( αs·(1-αb)·Cs + αs·αb·B(Cb,Cs) + (1-αs)·αb·Cb ) / αo   (αo=0 → 0)
+// ─────────────────────────────────────────────────────────────────────────────
 
 Shader "PSDSimpleEditor/LayerBlend"
 {
     Properties
     {
-        _MainTex      ("Background",                  2D) = "white"  {}
-        _LayerTex     ("Layer Texture",               2D) = "clear"  {}
-        _CanvasSize   ("Canvas Size (W, H, -, -)",    Vector) = (1, 1, 0, 0)
-        _LayerRect    ("Layer Rect (L, T, W, H)",     Vector) = (0, 0, 1, 1)
-        _Opacity      ("Opacity",                     Float)  = 1.0
-        _BlendMode    ("Blend Mode (0=Norm 1=Mul 2=Scr 3=Ovr)", Int) = 0
-        _IsAdjustment ("Is Adjustment Pass",          Int)    = 0
-
-        // 色調補正パラメータ (正規化済み: Brightness -1..1 / Contrast -1..1 /
-        //                    Hue -1..1 / Saturation -1..1 / Lightness -1..1)
-        _Brightness   ("Brightness",  Float) = 0
-        _Contrast     ("Contrast",    Float) = 0
-        _Hue          ("Hue",         Float) = 0
-        _Saturation   ("Saturation",  Float) = 0
-        _Lightness    ("Lightness",   Float) = 0
+        _MainTex      ("背景 (Blit ソース)",            2D)     = "black" {}
+        _LayerTex     ("レイヤー画像",                  2D)     = "black" {}
+        _MaskTex      ("レイヤーマスク (.r)",           2D)     = "white" {}
+        _ClipMaskTex  ("クリッピングマスク (.a)",       2D)     = "white" {}
+        _CanvasSize   ("キャンバスサイズ (W,H,0,0) px", Vector) = (1,1,0,0)
+        _LayerRect    ("レイヤー矩形 (L,T,W,H) px",     Vector) = (0,0,1,1)
+        _MaskRect     ("マスク矩形 (L,T,W,H) px",       Vector) = (0,0,1,1)
+        _MaskDefault  ("マスク矩形外の値 0..1",         Float)  = 1
+        _Opacity      ("不透明度 0..1",                 Float)  = 1
+        _BlendMode    ("ブレンドモード番号 (§2)",       Int)    = 0
+        _IsAdjustment ("調整パス 0/1",                  Int)    = 0
+        _HasMask      ("マスク有効 0/1",                Int)    = 0
+        _HasClipMask  ("クリップマスク有効 0/1",        Int)    = 0
+        _Brightness   ("明るさ -1..1 (実値/150)",       Float)  = 0
+        _Contrast     ("コントラスト -1..1 (実値/100)", Float)  = 0
+        _Hue          ("色相 -1..1 (実値/180)",         Float)  = 0
+        _Saturation   ("彩度 -1..1 (実値/100)",         Float)  = 0
+        _Lightness    ("明度 -1..1 (実値/100)",         Float)  = 0
     }
 
     SubShader
     {
-        Tags { "RenderType"="Opaque" }
-        Cull Off  ZWrite Off  ZTest Always
+        // エディタ内 Blit 専用。深度・カリングは一切使わない
+        Cull Off
+        ZWrite Off
+        ZTest Always
 
         Pass
         {
             CGPROGRAM
             #pragma vertex   vert
             #pragma fragment frag
+            #pragma target   3.0
             #include "UnityCG.cginc"
 
-            // ── Uniforms ──────────────────────────────────────────────
-            sampler2D _MainTex;
-            sampler2D _LayerTex;
-            float4    _CanvasSize;
-            float4    _LayerRect;
-            float     _Opacity;
-            int       _BlendMode;
-            int       _IsAdjustment;
-            float     _Brightness;
-            float     _Contrast;
-            float     _Hue;
-            float     _Saturation;
-            float     _Lightness;
+            // ════════════════════════════════════════════════════════════════
+            //  uniform (REWRITE_SPEC.md §3【凍結】)
+            // ════════════════════════════════════════════════════════════════
+            sampler2D _MainTex;       // 背景 (Graphics.Blit のソース)
+            sampler2D _LayerTex;      // レイヤー画像
+            sampler2D _MaskTex;       // レイヤーマスク (.r 参照)
+            sampler2D _ClipMaskTex;   // クリッピングマスク (キャンバス全面 RT, .a 参照)
+            float4    _CanvasSize;    // (キャンバス幅, 高さ, 0, 0) px
+            float4    _LayerRect;     // (L, T, W, H) — PSD 座標 (左上原点) px
+            float4    _MaskRect;      // (L, T, W, H) — 同上
+            float     _MaskDefault;   // マスク矩形外の値 0..1
+            float     _Opacity;       // 0..1
+            int       _BlendMode;     // §2 の番号
+            int       _IsAdjustment;  // 1 = 調整パス (背景へ色調補正)
+            int       _HasMask;       // 0/1
+            int       _HasClipMask;   // 0/1
+            float     _Brightness;    // -1..1 (実値 / 150)
+            float     _Contrast;      // -1..1 (実値 / 100)
+            float     _Hue;           // -1..1 (実値 / 180)
+            float     _Saturation;    // -1..1 (実値 / 100)
+            float     _Lightness;     // -1..1 (実値 / 100)
 
-            // ── Vertex ────────────────────────────────────────────────
-            struct appdata { float4 vertex : POSITION; float2 uv : TEXCOORD0; };
+            // ゼロ除算ガード用の微小値
+            #define EPS 1e-5
+
+            // ════════════════════════════════════════════════════════════════
+            //  頂点シェーダー (フルスクリーン Blit クアッドをそのまま通す)
+            // ════════════════════════════════════════════════════════════════
+            struct appdata { float4 vertex : POSITION;    float2 uv : TEXCOORD0; };
             struct v2f     { float4 pos    : SV_POSITION; float2 uv : TEXCOORD0; };
 
             v2f vert(appdata v)
@@ -61,39 +91,261 @@ Shader "PSDSimpleEditor/LayerBlend"
                 return o;
             }
 
-            // ── ブレンドモード関数 ────────────────────────────────────
-            float3 BlendNormal  (float3 bg, float3 fg) { return fg; }
-            float3 BlendMultiply(float3 bg, float3 fg) { return bg * fg; }
-            float3 BlendScreen  (float3 bg, float3 fg) { return 1.0 - (1.0 - bg) * (1.0 - fg); }
-            float3 BlendOverlay (float3 bg, float3 fg)
+            // ════════════════════════════════════════════════════════════════
+            //  非分離型ブレンド用ヘルパー (W3C compositing-1 仕様の式)
+            // ════════════════════════════════════════════════════════════════
+
+            // 輝度 (W3C: 0.3R + 0.59G + 0.11B)
+            float Lum(float3 c)
             {
-                return lerp(
-                    2.0 * bg * fg,
-                    1.0 - 2.0 * (1.0 - bg) * (1.0 - fg),
-                    step(0.5, bg));
+                return dot(c, float3(0.3, 0.59, 0.11));
             }
 
-            // ── RGB ↔ HSL 変換 ────────────────────────────────────────
+            // 輝度を保ったまま成分を [0,1] へ収める
+            float3 ClipColor(float3 c)
+            {
+                float l = Lum(c);
+                float n = min(c.r, min(c.g, c.b));
+                float x = max(c.r, max(c.g, c.b));
+                if (n < 0.0) c = l + (c - l) * (l       / max(l - n, EPS));
+                if (x > 1.0) c = l + (c - l) * ((1.0-l) / max(x - l, EPS));
+                return c;
+            }
+
+            // 輝度を lum に置き換える
+            float3 SetLum(float3 c, float lum)
+            {
+                return ClipColor(c + (lum - Lum(c)));
+            }
+
+            // 彩度 (最大成分 − 最小成分)
+            float Sat(float3 c)
+            {
+                return max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
+            }
+
+            // 彩度を s に置き換える
+            // (W3C SetSat: min→0, max→s, mid→比例。線形正規化と等価)
+            float3 SetSat(float3 c, float s)
+            {
+                float mn = min(c.r, min(c.g, c.b));
+                float mx = max(c.r, max(c.g, c.b));
+                if (mx - mn < EPS) return float3(0, 0, 0); // 無彩色
+                return (c - mn) / (mx - mn) * s;
+            }
+
+            // ════════════════════════════════════════════════════════════════
+            //  分離型ブレンド関数 B(Cb, Cs)  — Cb=背景色, Cs=レイヤー色
+            //  Photoshop 準拠の式。ゼロ除算は EPS でガード
+            // ════════════════════════════════════════════════════════════════
+
+            // Multiply: 乗算
+            float3 B_Multiply(float3 cb, float3 cs) { return cb * cs; }
+
+            // Screen: スクリーン
+            float3 B_Screen(float3 cb, float3 cs) { return cb + cs - cb * cs; }
+
+            // Overlay: オーバーレイ (背景が暗→乗算, 明→スクリーン)
+            float3 B_Overlay(float3 cb, float3 cs)
+            {
+                return lerp(2.0 * cb * cs,
+                            1.0 - 2.0 * (1.0 - cb) * (1.0 - cs),
+                            step(0.5, cb));
+            }
+
+            // Darken: 比較(暗)
+            float3 B_Darken(float3 cb, float3 cs) { return min(cb, cs); }
+
+            // Lighten: 比較(明)
+            float3 B_Lighten(float3 cb, float3 cs) { return max(cb, cs); }
+
+            // ColorBurn: 焼き込みカラー (cs=0 のとき cb=1 なら 1, それ以外 0)
+            float3 B_ColorBurn(float3 cb, float3 cs)
+            {
+                return 1.0 - min(1.0, (1.0 - cb) / max(cs, EPS));
+            }
+
+            // ColorDodge: 覆い焼きカラー (cs=1 のとき cb=0 なら 0, それ以外 1)
+            float3 B_ColorDodge(float3 cb, float3 cs)
+            {
+                return min(1.0, cb / max(1.0 - cs, EPS));
+            }
+
+            // LinearBurn: 焼き込み(リニア)
+            float3 B_LinearBurn(float3 cb, float3 cs) { return max(cb + cs - 1.0, 0.0); }
+
+            // LinearDodge: 覆い焼き(リニア) = 加算
+            float3 B_LinearDodge(float3 cb, float3 cs) { return min(cb + cs, 1.0); }
+
+            // SoftLight: ソフトライト (W3C/PDF 式)
+            float SoftLightD(float x)
+            {
+                return (x <= 0.25) ? ((16.0 * x - 12.0) * x + 4.0) * x : sqrt(x);
+            }
+            float SoftLight1(float cb, float cs)
+            {
+                if (cs <= 0.5)
+                    return cb - (1.0 - 2.0 * cs) * cb * (1.0 - cb);
+                else
+                    return cb + (2.0 * cs - 1.0) * (SoftLightD(cb) - cb);
+            }
+            float3 B_SoftLight(float3 cb, float3 cs)
+            {
+                return float3(SoftLight1(cb.r, cs.r),
+                              SoftLight1(cb.g, cs.g),
+                              SoftLight1(cb.b, cs.b));
+            }
+
+            // HardLight: ハードライト (Overlay の引数入れ替え)
+            float3 B_HardLight(float3 cb, float3 cs) { return B_Overlay(cs, cb); }
+
+            // VividLight: ビビッドライト (cs<0.5 → ColorBurn, cs>=0.5 → ColorDodge)
+            float3 B_VividLight(float3 cb, float3 cs)
+            {
+                float3 burn  = 1.0 - min(1.0, (1.0 - cb) / max(2.0 * cs, EPS));
+                float3 dodge = min(1.0, cb / max(2.0 * (1.0 - cs), EPS));
+                return lerp(burn, dodge, step(0.5, cs));
+            }
+
+            // LinearLight: リニアライト
+            float3 B_LinearLight(float3 cb, float3 cs)
+            {
+                return saturate(cb + 2.0 * cs - 1.0);
+            }
+
+            // PinLight: ピンライト
+            float3 B_PinLight(float3 cb, float3 cs)
+            {
+                return lerp(min(cb, 2.0 * cs),
+                            max(cb, 2.0 * cs - 1.0),
+                            step(0.5, cs));
+            }
+
+            // HardMix: ハードミックス (cb+cs >= 1 なら 1, それ未満は 0)
+            float3 B_HardMix(float3 cb, float3 cs)
+            {
+                return step(1.0, cb + cs);
+            }
+
+            // Difference: 差の絶対値
+            float3 B_Difference(float3 cb, float3 cs) { return abs(cb - cs); }
+
+            // Exclusion: 除外
+            float3 B_Exclusion(float3 cb, float3 cs) { return cb + cs - 2.0 * cb * cs; }
+
+            // Subtract: 減算
+            float3 B_Subtract(float3 cb, float3 cs) { return max(cb - cs, 0.0); }
+
+            // Divide: 除算
+            float3 B_Divide(float3 cb, float3 cs)
+            {
+                return min(1.0, cb / max(cs, EPS));
+            }
+
+            // ════════════════════════════════════════════════════════════════
+            //  非分離型・色比較ブレンド関数
+            // ════════════════════════════════════════════════════════════════
+
+            // DarkerColor: カラー比較(暗) — 輝度が低い方を色ごと採用
+            float3 B_DarkerColor(float3 cb, float3 cs)
+            {
+                return (Lum(cs) < Lum(cb)) ? cs : cb;
+            }
+
+            // LighterColor: カラー比較(明) — 輝度が高い方を色ごと採用
+            float3 B_LighterColor(float3 cb, float3 cs)
+            {
+                return (Lum(cs) > Lum(cb)) ? cs : cb;
+            }
+
+            // Hue: 色相 (レイヤーの色相 + 背景の彩度・輝度)
+            float3 B_Hue(float3 cb, float3 cs)
+            {
+                return SetLum(SetSat(cs, Sat(cb)), Lum(cb));
+            }
+
+            // Saturation: 彩度 (レイヤーの彩度 + 背景の色相・輝度)
+            float3 B_Saturation(float3 cb, float3 cs)
+            {
+                return SetLum(SetSat(cb, Sat(cs)), Lum(cb));
+            }
+
+            // Color: カラー (レイヤーの色相・彩度 + 背景の輝度)
+            float3 B_Color(float3 cb, float3 cs)
+            {
+                return SetLum(cs, Lum(cb));
+            }
+
+            // Luminosity: 輝度 (レイヤーの輝度 + 背景の色相・彩度)
+            float3 B_Luminosity(float3 cb, float3 cs)
+            {
+                return SetLum(cb, Lum(cs));
+            }
+
+            // ════════════════════════════════════════════════════════════════
+            //  ブレンドディスパッチ
+            //  if / else if の分岐番号 = BlendMode enum の int 値 (§2【凍結】)
+            //  4 (Dissolve) と 27 (PassThrough) は呼び出し側で Normal 相当に処理
+            // ════════════════════════════════════════════════════════════════
+            float3 ApplyBlend(int mode, float3 cb, float3 cs)
+            {
+                if      (mode == 0)  return cs;                       // Normal
+                else if (mode == 1)  return B_Multiply    (cb, cs);   // Multiply
+                else if (mode == 2)  return B_Screen      (cb, cs);   // Screen
+                else if (mode == 3)  return B_Overlay     (cb, cs);   // Overlay
+                else if (mode == 4)  return cs;                       // Dissolve (α 側で処理)
+                else if (mode == 5)  return B_Darken      (cb, cs);   // Darken
+                else if (mode == 6)  return B_ColorBurn   (cb, cs);   // ColorBurn
+                else if (mode == 7)  return B_LinearBurn  (cb, cs);   // LinearBurn
+                else if (mode == 8)  return B_DarkerColor (cb, cs);   // DarkerColor
+                else if (mode == 9)  return B_Lighten     (cb, cs);   // Lighten
+                else if (mode == 10) return B_ColorDodge  (cb, cs);   // ColorDodge
+                else if (mode == 11) return B_LinearDodge (cb, cs);   // LinearDodge (Add)
+                else if (mode == 12) return B_LighterColor(cb, cs);   // LighterColor
+                else if (mode == 13) return B_SoftLight   (cb, cs);   // SoftLight
+                else if (mode == 14) return B_HardLight   (cb, cs);   // HardLight
+                else if (mode == 15) return B_VividLight  (cb, cs);   // VividLight
+                else if (mode == 16) return B_LinearLight (cb, cs);   // LinearLight
+                else if (mode == 17) return B_PinLight    (cb, cs);   // PinLight
+                else if (mode == 18) return B_HardMix     (cb, cs);   // HardMix
+                else if (mode == 19) return B_Difference  (cb, cs);   // Difference
+                else if (mode == 20) return B_Exclusion   (cb, cs);   // Exclusion
+                else if (mode == 21) return B_Subtract    (cb, cs);   // Subtract
+                else if (mode == 22) return B_Divide      (cb, cs);   // Divide
+                else if (mode == 23) return B_Hue         (cb, cs);   // Hue
+                else if (mode == 24) return B_Saturation  (cb, cs);   // Saturation
+                else if (mode == 25) return B_Color       (cb, cs);   // Color
+                else if (mode == 26) return B_Luminosity  (cb, cs);   // Luminosity
+                else if (mode == 27) return cs;                       // PassThrough (Normal 扱い)
+                else                 return cs;                       // 99 / 未知 → Normal
+            }
+
+            // ════════════════════════════════════════════════════════════════
+            //  RGB ↔ HSL 変換 (色調補正の Hue/Saturation/Lightness 用)
+            // ════════════════════════════════════════════════════════════════
+
+            // RGB → HSL (h, s, l いずれも 0..1)
             float3 RGBtoHSL(float3 c)
             {
                 float mx    = max(c.r, max(c.g, c.b));
                 float mn    = min(c.r, min(c.g, c.b));
                 float delta = mx - mn;
                 float l     = (mx + mn) * 0.5;
-                float s     = (delta < 1e-4) ? 0.0
-                              : delta / (1.0 - abs(2.0 * l - 1.0));
                 float h     = 0.0;
-                if (delta > 1e-4)
+                float s     = 0.0;
+                if (delta > EPS)
                 {
-                    if      (mx == c.r) h = fmod((c.g - c.b) / delta, 6.0);
-                    else if (mx == c.g) h = (c.b - c.r) / delta + 2.0;
-                    else                h = (c.r - c.g) / delta + 4.0;
-                    h /= 6.0;
+                    s = delta / max(1.0 - abs(2.0 * l - 1.0), EPS);
+                    if      (mx == c.r) h = (c.g - c.b) / delta;        // 赤が最大
+                    else if (mx == c.g) h = (c.b - c.r) / delta + 2.0;  // 緑が最大
+                    else                h = (c.r - c.g) / delta + 4.0;  // 青が最大
+                    h = h / 6.0;
                     if (h < 0.0) h += 1.0;
                 }
                 return float3(h, s, l);
             }
 
+            // HSL → RGB
             float3 HSLtoRGB(float3 hsl)
             {
                 float h = hsl.x;
@@ -103,86 +355,150 @@ Shader "PSDSimpleEditor/LayerBlend"
                 float x = c * (1.0 - abs(fmod(h * 6.0, 2.0) - 1.0));
                 float m = l - c * 0.5;
                 float3 rgb;
-                if      (h < 1.0/6.0) rgb = float3(c, x, 0);
-                else if (h < 2.0/6.0) rgb = float3(x, c, 0);
-                else if (h < 3.0/6.0) rgb = float3(0, c, x);
-                else if (h < 4.0/6.0) rgb = float3(0, x, c);
-                else if (h < 5.0/6.0) rgb = float3(x, 0, c);
-                else                  rgb = float3(c, 0, x);
+                if      (h < 1.0 / 6.0) rgb = float3(c, x, 0);
+                else if (h < 2.0 / 6.0) rgb = float3(x, c, 0);
+                else if (h < 3.0 / 6.0) rgb = float3(0, c, x);
+                else if (h < 4.0 / 6.0) rgb = float3(0, x, c);
+                else if (h < 5.0 / 6.0) rgb = float3(x, 0, c);
+                else                    rgb = float3(c, 0, x);
                 return saturate(rgb + m);
             }
 
-            // ── 色調補正の適用 ────────────────────────────────────────
+            // ════════════════════════════════════════════════════════════════
+            //  色調補正 (_Brightness / _Contrast / _Hue / _Saturation / _Lightness)
+            //  すべて -1..1 に正規化済み (§3)
+            // ════════════════════════════════════════════════════════════════
             float3 ApplyAdjustments(float3 col)
             {
-                // 明るさ: _Brightness は -1..1 に正規化済み
+                // ── 明るさ: 加算系 ──
                 col = saturate(col + _Brightness);
 
-                // コントラスト: _Contrast は -1..1 に正規化済み
-                // factor = 1 + _Contrast → 0(フラット) .. 2(強調)
-                float factor = 1.0 + _Contrast;
-                col = saturate((col - 0.5) * factor + 0.5);
+                // ── コントラスト: 中間値 0.5 基準のスケーリング ──
+                col = saturate((col - 0.5) * (1.0 + _Contrast) + 0.5);
 
-                // 色相・彩度・明度
-                if (abs(_Hue) > 1e-4 || abs(_Saturation) > 1e-4 || abs(_Lightness) > 1e-4)
+                // ── 色相・彩度・明度: RGB → HSL → RGB (Photoshop hue2 相当の見た目を目標) ──
+                if (abs(_Hue) > EPS || abs(_Saturation) > EPS || abs(_Lightness) > EPS)
                 {
                     float3 hsl = RGBtoHSL(col);
-                    hsl.x = frac(hsl.x + _Hue);               // 色相を円環回転
-                    hsl.y = saturate(hsl.y + _Saturation);     // 彩度
-                    hsl.z = saturate(hsl.z + _Lightness * 0.5); // 明度 (±0.5 程度に抑制)
-                    col   = HSLtoRGB(hsl);
-                }
 
+                    // 色相: _Hue=±1 が ±180° = hue 値 ±0.5 (1 周 = 1.0)
+                    hsl.x = frac(hsl.x + _Hue * 0.5 + 1.0);
+
+                    // 彩度: +側は 1/(1-x) で増幅 (+1 → 完全飽和), -側は線形減衰 (-1 → 無彩色)
+                    if (_Saturation >= 0.0)
+                        hsl.y = saturate(hsl.y / max(1.0 - _Saturation, EPS));
+                    else
+                        hsl.y = hsl.y * (1.0 + _Saturation);
+
+                    // 明度: +側は白へ, -側は黒へ lerp (Photoshop の Lightness 挙動)
+                    if (_Lightness >= 0.0)
+                        hsl.z = hsl.z + (1.0 - hsl.z) * _Lightness;
+                    else
+                        hsl.z = hsl.z * (1.0 + _Lightness);
+
+                    col = HSLtoRGB(hsl);
+                }
                 return col;
             }
 
-            // ── Fragment ──────────────────────────────────────────────
-            fixed4 frag(v2f i) : SV_Target
+            // ════════════════════════════════════════════════════════════════
+            //  Dissolve 用ハッシュノイズ (スクリーン座標 → 0..1)
+            // ════════════════════════════════════════════════════════════════
+            float Hash21(float2 p)
             {
+                return frac(sin(dot(p, float2(12.9898, 78.233))) * 43758.5453);
+            }
+
+            // ════════════════════════════════════════════════════════════════
+            //  フラグメントシェーダー
+            // ════════════════════════════════════════════════════════════════
+            float4 frag(v2f i) : SV_Target
+            {
+                // 背景 (ストレートアルファ)
                 float4 bg = tex2D(_MainTex, i.uv);
 
-                // 調整レイヤーパス: 合成せずバックグラウンドに補正だけ適用
-                if (_IsAdjustment == 1)
-                {
-                    bg.rgb = ApplyAdjustments(bg.rgb);
-                    return bg;
-                }
-
-                // ── キャンバス UV → PSD ピクセル座標変換 ──
-                // Unity UV: (u, v) = (右, 上), PSD 座標: (x, y) = (右, 下)
+                // ── キャンバス UV → PSD ピクセル座標 (左上原点)【凍結】──
                 float psdX = i.uv.x * _CanvasSize.x;
                 float psdY = (1.0 - i.uv.y) * _CanvasSize.y;
 
-                // レイヤーローカル UV
-                float layerU = (psdX - _LayerRect.x) / max(_LayerRect.z, 1.0);
-                float layerV = 1.0 - (psdY - _LayerRect.y) / max(_LayerRect.w, 1.0);
+                // ── レイヤーマスク値 (矩形外は _MaskDefault) ──
+                float maskVal = 1.0;
+                if (_HasMask == 1)
+                {
+                    float mu = (psdX - _MaskRect.x) / max(_MaskRect.z, EPS);
+                    float mv = 1.0 - (psdY - _MaskRect.y) / max(_MaskRect.w, EPS);
+                    if (mu < 0.0 || mu > 1.0 || mv < 0.0 || mv > 1.0)
+                        maskVal = _MaskDefault;
+                    else
+                        maskVal = tex2D(_MaskTex, float2(mu, mv)).r;
+                }
 
-                // レイヤー矩形の外側は描画しない
-                float inBounds = step(0.0, layerU) * step(layerU, 1.0)
-                               * step(0.0, layerV) * step(layerV, 1.0);
+                // ── クリッピングマスク値 (キャンバス全面 RT の α, キャンバス UV) ──
+                float clipVal = 1.0;
+                if (_HasClipMask == 1)
+                    clipVal = tex2D(_ClipMaskTex, i.uv).a;
 
-                // UV をクランプしてからサンプリング (範囲外サンプリングを防ぐ)
-                float4 layerCol = tex2D(_LayerTex, saturate(float2(layerU, layerV)));
+                // ════════════════════════════════════════════════════════════
+                //  調整パス: _LayerTex を使わず背景へ色調補正を適用し、
+                //  適用率 = _Opacity × マスク × クリップマスク で元の色と lerp
+                // ════════════════════════════════════════════════════════════
+                if (_IsAdjustment == 1)
+                {
+                    float  amount   = _Opacity * maskVal * clipVal;
+                    float3 adjusted = ApplyAdjustments(bg.rgb);
+                    return float4(lerp(bg.rgb, adjusted, amount), bg.a);
+                }
 
-                // 色調補正
-                layerCol.rgb = ApplyAdjustments(layerCol.rgb);
+                // ════════════════════════════════════════════════════════════
+                //  通常パス: レイヤーをサンプルして背景へブレンド
+                // ════════════════════════════════════════════════════════════
 
-                // ── ブレンドモード ──
-                float3 blended;
-                if      (_BlendMode == 1) blended = BlendMultiply(bg.rgb, layerCol.rgb);
-                else if (_BlendMode == 2) blended = BlendScreen  (bg.rgb, layerCol.rgb);
-                else if (_BlendMode == 3) blended = BlendOverlay (bg.rgb, layerCol.rgb);
-                else                      blended = BlendNormal  (bg.rgb, layerCol.rgb);
+                // ── レイヤー UV (範囲外は α=0)【凍結】──
+                float lu = (psdX - _LayerRect.x) / max(_LayerRect.z, EPS);
+                float lv = 1.0 - (psdY - _LayerRect.y) / max(_LayerRect.w, EPS);
 
-                // Porter-Duff "over" 合成
-                float alpha       = layerCol.a * _Opacity * inBounds;
-                float3 outRGB     = blended * alpha + bg.rgb * (1.0 - alpha);
-                float  outAlpha   = alpha + bg.a * (1.0 - alpha);
+                float4 layer = float4(0, 0, 0, 0);
+                if (lu >= 0.0 && lu <= 1.0 && lv >= 0.0 && lv <= 1.0)
+                    layer = tex2D(_LayerTex, float2(lu, lv));
 
-                return float4(outRGB, outAlpha);
+                // 通常パスでも色調補正はレイヤー色に適用 (グループの 1 枚畳み込み用)
+                float3 cs = ApplyAdjustments(layer.rgb);
+
+                // ── ソースα: レイヤーα × _Opacity × マスク × クリップマスク【凍結】──
+                float alphaS = layer.a * _Opacity * maskVal * clipVal;
+
+                // ── Dissolve (4): スクリーン座標ハッシュノイズで α を 0/1 化する近似 ──
+                if (_BlendMode == 4)
+                    alphaS = (Hash21(floor(i.pos.xy)) < alphaS) ? 1.0 : 0.0;
+
+                float alphaB = bg.a;
+                float3 cb    = bg.rgb;
+
+                // ── ブレンド関数 B(Cb, Cs) ──
+                float3 blended = ApplyBlend(_BlendMode, cb, cs);
+
+                // ── 合成式 (ストレートアルファ, Photoshop / W3C 準拠)【凍結】──
+                //   αo = αs + αb·(1-αs)
+                //   Co = ( αs·(1-αb)·Cs + αs·αb·B + (1-αs)·αb·Cb ) / αo
+                float alphaO = alphaS + alphaB * (1.0 - alphaS);
+                float3 co;
+                if (alphaO <= 0.0)
+                {
+                    co     = float3(0, 0, 0);
+                    alphaO = 0.0;
+                }
+                else
+                {
+                    co = ( alphaS * (1.0 - alphaB) * cs
+                         + alphaS * alphaB         * blended
+                         + (1.0 - alphaS) * alphaB * cb ) / alphaO;
+                }
+
+                return float4(co, alphaO);
             }
-
             ENDCG
         }
     }
+    // フォールバックなし (エディタ専用)
+    Fallback Off
 }

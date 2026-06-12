@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEditor;
@@ -6,49 +7,77 @@ using UnityEditor;
 namespace PSDSimpleEditor
 {
     /// <summary>
-    /// Unity エディタ拡張のメインウィンドウ。
-    /// PSD ファイルの読み込み・レイヤー操作・プレビュー・PNG 書き出しを提供する。
-    /// メニュー: Window > PSD Simple Editor
+    /// PSD Simple Editor のメインウィンドウ (REWRITE_SPEC.md §6)。
+    /// PSD の読み込み → レイヤーツリー操作 → GPU 合成プレビュー → PNG 書き出しを提供する。
     /// </summary>
     public class PSDSimpleEditorWindow : EditorWindow
     {
         [MenuItem("dennokoworks/PSD Simple Editor")]
-        static void Open() => GetWindow<PSDSimpleEditorWindow>("PSD Simple Editor");
+        static void Open()
+        {
+            var window = GetWindow<PSDSimpleEditorWindow>("PSD Simple Editor");
+            window.minSize = new Vector2(640f, 360f);
+        }
 
-        // ── State ─────────────────────────────────────────────────────
-        string           _psdPath          = "";
-        PSDFile          _psdFile;
-        LayerCompositor  _compositor;
-        Texture2D        _compositeTexture;
-        bool             _needsRecomposite;
+        // ── 定数 ───────────────────────────────────────────────────────────
+        const float LayerPanelWidth = 270f;   // 左パネル固定幅
+        const float BottomBarHeight = 22f;    // 下部バー高さ
+        const float IndentWidth     = 14f;    // ツリー 1 段あたりのインデント
+        const float CheckerCellPx   = 8f;     // チェッカー 1 マスの画面ピクセル数
+
+        // ── 状態 ───────────────────────────────────────────────────────────
+        string _psdPath = "";                 // 入力中の PSD パス (リロード後も保持)
+        bool   _showMergedRef;                // マージ済み画像の参照表示
+
+        [NonSerialized] PSDFile         _psdFile;            // 読み込み結果
+        [NonSerialized] LayerCompositor _compositor;         // GPU 合成器
+        [NonSerialized] Texture2D       _compositeTexture;   // 最新の合成結果
+        [NonSerialized] Texture2D       _checkerTexture;     // 透明部可視化用の市松テクスチャ
+        [NonSerialized] bool            _needsRecomposite;   // 変更フラグ → Repaint 時に合成
 
         Vector2 _layerScroll;
 
-        // ── Lifecycle ──────────────────────────────────────────────────
+        // ── ライフサイクル ─────────────────────────────────────────────────
 
         void OnDestroy() => Cleanup();
 
+        /// <summary>全リソースを破棄する (再ロード前・ウィンドウ破棄時)。</summary>
         void Cleanup()
         {
             _compositor?.Dispose();
             _compositor = null;
 
-            if (_compositeTexture != null)
-            {
-                DestroyImmediate(_compositeTexture);
-                _compositeTexture = null;
-            }
+            SafeDestroy(ref _compositeTexture);
+            SafeDestroy(ref _checkerTexture);
 
             if (_psdFile != null)
             {
-                foreach (var layer in _psdFile.Layers)
-                    if (layer.Texture != null)
-                        DestroyImmediate(layer.Texture);
+                DestroyLayerTexturesRecursive(_psdFile.Layers);
+                SafeDestroy(ref _psdFile.MergedComposite);
                 _psdFile = null;
+            }
+
+            _needsRecomposite = false;
+        }
+
+        /// <summary>レイヤーツリーの Texture / MaskTexture を再帰的に破棄する。</summary>
+        static void DestroyLayerTexturesRecursive(List<PSDLayer> layers)
+        {
+            if (layers == null) return;
+            foreach (var layer in layers)
+            {
+                if (layer.Texture     != null) { DestroyImmediate(layer.Texture);     layer.Texture     = null; }
+                if (layer.MaskTexture != null) { DestroyImmediate(layer.MaskTexture); layer.MaskTexture = null; }
+                DestroyLayerTexturesRecursive(layer.Children);
             }
         }
 
-        // ── GUI ────────────────────────────────────────────────────────
+        static void SafeDestroy<T>(ref T obj) where T : UnityEngine.Object
+        {
+            if (obj != null) { DestroyImmediate(obj); obj = null; }
+        }
+
+        // ── OnGUI ──────────────────────────────────────────────────────────
 
         void OnGUI()
         {
@@ -56,201 +85,383 @@ namespace PSDSimpleEditor
 
             if (_psdFile == null)
             {
-                EditorGUILayout.HelpBox("PSD ファイルを選択して「Load」ボタンを押してください。",
-                    MessageType.Info);
-                return;
+                EditorGUILayout.HelpBox("PSD ファイルを選択して「Load」を押してください。", MessageType.Info);
+            }
+            else
+            {
+                float mainHeight = position.height
+                                 - EditorStyles.toolbar.fixedHeight
+                                 - BottomBarHeight - 6f;
+
+                EditorGUILayout.BeginHorizontal(GUILayout.Height(mainHeight));
+                DrawLayerPanel(mainHeight);
+                DrawPreviewPanel();
+                EditorGUILayout.EndHorizontal();
+
+                DrawBottomBar();
             }
 
-            // メインレイアウト: 左パネル + プレビューパネル
-            float bottomBarH = 24f;
-            float mainH      = position.height - EditorStyles.toolbar.fixedHeight - bottomBarH - 4f;
-
-            EditorGUILayout.BeginHorizontal(GUILayout.Height(mainH));
-            DrawLayerPanel(mainH);
-            DrawPreviewPanel();
-            EditorGUILayout.EndHorizontal();
-
-            DrawBottomBar();
-
-            // 再合成が必要なら実行
+            // 変更があれば Repaint イベント中に再合成する (レイアウト中の構造変更を避ける)
             if (_needsRecomposite && Event.current.type == EventType.Repaint)
                 DoComposite();
         }
 
-        // ── Toolbar ────────────────────────────────────────────────────
+        // ── ツールバー ─────────────────────────────────────────────────────
 
         void DrawToolbar()
         {
             EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
 
-            GUILayout.Label("PSD File:", GUILayout.Width(58));
-            string newPath = EditorGUILayout.TextField(_psdPath, EditorStyles.toolbarTextField,
-                                 GUILayout.ExpandWidth(true));
-            if (newPath != _psdPath) _psdPath = newPath;
+            GUILayout.Label("PSD:", GUILayout.Width(32));
+            _psdPath = EditorGUILayout.TextField(_psdPath, EditorStyles.toolbarTextField,
+                                                 GUILayout.ExpandWidth(true));
 
             if (GUILayout.Button("Browse...", EditorStyles.toolbarButton, GUILayout.Width(68)))
             {
-                string path = EditorUtility.OpenFilePanel("PSD ファイルを開く", "", "psd");
-                if (!string.IsNullOrEmpty(path)) _psdPath = path;
+                string dir = "";
+                try { if (File.Exists(_psdPath)) dir = Path.GetDirectoryName(_psdPath); } catch { }
+                string picked = EditorUtility.OpenFilePanel("PSD ファイルを開く", dir, "psd");
+                if (!string.IsNullOrEmpty(picked))
+                {
+                    _psdPath = picked;
+                    GUI.FocusControl(null);  // テキストフィールドの古い表示を解除
+                }
             }
 
             if (GUILayout.Button("Load", EditorStyles.toolbarButton, GUILayout.Width(44)))
                 LoadPSD();
 
+            GUILayout.Space(8);
+
+            _showMergedRef = GUILayout.Toggle(_showMergedRef, "マージ参照",
+                                              EditorStyles.toolbarButton, GUILayout.Width(76));
+
             EditorGUILayout.EndHorizontal();
         }
 
-        // ── Layer Panel ────────────────────────────────────────────────
+        // ── レイヤーパネル (左) ─────────────────────────────────────────────
 
         void DrawLayerPanel(float panelHeight)
         {
-            EditorGUILayout.BeginVertical(GUILayout.Width(260), GUILayout.Height(panelHeight));
-            GUILayout.Label("Layers", EditorStyles.boldLabel);
+            EditorGUILayout.BeginVertical(GUILayout.Width(LayerPanelWidth),
+                                          GUILayout.Height(panelHeight));
+            GUILayout.Label("レイヤー", EditorStyles.boldLabel);
 
-            _layerScroll = EditorGUILayout.BeginScrollView(_layerScroll, GUILayout.ExpandHeight(true));
-
-            // UI では上のレイヤーが先頭に来るよう逆順に描画
-            var layers = _psdFile.Layers;
-            for (int i = layers.Count - 1; i >= 0; i--)
-                DrawLayerItem(layers[i]);
-
+            _layerScroll = EditorGUILayout.BeginScrollView(_layerScroll,
+                                                           GUILayout.ExpandHeight(true));
+            DrawLayerListTopDown(_psdFile.Layers, 0);
             EditorGUILayout.EndScrollView();
+
             EditorGUILayout.EndVertical();
         }
 
-        void DrawLayerItem(PSDLayer layer)
+        /// <summary>
+        /// レイヤーリストを「上が最上層」になるよう逆順に描画する
+        /// (PSDFile.Layers は index 0 = 最下層)。
+        /// </summary>
+        void DrawLayerListTopDown(List<PSDLayer> layers, int indent)
         {
+            if (layers == null) return;
+            for (int i = layers.Count - 1; i >= 0; i--)
+                DrawLayerNode(layers[i], indent);
+        }
+
+        void DrawLayerNode(PSDLayer layer, int indent)
+        {
+            bool isGroup = layer.Children != null;
+
             EditorGUILayout.BeginVertical(GUI.skin.box);
 
-            // ── ヘッダ行: 表示切替 / 名前 / ブレンドモード ──
+            // ── ヘッダ行: [折りたたみ] [表示] 名前 ... ブレンド ──
             EditorGUILayout.BeginHorizontal();
 
-            bool newVis = EditorGUILayout.Toggle(layer.UIVisible, GUILayout.Width(18));
-            if (newVis != layer.UIVisible)
+            if (indent > 0)
+                GUILayout.Space(indent * IndentWidth);
+
+            if (isGroup)
             {
-                layer.UIVisible    = newVis;
+                // Foldout は ExpandWidth しないよう固定幅で配置
+                layer.IsExpanded = EditorGUILayout.Foldout(layer.IsExpanded, GUIContent.none, true);
+            }
+            else
+            {
+                GUILayout.Space(14f);
+            }
+
+            // 表示トグル → 再合成
+            bool newVisible = EditorGUILayout.Toggle(layer.UIVisible, GUILayout.Width(16));
+            if (newVisible != layer.UIVisible)
+            {
+                layer.UIVisible   = newVisible;
                 _needsRecomposite = true;
             }
 
-            string label = layer.IsAdjustmentLayer ? $"[調整] {layer.Name}" : layer.Name;
-            GUILayout.Label(label, GUILayout.ExpandWidth(true));
+            // 名前 + 種別プレフィックス
+            string label = BuildLayerLabel(layer, isGroup);
+            GUILayout.Label(new GUIContent(label, label), GUILayout.ExpandWidth(true));
 
-            GUIStyle blendStyle = EditorStyles.miniLabel;
-            GUILayout.Label(layer.BlendMode.ToString(), blendStyle, GUILayout.Width(56));
+            // ブレンドモード短縮ラベル
+            BlendMode mode = isGroup ? layer.GroupBlendMode : layer.BlendMode;
+            GUILayout.Label(BlendModeShortLabel(mode), EditorStyles.miniLabel, GUILayout.Width(50));
 
             EditorGUILayout.EndHorizontal();
 
-            if (!layer.UIVisible)
+            // ── 詳細 (表示中レイヤーのみ) ──
+            if (layer.UIVisible)
             {
-                EditorGUILayout.EndVertical();
-                GUILayout.Space(2);
-                return;
-            }
-
-            // ── 不透明度スライダー (ピクセルレイヤーのみ) ──
-            if (!layer.IsAdjustmentLayer)
-            {
-                float newOp = SliderField("Opacity", layer.UIOpacity, 0f, 1f, 50f);
-                if (Math.Abs(newOp - layer.UIOpacity) > 0.001f)
+                if (isGroup)
                 {
-                    layer.UIOpacity   = newOp;
-                    _needsRecomposite = true;
+                    // グループ自身の不透明度 (PassThrough 以外で合成に効く)
+                    DrawOpacitySlider(layer, indent);
+
+                    if (layer.IsExpanded)
+                        DrawLayerListTopDown(layer.Children, indent + 1);
+                }
+                else
+                {
+                    DrawLayerControls(layer, indent);
                 }
             }
 
-            // ── 明るさ / コントラスト ──
-            if (layer.Adjustment.HasBrightnessContrast)
-            {
-                GUILayout.Label("Brightness / Contrast", EditorStyles.miniLabel);
+            EditorGUILayout.EndVertical();
+            GUILayout.Space(1);
+        }
 
-                float nb = SliderField("Bright", layer.UIBrightness, -150f, 150f, 50f);
-                if (Math.Abs(nb - layer.UIBrightness) > 0.1f)
+        /// <summary>種別プレフィックス付きのレイヤー名を組み立てる。</summary>
+        static string BuildLayerLabel(PSDLayer layer, bool isGroup)
+        {
+            string prefix = "";
+
+            if (isGroup)
+                prefix += "[フォルダ] ";
+            if (layer.IsClipping)
+                prefix += "[クリップ] ";
+            if (layer.HasMask)
+                prefix += layer.MaskIsDisabled ? "[マスク無効] " : "[マスク] ";
+
+            if (layer.Adjustment != null && layer.Adjustment.HasSolidColor)
+                prefix += "[SoCo] ";
+            else if (!isGroup && layer.IsAdjustmentLayer &&
+                     layer.Adjustment != null &&
+                     (layer.Adjustment.HasBrightnessContrast || layer.Adjustment.HasHueSaturation))
+                prefix += "[調整] ";
+
+            if (layer.Effects != null && layer.Effects.HasColorOverlay)
+                prefix += "[CO] ";
+
+            return prefix + layer.Name;
+        }
+
+        /// <summary>非グループレイヤーの詳細コントロール。</summary>
+        void DrawLayerControls(PSDLayer layer, int indent)
+        {
+            // 不透明度
+            DrawOpacitySlider(layer, indent);
+
+            // 明るさ・コントラスト (brit / CgEd)
+            if (layer.Adjustment != null && layer.Adjustment.HasBrightnessContrast)
+            {
+                float nb = IndentedSlider("明るさ", layer.UIBrightness, -150f, 150f, indent);
+                float nc = IndentedSlider("ｺﾝﾄﾗｽﾄ", layer.UIContrast,    -50f, 100f, indent);
+                if (!Mathf.Approximately(nb, layer.UIBrightness) ||
+                    !Mathf.Approximately(nc, layer.UIContrast))
                 {
                     layer.UIBrightness = nb;
+                    layer.UIContrast   = nc;
                     _needsRecomposite  = true;
-                }
-
-                float nc = SliderField("Contrast", layer.UIContrast, -50f, 100f, 50f);
-                if (Math.Abs(nc - layer.UIContrast) > 0.1f)
-                {
-                    layer.UIContrast  = nc;
-                    _needsRecomposite = true;
                 }
             }
 
-            // ── 色相 / 彩度 / 明度 ──
-            if (layer.Adjustment.HasHueSaturation)
+            // 色相・彩度・明度 (hue2)
+            if (layer.Adjustment != null && layer.Adjustment.HasHueSaturation)
             {
-                GUILayout.Label("Hue / Saturation / Lightness", EditorStyles.miniLabel);
-
-                float nh = SliderField("Hue",  layer.UIHue,        -180f, 180f, 50f);
-                if (Math.Abs(nh - layer.UIHue) > 0.1f)
+                float nh = IndentedSlider("色相", layer.UIHue,        -180f, 180f, indent);
+                float ns = IndentedSlider("彩度", layer.UISaturation, -100f, 100f, indent);
+                float nl = IndentedSlider("明度", layer.UILightness,  -100f, 100f, indent);
+                if (!Mathf.Approximately(nh, layer.UIHue) ||
+                    !Mathf.Approximately(ns, layer.UISaturation) ||
+                    !Mathf.Approximately(nl, layer.UILightness))
                 {
-                    layer.UIHue       = nh;
-                    _needsRecomposite = true;
-                }
-
-                float ns = SliderField("Sat",  layer.UISaturation, -100f, 100f, 50f);
-                if (Math.Abs(ns - layer.UISaturation) > 0.1f)
-                {
+                    layer.UIHue        = nh;
                     layer.UISaturation = ns;
-                    _needsRecomposite  = true;
-                }
-
-                float nl = SliderField("Light", layer.UILightness, -100f, 100f, 50f);
-                if (Math.Abs(nl - layer.UILightness) > 0.1f)
-                {
                     layer.UILightness  = nl;
                     _needsRecomposite  = true;
                 }
             }
 
-            // ── ベタ塗り情報 ──
-            if (layer.Adjustment.HasSolidColor)
-                GUILayout.Label("SoCo (ベタ塗り)", EditorStyles.miniLabel);
+            // ベタ塗りカラー (SoCo)
+            if (layer.Adjustment != null && layer.Adjustment.HasSolidColor)
+            {
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.Space(indent * IndentWidth + 18f);
+                GUILayout.Label("塗り色", EditorStyles.miniLabel, GUILayout.Width(44));
+                Color nc = EditorGUILayout.ColorField(layer.Adjustment.SolidColor);
+                EditorGUILayout.EndHorizontal();
+                if (nc != layer.Adjustment.SolidColor)
+                {
+                    layer.Adjustment.SolidColor = nc;
+                    _needsRecomposite = true;
+                }
+            }
 
-            EditorGUILayout.EndVertical();
-            GUILayout.Space(2);
+            // マスクの有効/無効表示
+            if (layer.HasMask)
+            {
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.Space(indent * IndentWidth + 18f);
+                GUILayout.Label("マスク: " + (layer.MaskIsDisabled ? "無効" : "有効"),
+                                EditorStyles.miniLabel);
+                EditorGUILayout.EndHorizontal();
+            }
         }
 
-        // ラベル + スライダーのヘルパー
-        static float SliderField(string label, float value, float min, float max, float labelWidth)
+        void DrawOpacitySlider(PSDLayer layer, int indent)
+        {
+            float newOpacity = IndentedSlider("不透明度", layer.UIOpacity, 0f, 1f, indent);
+            if (!Mathf.Approximately(newOpacity, layer.UIOpacity))
+            {
+                layer.UIOpacity   = newOpacity;
+                _needsRecomposite = true;
+            }
+        }
+
+        /// <summary>インデント付きのラベル + スライダー 1 行。</summary>
+        static float IndentedSlider(string label, float value, float min, float max, int indent)
         {
             EditorGUILayout.BeginHorizontal();
-            GUILayout.Label(label, GUILayout.Width(labelWidth));
+            GUILayout.Space(indent * IndentWidth + 18f);
+            GUILayout.Label(label, EditorStyles.miniLabel, GUILayout.Width(48));
             float result = EditorGUILayout.Slider(value, min, max);
             EditorGUILayout.EndHorizontal();
             return result;
         }
 
-        // ── Preview Panel ─────────────────────────────────────────────
+        /// <summary>ブレンドモードの短縮ラベル。</summary>
+        static string BlendModeShortLabel(BlendMode mode)
+        {
+            switch (mode)
+            {
+                case BlendMode.Normal:       return "Norm";
+                case BlendMode.Multiply:     return "Mul";
+                case BlendMode.Screen:       return "Scrn";
+                case BlendMode.Overlay:      return "Over";
+                case BlendMode.Dissolve:     return "Diss";
+                case BlendMode.Darken:       return "Dark";
+                case BlendMode.ColorBurn:    return "CBrn";
+                case BlendMode.LinearBurn:   return "LBrn";
+                case BlendMode.DarkerColor:  return "DkCl";
+                case BlendMode.Lighten:      return "Lite";
+                case BlendMode.ColorDodge:   return "CDdg";
+                case BlendMode.LinearDodge:  return "Add";
+                case BlendMode.LighterColor: return "LtCl";
+                case BlendMode.SoftLight:    return "SLit";
+                case BlendMode.HardLight:    return "HLit";
+                case BlendMode.VividLight:   return "VLit";
+                case BlendMode.LinearLight:  return "LLit";
+                case BlendMode.PinLight:     return "PLit";
+                case BlendMode.HardMix:      return "HMix";
+                case BlendMode.Difference:   return "Diff";
+                case BlendMode.Exclusion:    return "Excl";
+                case BlendMode.Subtract:     return "Sub";
+                case BlendMode.Divide:       return "Div";
+                case BlendMode.Hue:          return "Hue";
+                case BlendMode.Saturation:   return "Sat";
+                case BlendMode.Color:        return "Colr";
+                case BlendMode.Luminosity:   return "Lum";
+                case BlendMode.PassThrough:  return "Pass";
+                default:                     return "?";
+            }
+        }
+
+        // ── プレビューパネル (右) ───────────────────────────────────────────
 
         void DrawPreviewPanel()
         {
             EditorGUILayout.BeginVertical();
-            GUILayout.Label("Preview", EditorStyles.boldLabel);
+            GUILayout.Label("プレビュー", EditorStyles.boldLabel);
 
-            Rect area = GUILayoutUtility.GetRect(
-                GUIContent.none, GUIStyle.none,
-                GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+            Rect area = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
+                                                 GUILayout.ExpandWidth(true),
+                                                 GUILayout.ExpandHeight(true));
 
-            if (_compositeTexture != null)
+            if (Event.current.type == EventType.Repaint)
             {
-                Rect drawRect = FitRect(area,
-                    (float)_compositeTexture.width / _compositeTexture.height);
-                GUI.DrawTexture(drawRect, _compositeTexture, ScaleMode.StretchToFill, true);
-            }
-            else
-            {
-                GUI.Label(area, "プレビューなし", EditorStyles.centeredGreyMiniLabel);
+                if (_compositeTexture != null && area.width > 8f && area.height > 8f)
+                {
+                    float aspect   = (float)_compositeTexture.width / _compositeTexture.height;
+                    Rect  drawRect = FitRectKeepAspect(area, aspect);
+
+                    // 透明部可視化のチェッカー背景 → その上にアルファ合成で描画
+                    DrawCheckerBackground(drawRect);
+                    GUI.DrawTexture(drawRect, _compositeTexture, ScaleMode.StretchToFill, true);
+
+                    // マージ済み画像の参照小窓 (右下)
+                    if (_showMergedRef && _psdFile != null && _psdFile.MergedComposite != null)
+                        DrawMergedOverlay(area);
+                }
+                else
+                {
+                    GUI.Label(area, "プレビューなし", EditorStyles.centeredGreyMiniLabel);
+                }
             }
 
             EditorGUILayout.EndVertical();
         }
 
-        static Rect FitRect(Rect area, float texAspect)
+        /// <summary>マージ済み画像を右下に小窓で重ね描きする。</summary>
+        void DrawMergedOverlay(Rect area)
         {
-            float areaAspect = area.width / area.height;
+            Texture2D merged = _psdFile.MergedComposite;
+            float maxSize = Mathf.Min(area.width, area.height) * 0.3f;
+            if (maxSize < 32f) return;
+
+            var box = new Rect(area.xMax - maxSize - 6f, area.yMax - maxSize - 6f,
+                               maxSize, maxSize);
+            Rect fit = FitRectKeepAspect(box, (float)merged.width / merged.height);
+
+            // 枠 + チェッカー + 画像 + ラベル
+            EditorGUI.DrawRect(new Rect(fit.x - 1, fit.y - 1, fit.width + 2, fit.height + 2),
+                               new Color(0f, 0f, 0f, 0.8f));
+            DrawCheckerBackground(fit);
+            GUI.DrawTexture(fit, merged, ScaleMode.StretchToFill, true);
+            GUI.Label(new Rect(fit.x, fit.y - 15f, fit.width, 14f),
+                      "マージ参照", EditorStyles.centeredGreyMiniLabel);
+        }
+
+        /// <summary>指定矩形にチェッカーパターンをタイル描画する。</summary>
+        void DrawCheckerBackground(Rect rect)
+        {
+            EnsureCheckerTexture();
+            if (_checkerTexture == null) return;
+
+            // 2×2 テクスチャの 1 テクセルを CheckerCellPx px で繰り返す
+            var coords = new Rect(0f, 0f,
+                                  rect.width  / (CheckerCellPx * 2f),
+                                  rect.height / (CheckerCellPx * 2f));
+            GUI.DrawTextureWithTexCoords(rect, _checkerTexture, coords, false);
+        }
+
+        /// <summary>市松テクスチャを (再) 生成する。ドメインリロード後にも対応。</summary>
+        void EnsureCheckerTexture()
+        {
+            if (_checkerTexture != null) return;
+
+            _checkerTexture = new Texture2D(2, 2, TextureFormat.RGBA32, false)
+            {
+                hideFlags  = HideFlags.HideAndDontSave,
+                filterMode = FilterMode.Point,
+                wrapMode   = TextureWrapMode.Repeat,
+            };
+            var bright = new Color32(190, 190, 190, 255);
+            var dark   = new Color32(127, 127, 127, 255);
+            _checkerTexture.SetPixels32(new[] { bright, dark, dark, bright });
+            _checkerTexture.Apply(false);
+        }
+
+        /// <summary>アスペクト比を維持して領域内に収め、中央配置した矩形を返す。</summary>
+        static Rect FitRectKeepAspect(Rect area, float texAspect)
+        {
+            float areaAspect = area.width / Mathf.Max(area.height, 1f);
             if (texAspect > areaAspect)
             {
                 float h = area.width / texAspect;
@@ -263,52 +474,86 @@ namespace PSDSimpleEditor
             }
         }
 
-        // ── Bottom Bar ────────────────────────────────────────────────
+        // ── 下部バー ───────────────────────────────────────────────────────
 
         void DrawBottomBar()
         {
-            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.BeginHorizontal(GUILayout.Height(BottomBarHeight));
 
-            if (_psdFile != null)
-                GUILayout.Label(
-                    $"{_psdFile.Width} × {_psdFile.Height} px  |  {_psdFile.Layers.Count} layers",
-                    EditorStyles.miniLabel);
+            GUILayout.Label(
+                $"{_psdFile.Width} × {_psdFile.Height} px  |  " +
+                $"レイヤー数: {CountLayersRecursive(_psdFile.Layers)}  |  " +
+                $"{_psdFile.BitDepth}bit  |  " +
+                ColorModeName(_psdFile.ColorMode),
+                EditorStyles.miniLabel);
 
             GUILayout.FlexibleSpace();
 
-            if (_psdFile != null && GUILayout.Button("Export PNG...", GUILayout.Width(100)))
-                ExportPNG();
+            using (new EditorGUI.DisabledScope(_compositeTexture == null))
+            {
+                if (GUILayout.Button("Export PNG...", GUILayout.Width(100)))
+                    ExportPNG();
+            }
 
             EditorGUILayout.EndHorizontal();
         }
 
-        // ── PSD 読み込み ───────────────────────────────────────────────
+        /// <summary>グループを含む全ノード数を再帰的に数える。</summary>
+        static int CountLayersRecursive(List<PSDLayer> layers)
+        {
+            if (layers == null) return 0;
+            int count = layers.Count;
+            foreach (var layer in layers)
+                count += CountLayersRecursive(layer.Children);
+            return count;
+        }
+
+        static string ColorModeName(ushort mode)
+        {
+            switch (mode)
+            {
+                case 0:  return "Bitmap";
+                case 1:  return "Grayscale";
+                case 2:  return "Indexed";
+                case 3:  return "RGB";
+                case 4:  return "CMYK";
+                case 7:  return "Multichannel";
+                case 8:  return "Duotone";
+                case 9:  return "Lab";
+                default: return $"Mode {mode}";
+            }
+        }
+
+        // ── PSD 読み込み ───────────────────────────────────────────────────
 
         void LoadPSD()
         {
             if (string.IsNullOrEmpty(_psdPath) || !File.Exists(_psdPath))
             {
-                EditorUtility.DisplayDialog("エラー", "有効な PSD ファイルを選択してください。", "OK");
+                EditorUtility.DisplayDialog("エラー", "有効な PSD ファイルを指定してください。", "OK");
                 return;
             }
 
             try
             {
-                EditorUtility.DisplayProgressBar("PSD 読み込み中", "ファイルを解析しています...", 0.3f);
-                Cleanup();
+                EditorUtility.DisplayProgressBar("PSD 読み込み中", "旧データを破棄しています...", 0.1f);
+                Cleanup();  // 旧リソースを完全破棄してから読み込む
 
-                EditorUtility.DisplayProgressBar("PSD 読み込み中", "レイヤーデータを展開しています...", 0.6f);
+                EditorUtility.DisplayProgressBar("PSD 読み込み中", "ファイルを解析しています...", 0.4f);
                 _psdFile = PSDParser.Parse(_psdPath);
 
-                EditorUtility.DisplayProgressBar("PSD 読み込み中", "コンポジターを初期化しています...", 0.9f);
-                _compositor       = new LayerCompositor(_psdFile.Width, _psdFile.Height);
-                _needsRecomposite = true;
+                EditorUtility.DisplayProgressBar("PSD 読み込み中", "コンポジターを初期化しています...", 0.85f);
+                _compositor = new LayerCompositor(_psdFile.Width, _psdFile.Height);
+                if (!_compositor.IsValid)
+                    Debug.LogWarning("[PSDSimpleEditor] コンポジターの初期化に失敗しました。" +
+                                     "LayerBlend.shader を確認してください。");
 
-                Repaint();
+                _needsRecomposite = true;
             }
             catch (Exception e)
             {
-                Debug.LogError($"[PSDSimpleEditor] PSD 読み込み失敗: {e.Message}\n{e.StackTrace}");
+                Debug.LogError($"[PSDSimpleEditor] PSD 読み込み失敗: {e}");
+                Cleanup();  // 中途半端な状態を残さない
                 EditorUtility.DisplayDialog("読み込みエラー",
                     $"PSD ファイルの読み込みに失敗しました:\n{e.Message}", "OK");
             }
@@ -316,38 +561,46 @@ namespace PSDSimpleEditor
             {
                 EditorUtility.ClearProgressBar();
             }
-        }
 
-        // ── 合成実行 ───────────────────────────────────────────────────
-
-        void DoComposite()
-        {
-            _needsRecomposite = false;
-            if (_compositor == null || !_compositor.IsValid || _psdFile == null) return;
-
-            if (_compositeTexture != null)
-            {
-                DestroyImmediate(_compositeTexture);
-                _compositeTexture = null;
-            }
-
-            _compositeTexture = _compositor.Composite(_psdFile.Layers);
             Repaint();
         }
 
-        // ── PNG エクスポート ───────────────────────────────────────────
+        // ── 合成 ───────────────────────────────────────────────────────────
+
+        /// <summary>Repaint イベント中に呼び出す。古い結果を破棄して再合成する。</summary>
+        void DoComposite()
+        {
+            _needsRecomposite = false;
+            if (_psdFile == null || _compositor == null || !_compositor.IsValid) return;
+
+            SafeDestroy(ref _compositeTexture);
+            try
+            {
+                _compositeTexture = _compositor.Composite(_psdFile.Layers);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[PSDSimpleEditor] 合成失敗: {e}");
+            }
+            Repaint();  // 新しい結果を次フレームで表示
+        }
+
+        // ── PNG 書き出し ───────────────────────────────────────────────────
 
         void ExportPNG()
         {
             if (_compositeTexture == null)
             {
-                EditorUtility.DisplayDialog("エラー", "プレビューが存在しません。先に PSD を読み込んでください。", "OK");
+                EditorUtility.DisplayDialog("エラー",
+                    "合成結果がありません。先に PSD を読み込んでください。", "OK");
                 return;
             }
 
             string defaultName = Path.GetFileNameWithoutExtension(_psdPath) + "_export";
-            string dir         = File.Exists(_psdPath) ? Path.GetDirectoryName(_psdPath) : "";
-            string savePath    = EditorUtility.SaveFilePanel("PNG として保存", dir, defaultName, "png");
+            string dir = "";
+            try { if (File.Exists(_psdPath)) dir = Path.GetDirectoryName(_psdPath); } catch { }
+
+            string savePath = EditorUtility.SaveFilePanel("PNG として保存", dir, defaultName, "png");
             if (string.IsNullOrEmpty(savePath)) return;
 
             try
@@ -359,8 +612,8 @@ namespace PSDSimpleEditor
             }
             catch (Exception e)
             {
-                Debug.LogError($"[PSDSimpleEditor] PNG 保存失敗: {e.Message}");
-                EditorUtility.DisplayDialog("エクスポートエラー",
+                Debug.LogError($"[PSDSimpleEditor] PNG 保存失敗: {e}");
+                EditorUtility.DisplayDialog("書き出しエラー",
                     $"PNG の保存に失敗しました:\n{e.Message}", "OK");
             }
         }
