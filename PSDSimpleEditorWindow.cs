@@ -405,6 +405,7 @@ namespace PSDSimpleEditor
                     layer.UILightness  = nl;
                     _needsRecomposite  = true;
                 }
+                DrawColorizeToggle(layer, indent);
             }
 
             // ベタ塗りカラー (SoCo)
@@ -480,8 +481,87 @@ namespace PSDSimpleEditor
                 layer.UILightness  = nl;
                 _needsRecomposite  = true;
             }
+            DrawColorizeToggle(layer, ci);
 
             DrawGradientMapControls(layer, ci);
+            DrawImageClipControls(layer, ci);
+        }
+
+        /// <summary>「着色」トグル。ON で絶対値の色相・彩度を強制し、白黒 (彩度0) にも色が乗る。</summary>
+        void DrawColorizeToggle(PSDLayer layer, int indent)
+        {
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(indent * IndentWidth + 18f);
+            bool en = EditorGUILayout.ToggleLeft("着色 (白黒にも色を入れる)", layer.UIColorize);
+            EditorGUILayout.EndHorizontal();
+            if (en != layer.UIColorize)
+            {
+                layer.UIColorize  = en;
+                _needsRecomposite = true;
+            }
+        }
+
+        /// <summary>画像クリップ合成: 任意画像をレイヤーα形状へクリップ・タイリング・ブレンド。</summary>
+        void DrawImageClipControls(PSDLayer layer, int indent)
+        {
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(indent * IndentWidth + 18f);
+            bool en = EditorGUILayout.ToggleLeft("画像クリップ合成", layer.UIImageClipEnabled);
+            EditorGUILayout.EndHorizontal();
+            if (en != layer.UIImageClipEnabled)
+            {
+                layer.UIImageClipEnabled = en;
+                _needsRecomposite = true;
+            }
+            if (!en) return;
+
+            // 画像
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(indent * IndentWidth + 18f);
+            GUILayout.Label("画像", EditorStyles.miniLabel, GUILayout.Width(48));
+            var tex = (Texture2D)EditorGUILayout.ObjectField(layer.UIImageClipTex, typeof(Texture2D), false);
+            EditorGUILayout.EndHorizontal();
+            if (tex != layer.UIImageClipTex)
+            {
+                layer.UIImageClipTex = tex;
+                _needsRecomposite = true;
+            }
+
+            // タイル反復数 (X,Y)
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(indent * IndentWidth + 18f);
+            GUILayout.Label("タイル", EditorStyles.miniLabel, GUILayout.Width(48));
+            Vector2 nt = EditorGUILayout.Vector2Field(GUIContent.none, layer.UIImageClipTile);
+            EditorGUILayout.EndHorizontal();
+            if (nt != layer.UIImageClipTile)
+            {
+                // 0 / 負値はタイリングが破綻するため下限でクランプ
+                layer.UIImageClipTile = new Vector2(Mathf.Max(0.01f, nt.x), Mathf.Max(0.01f, nt.y));
+                _needsRecomposite = true;
+            }
+
+            // 合成モード
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(indent * IndentWidth + 18f);
+            GUILayout.Label("合成", EditorStyles.miniLabel, GUILayout.Width(48));
+            BlendMode[] modes  = _blendModesNormal;
+            string[]    labels = _blendLabelsNormal ?? (_blendLabelsNormal = BuildBlendLabels(_blendModesNormal));
+            int curIndex = Mathf.Max(0, Array.IndexOf(modes, layer.UIImageClipBlend));
+            int newIndex = EditorGUILayout.Popup(curIndex, labels);
+            EditorGUILayout.EndHorizontal();
+            if (newIndex != curIndex)
+            {
+                layer.UIImageClipBlend = modes[newIndex];
+                _needsRecomposite = true;
+            }
+
+            // 不透明度
+            float no = IndentedSlider("不透明度", layer.UIImageClipOpacity, 0f, 1f, indent);
+            if (!Mathf.Approximately(no, layer.UIImageClipOpacity))
+            {
+                layer.UIImageClipOpacity = no;
+                _needsRecomposite = true;
+            }
         }
 
         /// <summary>グラデーションマップの有効トグル・グラデーション編集・適用率。</summary>

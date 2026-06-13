@@ -250,7 +250,8 @@ namespace PSDSimpleEditor
             if (layer.IsAdjustmentLayer && !layer.Adjustment.HasSolidColor)
             {
                 bool hasAdj = layer.Adjustment.HasBrightnessContrast
-                           || layer.Adjustment.HasHueSaturation;
+                           || layer.Adjustment.HasHueSaturation
+                           || layer.UIColorize;
                 // 補正項目を持たない調整レイヤーは素通し (バッファは変化しないため描画自体を省略)
                 if (!hasAdj) return;
 
@@ -312,6 +313,35 @@ namespace PSDSimpleEditor
                 op.LayerRect   = FullCanvasRect;
                 op.Opacity     = layer.Effects.OverlayOpacity;
                 op.BlendMode   = ToShaderBlendMode(layer.Effects.OverlayBlendMode);
+                op.ClipMaskTex = shape;
+                ApplyParams(op);
+                Graphics.Blit(temp, next, _mat);
+                Swap(ref cur, ref next);
+
+                ReleaseToPool(temp);
+                ReleaseToPool(shape);
+                return;
+            }
+
+            // ── 画像クリップ合成 (任意画像をレイヤーα形状へクリップ・タイリング・ブレンド) ──
+            if (layer.UIImageClipEnabled && layer.UIImageClipTex != null)
+            {
+                // 1) レイヤー本体 (補正込み) を temp へ合成
+                var temp = AcquireRT(clearToTransparent: false);
+                ApplyParams(p);
+                Graphics.Blit(cur, temp, _mat);
+
+                // 2) レイヤーの実効 α 形状 (マスク・不透明度・クリップ込み) を取得
+                var shape = RenderLayerAlpha(layer, clipMask);
+
+                // 3) クリップ画像をレイヤー矩形基準でタイリングし、実効 α でクリップして合成
+                var op = NewParams();
+                op.LayerTex    = layer.UIImageClipTex;
+                op.LayerRect   = LayerRectOf(layer); // 保存レイヤー (同矩形) とプレビューを一致させる
+                op.LayerWrap   = true;
+                op.LayerTile   = layer.UIImageClipTile;
+                op.Opacity     = layer.UIImageClipOpacity;
+                op.BlendMode   = ToShaderBlendMode(layer.UIImageClipBlend);
                 op.ClipMaskTex = shape;
                 ApplyParams(op);
                 Graphics.Blit(temp, next, _mat);
@@ -474,6 +504,65 @@ namespace PSDSimpleEditor
             }
         }
 
+        /// <summary>
+        /// 画像クリップ合成の元画像を「ベースレイヤーのサイズ (Width×Height)」へタイル展開し、
+        /// トップダウン (PSD 向き = 行 0 が上端) の Color32[] で返す。
+        /// ブレンドモード/不透明度/クリッピングは PSD 側プロパティとして保持するため、ここでは
+        /// 適用しない (Normal・不透明度 1・素のタイル画像)。クリップ無効/ピクセル無しは null。
+        /// </summary>
+        public Color32[] RenderImageClipForExport(PSDLayer baseLayer)
+        {
+            if (!IsValid || baseLayer == null) return null;
+            if (!baseLayer.UIImageClipEnabled || baseLayer.UIImageClipTex == null) return null;
+            int lw = baseLayer.Width, lh = baseLayer.Height;
+            if (lw <= 0 || lh <= 0) return null;
+
+            bool prevSRGBWrite = GL.sRGBWrite;
+            var  prevActive    = RenderTexture.active;
+            GL.sRGBWrite = false;
+
+            RenderTexture dst   = null, clear = null;
+            Texture2D     tmp   = null;
+            try
+            {
+                dst   = RenderTexture.GetTemporary(lw, lh, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+                clear = RenderTexture.GetTemporary(lw, lh, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+                ClearRT(clear);
+
+                // クリップ画像を全面 (0,0,lw,lh) へタイル展開。ブレンド/不透明度/クリップは適用しない。
+                var p = NewParams();
+                p.LayerTex  = baseLayer.UIImageClipTex;
+                p.LayerRect = new Vector4(0, 0, lw, lh);
+                p.LayerWrap = true;
+                p.LayerTile = baseLayer.UIImageClipTile;
+                p.Opacity   = 1f;
+                p.BlendMode = 0; // Normal
+                ApplyParams(p, new Vector4(lw, lh, 0, 0));
+                Graphics.Blit(clear, dst, _mat);
+
+                tmp = new Texture2D(lw, lh, TextureFormat.RGBA32, false, linear: true)
+                { hideFlags = HideFlags.HideAndDontSave };
+                RenderTexture.active = dst;
+                tmp.ReadPixels(new Rect(0, 0, lw, lh), 0, 0);
+                tmp.Apply(false);
+
+                // GetPixels32 はボトムアップ (行 0 = 下端)。PSD 向きのトップダウンへ反転。
+                var bottomUp = tmp.GetPixels32();
+                var topDown  = new Color32[lw * lh];
+                for (int y = 0; y < lh; y++)
+                    System.Array.Copy(bottomUp, (lh - 1 - y) * lw, topDown, y * lw, lw);
+                return topDown;
+            }
+            finally
+            {
+                RenderTexture.active = prevActive;
+                if (tmp   != null) Object.DestroyImmediate(tmp);
+                if (dst   != null) RenderTexture.ReleaseTemporary(dst);
+                if (clear != null) RenderTexture.ReleaseTemporary(clear);
+                GL.sRGBWrite = prevSRGBWrite;
+            }
+        }
+
         // ════════════════════════════════════════════════════════════════
         //  uniform 一括設定 (Material はステートフルなため毎回全 uniform を明示設定)
         // ════════════════════════════════════════════════════════════════
@@ -483,6 +572,8 @@ namespace PSDSimpleEditor
         {
             public Texture LayerTex;     // null → 黒テクスチャ (未使用スロットの掃除)
             public Vector4 LayerRect;    // (L, T, W, H) PSD 座標
+            public Vector2 LayerTile;    // タイル反復数 (LayerWrap=true のとき有効)
+            public bool    LayerWrap;    // true → レイヤー矩形内で frac タイリング
             public float   Opacity;      // 0..1
             public int     BlendMode;    // BlendMode enum の int 値 (シェーダー分岐番号)
             public bool    IsAdjustment;
@@ -491,6 +582,7 @@ namespace PSDSimpleEditor
             public float   MaskDefault;  // 0..1
             public Texture ClipMaskTex;  // null → _HasClipMask = 0
             public float   Brightness, Contrast, Hue, Saturation, Lightness; // 正規化済み -1..1
+            public bool    Colorize;     // true → 絶対値の色相・彩度を強制 (白黒着色)
             public Texture GradientMapTex;     // null → グラデーションマップ無効
             public float   GradientMapOpacity; // 0..1
         }
@@ -501,6 +593,8 @@ namespace PSDSimpleEditor
             {
                 LayerTex    = null,
                 LayerRect   = new Vector4(0, 0, 1, 1),
+                LayerTile   = Vector2.one,
+                LayerWrap   = false,
                 Opacity     = 1f,
                 BlendMode   = 0,
                 IsAdjustment = false,
@@ -509,6 +603,7 @@ namespace PSDSimpleEditor
                 MaskDefault = 1f,
                 ClipMaskTex = null,
                 Brightness = 0f, Contrast = 0f, Hue = 0f, Saturation = 0f, Lightness = 0f,
+                Colorize = false,
                 GradientMapTex = null, GradientMapOpacity = 1f
             };
         }
@@ -527,6 +622,8 @@ namespace PSDSimpleEditor
             // レイヤー
             _mat.SetTexture("_LayerTex", p.LayerTex != null ? p.LayerTex : Texture2D.blackTexture);
             _mat.SetVector ("_LayerRect", p.LayerRect);
+            _mat.SetVector ("_LayerTile", new Vector4(p.LayerTile.x, p.LayerTile.y, 0, 0));
+            _mat.SetInt    ("_LayerWrap", p.LayerWrap ? 1 : 0);
             _mat.SetFloat  ("_Opacity",   Mathf.Clamp01(p.Opacity));
             _mat.SetInt    ("_BlendMode", p.BlendMode);
             _mat.SetInt    ("_IsAdjustment", p.IsAdjustment ? 1 : 0);
@@ -549,6 +646,7 @@ namespace PSDSimpleEditor
             _mat.SetFloat("_Hue",        Mathf.Clamp(p.Hue,        -1f, 1f));
             _mat.SetFloat("_Saturation", Mathf.Clamp(p.Saturation, -1f, 1f));
             _mat.SetFloat("_Lightness",  Mathf.Clamp(p.Lightness,  -1f, 1f));
+            _mat.SetInt  ("_Colorize",   p.Colorize ? 1 : 0);
 
             // グラデーションマップ (LUT 未設定時は無効)
             bool hasGrad = p.GradientMapTex != null;
@@ -576,6 +674,7 @@ namespace PSDSimpleEditor
             p.Hue        = layer.UIHue        / 180f;
             p.Saturation = layer.UISaturation / 100f;
             p.Lightness  = layer.UILightness  / 100f;
+            p.Colorize   = layer.UIColorize;
 
             if (layer.UIGradientMapEnabled && layer._gradientLut != null)
             {

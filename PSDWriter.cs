@@ -252,6 +252,12 @@ namespace PSDSimpleEditor
                 else
                 {
                     outRecs.Add(BuildPixelRecord(layer, comp));
+
+                    // 画像クリップ合成は独立したクリッピングレイヤーとして真上に挿入する。
+                    // (ファイル格納順 = 下→上なので、直後 append = ベースの真上 = クリップ先が直下)
+                    // 既知の制限: ベースが既に他のクリッピングメンバーを真上に持つ場合、その間に入る。
+                    if (layer.UIImageClipEnabled && layer.UIImageClipTex != null)
+                        outRecs.Add(BuildImageClipRecord(layer, comp));
                 }
             }
         }
@@ -350,6 +356,52 @@ namespace PSDSimpleEditor
             return rec;
         }
 
+        /// <summary>
+        /// 画像クリップ合成を独立したクリッピングピクセルレイヤーとして書き出すレコードを組み立てる。
+        /// 矩形・座標はベースレイヤーと同一。タイル展開済み画像をピクセルとして格納し、
+        /// ブレンドモード/不透明度/クリッピングは PSD プロパティとして保持する。
+        /// </summary>
+        static ExportRecord BuildImageClipRecord(PSDLayer baseLayer, LayerCompositor comp)
+        {
+            var rec = new ExportRecord
+            {
+                Top      = baseLayer.Top,
+                Left     = baseLayer.Left,
+                Bottom   = baseLayer.Bottom,
+                Right    = baseLayer.Right,
+                Name     = baseLayer.Name + " 画像合成",
+                BlendKey = KeyOf(baseLayer.UIImageClipBlend),
+                Opacity  = ToByteOpacity(baseLayer.UIImageClipOpacity),
+                Clipping = 1,
+                Flags    = 0x00, // 表示
+            };
+
+            int lw = baseLayer.Width, lh = baseLayer.Height;
+            Color32[] px = comp != null ? comp.RenderImageClipForExport(baseLayer) : null;
+            if (px != null && lw > 0 && lh > 0)
+            {
+                var rp = new byte[lw * lh];
+                var gp = new byte[lw * lh];
+                var bp = new byte[lw * lh];
+                var ap = new byte[lw * lh];
+                for (int i = 0; i < lw * lh; i++)
+                {
+                    rp[i] = px[i].r; gp[i] = px[i].g; bp[i] = px[i].b; ap[i] = px[i].a;
+                }
+                rec.Channels.Add(new ExportChannel { Id = 0,  Data = CompressPlaneRLE(rp, lw, lh) });
+                rec.Channels.Add(new ExportChannel { Id = 1,  Data = CompressPlaneRLE(gp, lw, lh) });
+                rec.Channels.Add(new ExportChannel { Id = 2,  Data = CompressPlaneRLE(bp, lw, lh) });
+                rec.Channels.Add(new ExportChannel { Id = -1, Data = CompressPlaneRLE(ap, lw, lh) });
+            }
+            else
+            {
+                // 展開失敗時は空チャンネルでクラッシュを避ける
+                rec.Channels = EmptyChannels();
+            }
+
+            return rec;
+        }
+
         static bool NeedsBake(PSDLayer layer)
         {
             return !Mathf.Approximately(layer.UIBrightness, 0f)
@@ -357,6 +409,7 @@ namespace PSDSimpleEditor
                 || !Mathf.Approximately(layer.UIHue,        0f)
                 || !Mathf.Approximately(layer.UISaturation, 0f)
                 || !Mathf.Approximately(layer.UILightness,  0f)
+                || layer.UIColorize
                 || (layer.UIGradientMapEnabled && layer._gradientLut != null);
         }
 

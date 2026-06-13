@@ -23,6 +23,8 @@ Shader "PSDSimpleEditor/LayerBlend"
         _ClipMaskTex  ("クリッピングマスク (.a)",       2D)     = "white" {}
         _CanvasSize   ("キャンバスサイズ (W,H,0,0) px", Vector) = (1,1,0,0)
         _LayerRect    ("レイヤー矩形 (L,T,W,H) px",     Vector) = (0,0,1,1)
+        _LayerTile    ("(X,Y) タイル反復",              Vector) = (1,1,0,0)
+        _LayerWrap    ("ラップ (タイリング) 0/1",       Int)    = 0
         _MaskRect     ("マスク矩形 (L,T,W,H) px",       Vector) = (0,0,1,1)
         _MaskDefault  ("マスク矩形外の値 0..1",         Float)  = 1
         _Opacity      ("不透明度 0..1",                 Float)  = 1
@@ -35,6 +37,7 @@ Shader "PSDSimpleEditor/LayerBlend"
         _Hue          ("色相 -1..1 (実値/180)",         Float)  = 0
         _Saturation   ("彩度 -1..1 (実値/100)",         Float)  = 0
         _Lightness    ("明度 -1..1 (実値/100)",         Float)  = 0
+        _Colorize     ("着色 0/1",                      Int)    = 0
         _HasGradientMap     ("グラデーションマップ有効 0/1", Int)   = 0
         _GradientMapTex     ("グラデーション LUT (256x1)",   2D)    = "white" {}
         _GradientMapOpacity ("グラデーションマップ適用率 0..1", Float) = 1
@@ -64,6 +67,8 @@ Shader "PSDSimpleEditor/LayerBlend"
             sampler2D _ClipMaskTex;   // クリッピングマスク (キャンバス全面 RT, .a 参照)
             float4    _CanvasSize;    // (キャンバス幅, 高さ, 0, 0) px
             float4    _LayerRect;     // (L, T, W, H) — PSD 座標 (左上原点) px
+            float4    _LayerTile;     // (X, Y, 0, 0) タイル反復数 (_LayerWrap=1 のとき有効)
+            int       _LayerWrap;     // 1 = レイヤー矩形内で frac タイリング
             float4    _MaskRect;      // (L, T, W, H) — 同上
             float     _MaskDefault;   // マスク矩形外の値 0..1
             float     _Opacity;       // 0..1
@@ -76,6 +81,7 @@ Shader "PSDSimpleEditor/LayerBlend"
             float     _Hue;           // -1..1 (実値 / 180)
             float     _Saturation;    // -1..1 (実値 / 100)
             float     _Lightness;     // -1..1 (実値 / 100)
+            int       _Colorize;      // 1 = 絶対値の色相・彩度を強制 (白黒着色)
             int       _HasGradientMap;     // 0/1
             sampler2D _GradientMapTex;     // 256x1 LUT (輝度 → 色)
             float     _GradientMapOpacity; // 0..1
@@ -383,18 +389,27 @@ Shader "PSDSimpleEditor/LayerBlend"
                 col = saturate((col - 0.5) * (1.0 + _Contrast) + 0.5);
 
                 // ── 色相・彩度・明度: RGB → HSL → RGB (Photoshop hue2 相当の見た目を目標) ──
-                if (abs(_Hue) > EPS || abs(_Saturation) > EPS || abs(_Lightness) > EPS)
+                if (abs(_Hue) > EPS || abs(_Saturation) > EPS || abs(_Lightness) > EPS || _Colorize == 1)
                 {
                     float3 hsl = RGBtoHSL(col);
 
-                    // 色相: _Hue=±1 が ±180° = hue 値 ±0.5 (1 周 = 1.0)
-                    hsl.x = frac(hsl.x + _Hue * 0.5 + 1.0);
-
-                    // 彩度: +側は 1/(1-x) で増幅 (+1 → 完全飽和), -側は線形減衰 (-1 → 無彩色)
-                    if (_Saturation >= 0.0)
-                        hsl.y = saturate(hsl.y / max(1.0 - _Saturation, EPS));
+                    if (_Colorize == 1)
+                    {
+                        // 着色: 原色の彩度に依存せず絶対値を強制 → 白黒 (彩度0) にも色が乗る
+                        hsl.x = frac(_Hue * 0.5 + 1.0);            // Hue スライダ → 絶対色相 [0,1]
+                        hsl.y = saturate(_Saturation * 0.5 + 0.5); // Saturation スライダ中央=0.5
+                    }
                     else
-                        hsl.y = hsl.y * (1.0 + _Saturation);
+                    {
+                        // 色相: _Hue=±1 が ±180° = hue 値 ±0.5 (1 周 = 1.0)
+                        hsl.x = frac(hsl.x + _Hue * 0.5 + 1.0);
+
+                        // 彩度: +側は 1/(1-x) で増幅 (+1 → 完全飽和), -側は線形減衰 (-1 → 無彩色)
+                        if (_Saturation >= 0.0)
+                            hsl.y = saturate(hsl.y / max(1.0 - _Saturation, EPS));
+                        else
+                            hsl.y = hsl.y * (1.0 + _Saturation);
+                    }
 
                     // 明度: +側は白へ, -側は黒へ lerp (Photoshop の Lightness 挙動)
                     if (_Lightness >= 0.0)
@@ -472,8 +487,16 @@ Shader "PSDSimpleEditor/LayerBlend"
                 float lv = 1.0 - (psdY - _LayerRect.y) / max(_LayerRect.w, EPS);
 
                 float4 layer = float4(0, 0, 0, 0);
-                if (lu >= 0.0 && lu <= 1.0 && lv >= 0.0 && lv <= 1.0)
+                if (_LayerWrap == 1)
+                {
+                    // タイリング: レイヤー矩形を基準に frac でラップ (範囲外クランプ無し)。
+                    // レイヤー矩形外はクリップ形状 (clipVal) で α=0 になるため漏れない。
+                    layer = tex2D(_LayerTex, frac(float2(lu, lv) * _LayerTile.xy));
+                }
+                else if (lu >= 0.0 && lu <= 1.0 && lv >= 0.0 && lv <= 1.0)
+                {
                     layer = tex2D(_LayerTex, float2(lu, lv));
+                }
 
                 // 通常パスでも色調補正はレイヤー色に適用 (グループの 1 枚畳み込み用)
                 float3 cs = ApplyAdjustments(layer.rgb);

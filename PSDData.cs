@@ -128,6 +128,16 @@ namespace PSDSimpleEditor
         public float UISaturation;   // -100 .. 100
         public float UILightness;    // -100 .. 100
 
+        // ── 着色 (Colorize): ON で絶対値の色相・彩度を強制し、白黒 (彩度0) にも着色する ──
+        [System.NonSerialized] public bool UIColorize;
+
+        // ── 画像クリップ合成 (非破壊。任意画像をレイヤーα形状へクリップ・タイリング・ブレンド) ──
+        [System.NonSerialized] public bool      UIImageClipEnabled;
+        [System.NonSerialized] public Texture2D UIImageClipTex;
+        [System.NonSerialized] public Vector2   UIImageClipTile = Vector2.one;  // タイル反復数 (X,Y)
+        [System.NonSerialized] public BlendMode UIImageClipBlend = BlendMode.Normal;
+        [System.NonSerialized] public float     UIImageClipOpacity = 1f;        // 0 .. 1
+
         // ── グラデーションマップ (非破壊。ピクセル輝度 → グラデーション色へ) ──
         [System.NonSerialized] public bool      UIGradientMapEnabled;
         [System.NonSerialized] public Gradient  UIGradient;            // 既定: 黒→白
