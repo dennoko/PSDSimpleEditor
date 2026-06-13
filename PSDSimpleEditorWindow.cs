@@ -26,6 +26,7 @@ namespace PSDSimpleEditor
 
         // ── 状態 ───────────────────────────────────────────────────────────
         [SerializeField] float _layerPanelWidth = 270f; // 左パネル幅
+        [SerializeField] string _exportDir = "Assets/PSDSE_exported"; // PNG出力先フォルダ
         string _psdPath = "";                 // 入力中の PSD パス (リロード後も保持)
         bool   _showMergedRef;                // マージ済み画像の参照表示
 
@@ -90,6 +91,7 @@ namespace PSDSimpleEditor
         void OnGUI()
         {
             DrawToolbar();
+            DrawExportBar();
 
             if (_psdFile == null)
             {
@@ -98,8 +100,8 @@ namespace PSDSimpleEditor
             else
             {
                 float mainHeight = position.height
-                                 - EditorStyles.toolbar.fixedHeight
-                                 - BottomBarHeight - 6f;
+                                 - EditorStyles.toolbar.fixedHeight * 2f
+                                 - BottomBarHeight - 8f;
 
                 // レイヤーパネルの幅をウィンドウサイズに応じて制限
                 float minWidth = 150f;
@@ -149,6 +151,37 @@ namespace PSDSimpleEditor
 
             _showMergedRef = GUILayout.Toggle(_showMergedRef, "マージ参照",
                                               EditorStyles.toolbarButton, GUILayout.Width(76));
+
+            EditorGUILayout.EndHorizontal();
+        }
+
+        void DrawExportBar()
+        {
+            EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+
+            GUILayout.Label("Export Dir:", GUILayout.Width(72));
+            _exportDir = EditorGUILayout.TextField(_exportDir, EditorStyles.toolbarTextField,
+                                                   GUILayout.ExpandWidth(true));
+
+            if (GUILayout.Button("Browse...", EditorStyles.toolbarButton, GUILayout.Width(68)))
+            {
+                string picked = EditorUtility.OpenFolderPanel("PNG出力先フォルダを選択", _exportDir, "");
+                if (!string.IsNullOrEmpty(picked))
+                {
+                    string projectPath = Path.GetFullPath(Application.dataPath);
+                    string normalizedPicked = Path.GetFullPath(picked);
+                    if (normalizedPicked.StartsWith(projectPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        string relative = "Assets" + normalizedPicked.Substring(projectPath.Length);
+                        _exportDir = relative.Replace('\\', '/');
+                    }
+                    else
+                    {
+                        _exportDir = normalizedPicked.Replace('\\', '/');
+                    }
+                    GUI.FocusControl(null);
+                }
+            }
 
             EditorGUILayout.EndHorizontal();
         }
@@ -742,7 +775,7 @@ namespace PSDSimpleEditor
 
             using (new EditorGUI.DisabledScope(_compositeTexture == null))
             {
-                if (GUILayout.Button("Export PNG...", GUILayout.Width(100)))
+                if (GUILayout.Button("Export PNG", GUILayout.Width(100)))
                     ExportPNG();
             }
 
@@ -853,18 +886,33 @@ namespace PSDSimpleEditor
                 return;
             }
 
-            string defaultName = Path.GetFileNameWithoutExtension(_psdPath) + "_export";
-            string dir = "";
-            try { if (File.Exists(_psdPath)) dir = Path.GetDirectoryName(_psdPath); } catch { }
-
-            string savePath = EditorUtility.SaveFilePanel("PNG として保存", dir, defaultName, "png");
-            if (string.IsNullOrEmpty(savePath)) return;
+            if (string.IsNullOrEmpty(_exportDir))
+            {
+                EditorUtility.DisplayDialog("エラー",
+                    "出力先フォルダが指定されていません。", "OK");
+                return;
+            }
 
             try
             {
+                string baseName = "composite";
+                if (!string.IsNullOrEmpty(_psdPath))
+                {
+                    baseName = Path.GetFileNameWithoutExtension(_psdPath);
+                }
+
+                string savePath = GetUniqueExportPath(_exportDir, baseName, ".png");
+
                 byte[] png = _compositeTexture.EncodeToPNG();
                 File.WriteAllBytes(savePath, png);
                 Debug.Log($"[PSDSimpleEditor] PNG を保存しました: {savePath}");
+
+                // プロジェクト内の出力ならAssetDatabaseをリフレッシュしてUnityエディタ上で見えるようにする
+                if (savePath.Replace('\\', '/').Contains("/Assets/"))
+                {
+                    AssetDatabase.Refresh();
+                }
+
                 EditorUtility.RevealInFinder(savePath);
             }
             catch (Exception e)
@@ -873,6 +921,37 @@ namespace PSDSimpleEditor
                 EditorUtility.DisplayDialog("書き出しエラー",
                     $"PNG の保存に失敗しました:\n{e.Message}", "OK");
             }
+        }
+
+        /// <summary>指定されたディレクトリ、ファイル名で衝突しない一意なパスを取得する。</summary>
+        string GetUniqueExportPath(string dir, string baseNameWithoutExt, string ext)
+        {
+            string targetDir = dir;
+            // "Assets" で始まる相対パスをプロジェクトルートからの絶対パスに変換
+            if (dir.StartsWith("Assets", StringComparison.OrdinalIgnoreCase))
+            {
+                string subPath = dir.Substring(6).TrimStart('/', '\\');
+                targetDir = Path.Combine(Application.dataPath, subPath);
+            }
+
+            targetDir = Path.GetFullPath(targetDir);
+
+            // ディレクトリが存在しない場合は作成
+            if (!Directory.Exists(targetDir))
+            {
+                Directory.CreateDirectory(targetDir);
+            }
+
+            string targetPath = Path.Combine(targetDir, baseNameWithoutExt + ext);
+            int counter = 1;
+
+            while (File.Exists(targetPath))
+            {
+                targetPath = Path.Combine(targetDir, $"{baseNameWithoutExt} {counter}{ext}");
+                counter++;
+            }
+
+            return targetPath;
         }
 
         // ── PSD 書き出し (レイヤー構造保持) ─────────────────────────────────
