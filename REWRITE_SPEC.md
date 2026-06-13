@@ -104,7 +104,7 @@ public Texture2D Composite(List<PSDLayer> layers)  // index 0 = 最下層
 public void Dispose()
 ```
 
-シェーダーは `AssetDatabase.LoadAssetAtPath<Shader>("Assets/Editor/PSDSimpleEditor/LayerBlend.shader")` で取得。
+シェーダーは `AssetDatabase.LoadAssetAtPath<Shader>("Assets/dennokoworks/PSDSimpleEditor/LayerBlend.shader")` で取得。
 
 ### 合成ロジック要件
 
