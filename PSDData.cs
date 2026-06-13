@@ -147,6 +147,11 @@ namespace PSDSimpleEditor
         // ── UI フォールドアウト状態 (色調補正セクションの開閉) ──
         [System.NonSerialized] public bool UIAdjustExpanded;
 
+        // ── 色域選択マスク (このレイヤー自身の画素から、対象色 ± 閾値で選択範囲を作り PNG 出力) ──
+        [System.NonSerialized] public bool  UIColorRangeExpanded;
+        [System.NonSerialized] public Color UIColorRangeTarget    = Color.white; // 対象色
+        [System.NonSerialized] public float UIColorRangeThreshold = 0.1f;        // 閾値 0..1 (RGB 正規化距離)
+
         // ── ヘルパー ──
         public bool IsAdjustmentLayer => Width <= 0 || Height <= 0;
 
