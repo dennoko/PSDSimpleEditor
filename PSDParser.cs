@@ -43,6 +43,19 @@ namespace PSDSimpleEditor
         /// <summary>PSD ファイルをパースする。verbose=true でレイヤー構造のダンプログを出力。</summary>
         public static PSDFile Parse(string filePath, bool verbose)
         {
+            // 直接アクセスが失敗した場合はダブルクォーテーションを無視して再アクセス
+            if (!string.IsNullOrEmpty(filePath) && !File.Exists(filePath))
+            {
+                if (filePath.StartsWith("\"") || filePath.EndsWith("\""))
+                {
+                    string trimmed = filePath.Trim('"');
+                    if (File.Exists(trimmed))
+                    {
+                        filePath = trimmed;
+                    }
+                }
+            }
+
             var psd  = new PSDFile();
             var vlog = verbose ? new StringBuilder() : null;
             vlog?.AppendLine($"[PSDParser] ダンプ: {filePath}");

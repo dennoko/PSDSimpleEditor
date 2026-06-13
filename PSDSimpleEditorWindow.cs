@@ -135,7 +135,12 @@ namespace PSDSimpleEditor
             if (GUILayout.Button("Browse...", EditorStyles.toolbarButton, GUILayout.Width(68)))
             {
                 string dir = "";
-                try { if (File.Exists(_psdPath)) dir = Path.GetDirectoryName(_psdPath); } catch { }
+                try
+                {
+                    string resolved = ResolvePSDPath();
+                    if (File.Exists(resolved)) dir = Path.GetDirectoryName(resolved);
+                }
+                catch { }
                 string picked = EditorUtility.OpenFilePanel("PSD ファイルを開く", dir, "psd");
                 if (!string.IsNullOrEmpty(picked))
                 {
@@ -818,7 +823,8 @@ namespace PSDSimpleEditor
 
         void LoadPSD()
         {
-            if (string.IsNullOrEmpty(_psdPath) || !File.Exists(_psdPath))
+            string resolved = ResolvePSDPath();
+            if (string.IsNullOrEmpty(resolved) || !File.Exists(resolved))
             {
                 EditorUtility.DisplayDialog("エラー", "有効な PSD ファイルを指定してください。", "OK");
                 return;
@@ -908,12 +914,25 @@ namespace PSDSimpleEditor
                 Debug.Log($"[PSDSimpleEditor] PNG を保存しました: {savePath}");
 
                 // プロジェクト内の出力ならAssetDatabaseをリフレッシュしてUnityエディタ上で見えるようにする
-                if (savePath.Replace('\\', '/').Contains("/Assets/"))
+                string normalizedSavePath = savePath.Replace('\\', '/');
+                int assetsIndex = normalizedSavePath.IndexOf("/Assets/", StringComparison.OrdinalIgnoreCase);
+                if (assetsIndex != -1)
                 {
+                    string assetPath = normalizedSavePath.Substring(assetsIndex + 1);
                     AssetDatabase.Refresh();
-                }
 
-                EditorUtility.RevealInFinder(savePath);
+                    // プロジェクトビューで該当ファイルを選択してハイライト（Ping）する
+                    var obj = AssetDatabase.LoadMainAssetAtPath(assetPath);
+                    if (obj != null)
+                    {
+                        Selection.activeObject = obj;
+                        EditorGUIUtility.PingObject(obj);
+                    }
+                }
+                else
+                {
+                    EditorUtility.RevealInFinder(savePath);
+                }
             }
             catch (Exception e)
             {
@@ -964,9 +983,14 @@ namespace PSDSimpleEditor
                 return;
             }
 
+            ResolvePSDPath();
             string defaultName = Path.GetFileNameWithoutExtension(_psdPath) + "_export";
             string dir = "";
-            try { if (File.Exists(_psdPath)) dir = Path.GetDirectoryName(_psdPath); } catch { }
+            try
+            {
+                if (File.Exists(_psdPath)) dir = Path.GetDirectoryName(_psdPath);
+            }
+            catch { }
 
             string savePath = EditorUtility.SaveFilePanel("PSD として保存", dir, defaultName, "psd");
             if (string.IsNullOrEmpty(savePath)) return;
@@ -987,7 +1011,26 @@ namespace PSDSimpleEditor
                 PSDWriter.Save(_psdFile, _psdFile.Layers, _compositor, _compositeTexture, savePath);
 
                 Debug.Log($"[PSDSimpleEditor] PSD を保存しました: {savePath}");
-                EditorUtility.RevealInFinder(savePath);
+
+                string normalizedSavePath = savePath.Replace('\\', '/');
+                int assetsIndex = normalizedSavePath.IndexOf("/Assets/", StringComparison.OrdinalIgnoreCase);
+                if (assetsIndex != -1)
+                {
+                    string assetPath = normalizedSavePath.Substring(assetsIndex + 1);
+                    AssetDatabase.Refresh();
+
+                    // プロジェクトビューで該当ファイルを選択してハイライト（Ping）する
+                    var obj = AssetDatabase.LoadMainAssetAtPath(assetPath);
+                    if (obj != null)
+                    {
+                        Selection.activeObject = obj;
+                        EditorGUIUtility.PingObject(obj);
+                    }
+                }
+                else
+                {
+                    EditorUtility.RevealInFinder(savePath);
+                }
             }
             catch (Exception e)
             {
@@ -999,6 +1042,28 @@ namespace PSDSimpleEditor
             {
                 EditorUtility.ClearProgressBar();
             }
+        }
+
+        /// <summary>
+        /// パスにダブルクォーテーションが含まれており、そのままではファイルが存在しない場合、
+        /// ダブルクォーテーションを除去してファイル存在チェックを試みる。
+        /// 存在すればクリーンアップされたパスを返し、かつ _psdPath 自体を更新する。
+        /// </summary>
+        string ResolvePSDPath()
+        {
+            if (string.IsNullOrEmpty(_psdPath)) return _psdPath;
+            if (File.Exists(_psdPath)) return _psdPath;
+
+            if (_psdPath.StartsWith("\"") || _psdPath.EndsWith("\""))
+            {
+                string trimmed = _psdPath.Trim('"');
+                if (File.Exists(trimmed))
+                {
+                    _psdPath = trimmed;
+                    return trimmed;
+                }
+            }
+            return _psdPath;
         }
     }
 }
