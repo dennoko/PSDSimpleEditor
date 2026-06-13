@@ -413,6 +413,68 @@ namespace PSDSimpleEditor
         }
 
         // ════════════════════════════════════════════════════════════════
+        //  書き出し用: レイヤー単独を色調補正・グラデーションマップ込みで焼き込む
+        // ════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// ピクセルレイヤーを「自身のサイズ (1:1)」のキャンバスへ Normal・不透明度 1・マスク/クリップ無しで
+        /// 単独描画し、色調補正とグラデーションマップを焼き込んだ結果を
+        /// トップダウン (PSD 向き = 行 0 が上端) の Color32[] (Width×Height) で返す。
+        /// ブレンドモード/不透明度/マスクは PSD 側プロパティとして保持するため、ここでは適用しない。
+        /// ピクセルを持たないレイヤーは null。
+        /// </summary>
+        public Color32[] RenderLayerForExport(PSDLayer layer)
+        {
+            if (!IsValid || layer == null || layer.Texture == null) return null;
+            int lw = layer.Width, lh = layer.Height;
+            if (lw <= 0 || lh <= 0) return null;
+
+            bool prevSRGBWrite = GL.sRGBWrite;
+            var  prevActive    = RenderTexture.active;
+            GL.sRGBWrite = false;
+
+            RenderTexture dst   = null, clear = null;
+            Texture2D     tmp   = null;
+            try
+            {
+                dst   = RenderTexture.GetTemporary(lw, lh, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+                clear = RenderTexture.GetTemporary(lw, lh, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+                ClearRT(clear);
+
+                // レイヤーを 1:1 で全面配置。補正・グラデーションマップのみ適用。
+                var p = NewParams();
+                p.LayerTex  = layer.Texture;
+                p.LayerRect = new Vector4(0, 0, lw, lh);
+                p.Opacity   = 1f;
+                p.BlendMode = 0; // Normal
+                SetAdjustmentsFrom(ref p, layer); // 色調補正 + グラデーション LUT
+                ApplyParams(p, new Vector4(lw, lh, 0, 0));
+                Graphics.Blit(clear, dst, _mat);
+
+                tmp = new Texture2D(lw, lh, TextureFormat.RGBA32, false, linear: true)
+                { hideFlags = HideFlags.HideAndDontSave };
+                RenderTexture.active = dst;
+                tmp.ReadPixels(new Rect(0, 0, lw, lh), 0, 0);
+                tmp.Apply(false);
+
+                // GetPixels32 はボトムアップ (行 0 = 下端)。PSD 向きのトップダウンへ反転。
+                var bottomUp = tmp.GetPixels32();
+                var topDown  = new Color32[lw * lh];
+                for (int y = 0; y < lh; y++)
+                    System.Array.Copy(bottomUp, (lh - 1 - y) * lw, topDown, y * lw, lw);
+                return topDown;
+            }
+            finally
+            {
+                RenderTexture.active = prevActive;
+                if (tmp   != null) Object.DestroyImmediate(tmp);
+                if (dst   != null) RenderTexture.ReleaseTemporary(dst);
+                if (clear != null) RenderTexture.ReleaseTemporary(clear);
+                GL.sRGBWrite = prevSRGBWrite;
+            }
+        }
+
+        // ════════════════════════════════════════════════════════════════
         //  uniform 一括設定 (Material はステートフルなため毎回全 uniform を明示設定)
         // ════════════════════════════════════════════════════════════════
 
@@ -429,6 +491,8 @@ namespace PSDSimpleEditor
             public float   MaskDefault;  // 0..1
             public Texture ClipMaskTex;  // null → _HasClipMask = 0
             public float   Brightness, Contrast, Hue, Saturation, Lightness; // 正規化済み -1..1
+            public Texture GradientMapTex;     // null → グラデーションマップ無効
+            public float   GradientMapOpacity; // 0..1
         }
 
         static DrawParams NewParams()
@@ -444,7 +508,8 @@ namespace PSDSimpleEditor
                 MaskRect    = new Vector4(0, 0, 1, 1),
                 MaskDefault = 1f,
                 ClipMaskTex = null,
-                Brightness = 0f, Contrast = 0f, Hue = 0f, Saturation = 0f, Lightness = 0f
+                Brightness = 0f, Contrast = 0f, Hue = 0f, Saturation = 0f, Lightness = 0f,
+                GradientMapTex = null, GradientMapOpacity = 1f
             };
         }
 
@@ -452,8 +517,12 @@ namespace PSDSimpleEditor
         /// 全関連 uniform を毎回明示的に設定する (前レイヤーの値が残る事故の防止)。
         /// </summary>
         void ApplyParams(in DrawParams p)
+            => ApplyParams(p, new Vector4(_canvasW, _canvasH, 0, 0));
+
+        /// <summary>キャンバスサイズを明示指定する版 (レイヤー単独の 1:1 書き出しレンダリング用)。</summary>
+        void ApplyParams(in DrawParams p, Vector4 canvasSize)
         {
-            _mat.SetVector("_CanvasSize", new Vector4(_canvasW, _canvasH, 0, 0));
+            _mat.SetVector("_CanvasSize", canvasSize);
 
             // レイヤー
             _mat.SetTexture("_LayerTex", p.LayerTex != null ? p.LayerTex : Texture2D.blackTexture);
@@ -480,6 +549,12 @@ namespace PSDSimpleEditor
             _mat.SetFloat("_Hue",        Mathf.Clamp(p.Hue,        -1f, 1f));
             _mat.SetFloat("_Saturation", Mathf.Clamp(p.Saturation, -1f, 1f));
             _mat.SetFloat("_Lightness",  Mathf.Clamp(p.Lightness,  -1f, 1f));
+
+            // グラデーションマップ (LUT 未設定時は無効)
+            bool hasGrad = p.GradientMapTex != null;
+            _mat.SetInt    ("_HasGradientMap",     hasGrad ? 1 : 0);
+            _mat.SetTexture("_GradientMapTex",     hasGrad ? p.GradientMapTex : (Texture)Texture2D.whiteTexture);
+            _mat.SetFloat  ("_GradientMapOpacity", Mathf.Clamp01(p.GradientMapOpacity));
         }
 
         // レイヤーのマスク情報を DrawParams へ反映 (無効・テクスチャなしは「マスクなし」扱い)
@@ -501,6 +576,12 @@ namespace PSDSimpleEditor
             p.Hue        = layer.UIHue        / 180f;
             p.Saturation = layer.UISaturation / 100f;
             p.Lightness  = layer.UILightness  / 100f;
+
+            if (layer.UIGradientMapEnabled && layer._gradientLut != null)
+            {
+                p.GradientMapTex     = layer._gradientLut;
+                p.GradientMapOpacity = layer.UIGradientMapOpacity;
+            }
         }
 
         // PassThrough / Unknown はシェーダー上 Normal として扱う

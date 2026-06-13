@@ -68,6 +68,7 @@ namespace PSDSimpleEditor
             {
                 if (layer.Texture     != null) { DestroyImmediate(layer.Texture);     layer.Texture     = null; }
                 if (layer.MaskTexture != null) { DestroyImmediate(layer.MaskTexture); layer.MaskTexture = null; }
+                if (layer._gradientLut != null) { DestroyImmediate(layer._gradientLut); layer._gradientLut = null; }
                 DestroyLayerTexturesRecursive(layer.Children);
             }
         }
@@ -200,9 +201,8 @@ namespace PSDSimpleEditor
             string label = BuildLayerLabel(layer, isGroup);
             GUILayout.Label(new GUIContent(label, label), GUILayout.ExpandWidth(true));
 
-            // ブレンドモード短縮ラベル
-            BlendMode mode = isGroup ? layer.GroupBlendMode : layer.BlendMode;
-            GUILayout.Label(BlendModeShortLabel(mode), EditorStyles.miniLabel, GUILayout.Width(50));
+            // ブレンドモード (編集可能な Popup)
+            DrawBlendModePopup(layer, isGroup);
 
             EditorGUILayout.EndHorizontal();
 
@@ -304,6 +304,11 @@ namespace PSDSimpleEditor
                 }
             }
 
+            // 全ピクセルレイヤー向け: 色調補正 + グラデーションマップ (非破壊)
+            // (parse 済み調整レイヤー / SoCo は上の専用 UI が担当するため除外)
+            if (!layer.IsAdjustmentLayer)
+                DrawAdjustmentFoldout(layer, indent);
+
             // マスクの有効/無効表示
             if (layer.HasMask)
             {
@@ -323,6 +328,117 @@ namespace PSDSimpleEditor
                 layer.UIOpacity   = newOpacity;
                 _needsRecomposite = true;
             }
+        }
+
+        // ── 色調補正 + グラデーションマップ (非破壊・全ピクセルレイヤー) ──────
+
+        /// <summary>「色調補正」フォールドアウト。明るさ/コントラスト/色相/彩度/明度 + グラデーションマップ。</summary>
+        void DrawAdjustmentFoldout(PSDLayer layer, int indent)
+        {
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(indent * IndentWidth + 18f);
+            layer.UIAdjustExpanded = EditorGUILayout.Foldout(layer.UIAdjustExpanded, "色調補正", true);
+            EditorGUILayout.EndHorizontal();
+            if (!layer.UIAdjustExpanded) return;
+
+            int ci = indent + 1;
+
+            // 明るさ・コントラスト・色相・彩度・明度 (シェーダーの正規化除数に合わせた範囲)
+            float nb = IndentedSlider("明るさ",  layer.UIBrightness, -150f, 150f, ci);
+            float nc = IndentedSlider("ｺﾝﾄﾗｽﾄ",  layer.UIContrast,   -50f, 100f, ci);
+            float nh = IndentedSlider("色相",    layer.UIHue,        -180f, 180f, ci);
+            float ns = IndentedSlider("彩度",    layer.UISaturation, -100f, 100f, ci);
+            float nl = IndentedSlider("明度",    layer.UILightness,  -100f, 100f, ci);
+            if (!Mathf.Approximately(nb, layer.UIBrightness) ||
+                !Mathf.Approximately(nc, layer.UIContrast)   ||
+                !Mathf.Approximately(nh, layer.UIHue)        ||
+                !Mathf.Approximately(ns, layer.UISaturation) ||
+                !Mathf.Approximately(nl, layer.UILightness))
+            {
+                layer.UIBrightness = nb;
+                layer.UIContrast   = nc;
+                layer.UIHue        = nh;
+                layer.UISaturation = ns;
+                layer.UILightness  = nl;
+                _needsRecomposite  = true;
+            }
+
+            DrawGradientMapControls(layer, ci);
+        }
+
+        /// <summary>グラデーションマップの有効トグル・グラデーション編集・適用率。</summary>
+        void DrawGradientMapControls(PSDLayer layer, int indent)
+        {
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(indent * IndentWidth + 18f);
+            bool en = EditorGUILayout.ToggleLeft("グラデーションマップ", layer.UIGradientMapEnabled);
+            EditorGUILayout.EndHorizontal();
+            if (en != layer.UIGradientMapEnabled)
+            {
+                layer.UIGradientMapEnabled = en;
+                if (en) EnsureGradientLut(layer);   // 初回有効化時に LUT を焼く
+                _needsRecomposite = true;
+            }
+            if (!en) return;
+
+            if (layer.UIGradient == null) layer.UIGradient = CreateDefaultGradient();
+
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(indent * IndentWidth + 18f);
+            GUILayout.Label("階調", EditorStyles.miniLabel, GUILayout.Width(48));
+            EditorGUI.BeginChangeCheck();
+            Gradient ng = EditorGUILayout.GradientField(layer.UIGradient);
+            bool gradientChanged = EditorGUI.EndChangeCheck();
+            EditorGUILayout.EndHorizontal();
+            if (gradientChanged)
+            {
+                layer.UIGradient = ng;
+                BakeGradientLut(layer);
+                _needsRecomposite = true;
+            }
+
+            float no = IndentedSlider("適用率", layer.UIGradientMapOpacity, 0f, 1f, indent);
+            if (!Mathf.Approximately(no, layer.UIGradientMapOpacity))
+            {
+                layer.UIGradientMapOpacity = no;
+                _needsRecomposite = true;
+            }
+        }
+
+        static Gradient CreateDefaultGradient()
+        {
+            var g = new Gradient();
+            g.SetKeys(
+                new[] { new GradientColorKey(Color.black, 0f), new GradientColorKey(Color.white, 1f) },
+                new[] { new GradientAlphaKey(1f, 0f),          new GradientAlphaKey(1f, 1f) });
+            return g;
+        }
+
+        /// <summary>グラデーション有効時に LUT が無ければ焼く。</summary>
+        void EnsureGradientLut(PSDLayer layer)
+        {
+            if (layer.UIGradient == null) layer.UIGradient = CreateDefaultGradient();
+            if (layer._gradientLut == null) BakeGradientLut(layer);
+        }
+
+        /// <summary>UIGradient を 256×1 の LUT テクスチャ (linear) に焼き込む。</summary>
+        static void BakeGradientLut(PSDLayer layer)
+        {
+            const int N = 256;
+            if (layer._gradientLut == null)
+            {
+                layer._gradientLut = new Texture2D(N, 1, TextureFormat.RGBA32, false, linear: true)
+                {
+                    hideFlags  = HideFlags.HideAndDontSave,
+                    wrapMode   = TextureWrapMode.Clamp,
+                    filterMode = FilterMode.Bilinear,
+                };
+            }
+            var px = new Color32[N];
+            for (int i = 0; i < N; i++)
+                px[i] = layer.UIGradient.Evaluate(i / (float)(N - 1));
+            layer._gradientLut.SetPixels32(px);
+            layer._gradientLut.Apply(false);
         }
 
         /// <summary>インデント付きのラベル + スライダー 1 行。</summary>
@@ -371,6 +487,61 @@ namespace PSDSimpleEditor
                 case BlendMode.PassThrough:  return "Pass";
                 default:                     return "?";
             }
+        }
+
+        // ── ブレンドモード Popup ────────────────────────────────────────────
+
+        // Popup の候補 (Unknown は除外)。グループのみ PassThrough を先頭に含める。
+        static readonly BlendMode[] _blendModesNormal =
+        {
+            BlendMode.Normal,      BlendMode.Multiply,    BlendMode.Screen,
+            BlendMode.Overlay,     BlendMode.Dissolve,    BlendMode.Darken,
+            BlendMode.ColorBurn,   BlendMode.LinearBurn,  BlendMode.DarkerColor,
+            BlendMode.Lighten,     BlendMode.ColorDodge,  BlendMode.LinearDodge,
+            BlendMode.LighterColor,BlendMode.SoftLight,   BlendMode.HardLight,
+            BlendMode.VividLight,  BlendMode.LinearLight, BlendMode.PinLight,
+            BlendMode.HardMix,     BlendMode.Difference,  BlendMode.Exclusion,
+            BlendMode.Subtract,    BlendMode.Divide,      BlendMode.Hue,
+            BlendMode.Saturation,  BlendMode.Color,       BlendMode.Luminosity,
+        };
+        static readonly BlendMode[] _blendModesGroup = BuildGroupBlendModes();
+        static string[] _blendLabelsNormal;
+        static string[] _blendLabelsGroup;
+
+        static BlendMode[] BuildGroupBlendModes()
+        {
+            var list = new List<BlendMode> { BlendMode.PassThrough };
+            list.AddRange(_blendModesNormal);
+            return list.ToArray();
+        }
+
+        /// <summary>レイヤー/グループのブレンドモードを Popup で編集する。変更時に再合成を要求。</summary>
+        void DrawBlendModePopup(PSDLayer layer, bool isGroup)
+        {
+            BlendMode[] modes  = isGroup ? _blendModesGroup : _blendModesNormal;
+            string[]    labels = isGroup
+                ? (_blendLabelsGroup  ?? (_blendLabelsGroup  = BuildBlendLabels(_blendModesGroup)))
+                : (_blendLabelsNormal ?? (_blendLabelsNormal = BuildBlendLabels(_blendModesNormal)));
+
+            BlendMode cur = isGroup ? layer.GroupBlendMode : layer.BlendMode;
+            // Unknown 等で候補に無い場合は index 0 を仮表示 (ユーザー操作があるまで書き換えない)
+            int curIndex = Mathf.Max(0, Array.IndexOf(modes, cur));
+
+            int newIndex = EditorGUILayout.Popup(curIndex, labels, GUILayout.Width(74));
+            if (newIndex != curIndex)
+            {
+                if (isGroup) layer.GroupBlendMode = modes[newIndex];
+                else         layer.BlendMode      = modes[newIndex];
+                _needsRecomposite = true;
+            }
+        }
+
+        static string[] BuildBlendLabels(BlendMode[] modes)
+        {
+            var labels = new string[modes.Length];
+            for (int i = 0; i < modes.Length; i++)
+                labels[i] = BlendModeShortLabel(modes[i]);
+            return labels;
         }
 
         // ── プレビューパネル (右) ───────────────────────────────────────────
@@ -495,6 +666,12 @@ namespace PSDSimpleEditor
                     ExportPNG();
             }
 
+            using (new EditorGUI.DisabledScope(_psdFile == null))
+            {
+                if (GUILayout.Button("Export PSD...", GUILayout.Width(100)))
+                    ExportPSD();
+            }
+
             EditorGUILayout.EndHorizontal();
         }
 
@@ -615,6 +792,53 @@ namespace PSDSimpleEditor
                 Debug.LogError($"[PSDSimpleEditor] PNG 保存失敗: {e}");
                 EditorUtility.DisplayDialog("書き出しエラー",
                     $"PNG の保存に失敗しました:\n{e.Message}", "OK");
+            }
+        }
+
+        // ── PSD 書き出し (レイヤー構造保持) ─────────────────────────────────
+
+        void ExportPSD()
+        {
+            if (_psdFile == null)
+            {
+                EditorUtility.DisplayDialog("エラー", "先に PSD を読み込んでください。", "OK");
+                return;
+            }
+
+            string defaultName = Path.GetFileNameWithoutExtension(_psdPath) + "_export";
+            string dir = "";
+            try { if (File.Exists(_psdPath)) dir = Path.GetDirectoryName(_psdPath); } catch { }
+
+            string savePath = EditorUtility.SaveFilePanel("PSD として保存", dir, defaultName, "psd");
+            if (string.IsNullOrEmpty(savePath)) return;
+
+            try
+            {
+                EditorUtility.DisplayProgressBar("PSD 書き出し中", "合成結果を更新しています...", 0.2f);
+
+                // マージ画像を最新の編集状態に同期 (Repaint 待ちに依存しない)
+                if (_compositor != null && _compositor.IsValid)
+                {
+                    SafeDestroy(ref _compositeTexture);
+                    _compositeTexture = _compositor.Composite(_psdFile.Layers);
+                    _needsRecomposite = false;
+                }
+
+                EditorUtility.DisplayProgressBar("PSD 書き出し中", "PSD を書き出しています...", 0.6f);
+                PSDWriter.Save(_psdFile, _psdFile.Layers, _compositor, _compositeTexture, savePath);
+
+                Debug.Log($"[PSDSimpleEditor] PSD を保存しました: {savePath}");
+                EditorUtility.RevealInFinder(savePath);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[PSDSimpleEditor] PSD 保存失敗: {e}");
+                EditorUtility.DisplayDialog("書き出しエラー",
+                    $"PSD の保存に失敗しました:\n{e.Message}", "OK");
+            }
+            finally
+            {
+                EditorUtility.ClearProgressBar();
             }
         }
     }

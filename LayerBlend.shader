@@ -35,6 +35,9 @@ Shader "PSDSimpleEditor/LayerBlend"
         _Hue          ("色相 -1..1 (実値/180)",         Float)  = 0
         _Saturation   ("彩度 -1..1 (実値/100)",         Float)  = 0
         _Lightness    ("明度 -1..1 (実値/100)",         Float)  = 0
+        _HasGradientMap     ("グラデーションマップ有効 0/1", Int)   = 0
+        _GradientMapTex     ("グラデーション LUT (256x1)",   2D)    = "white" {}
+        _GradientMapOpacity ("グラデーションマップ適用率 0..1", Float) = 1
     }
 
     SubShader
@@ -73,6 +76,9 @@ Shader "PSDSimpleEditor/LayerBlend"
             float     _Hue;           // -1..1 (実値 / 180)
             float     _Saturation;    // -1..1 (実値 / 100)
             float     _Lightness;     // -1..1 (実値 / 100)
+            int       _HasGradientMap;     // 0/1
+            sampler2D _GradientMapTex;     // 256x1 LUT (輝度 → 色)
+            float     _GradientMapOpacity; // 0..1
 
             // ゼロ除算ガード用の微小値
             #define EPS 1e-5
@@ -397,6 +403,14 @@ Shader "PSDSimpleEditor/LayerBlend"
                         hsl.z = hsl.z * (1.0 + _Lightness);
 
                     col = HSLtoRGB(hsl);
+                }
+
+                // ── グラデーションマップ: 輝度を LUT 色に置き換え、適用率で lerp ──
+                if (_HasGradientMap == 1)
+                {
+                    float lum = Lum(col);
+                    float3 g  = tex2D(_GradientMapTex, float2(saturate(lum), 0.5)).rgb;
+                    col = lerp(col, g, saturate(_GradientMapOpacity));
                 }
                 return col;
             }

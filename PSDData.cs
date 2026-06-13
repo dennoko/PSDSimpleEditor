@@ -128,6 +128,15 @@ namespace PSDSimpleEditor
         public float UISaturation;   // -100 .. 100
         public float UILightness;    // -100 .. 100
 
+        // ── グラデーションマップ (非破壊。ピクセル輝度 → グラデーション色へ) ──
+        [System.NonSerialized] public bool      UIGradientMapEnabled;
+        [System.NonSerialized] public Gradient  UIGradient;            // 既定: 黒→白
+        [System.NonSerialized] public float     UIGradientMapOpacity = 1f; // 0 .. 1
+        [System.NonSerialized] public Texture2D _gradientLut;          // 256×1 焼き込み LUT (window が管理)
+
+        // ── UI フォールドアウト状態 (色調補正セクションの開閉) ──
+        [System.NonSerialized] public bool UIAdjustExpanded;
+
         // ── ヘルパー ──
         public bool IsAdjustmentLayer => Width <= 0 || Height <= 0;
 
