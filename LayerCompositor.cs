@@ -102,8 +102,8 @@ namespace PSDSimpleEditor
                 if (layers != null)
                     CompositeList(layers, ref cur, ref next);
 
-                // cur が最終結果 → Texture2D (linear) へ転写
-                var result = new Texture2D(_canvasW, _canvasH, TextureFormat.RGBA32, false, linear: true)
+                // cur が最終結果 → Texture2D (sRGB) へ転写
+                var result = new Texture2D(_canvasW, _canvasH, TextureFormat.RGBA32, false, linear: false)
                 { hideFlags = HideFlags.HideAndDontSave };
                 RenderTexture.active = cur;
                 result.ReadPixels(new Rect(0, 0, _canvasW, _canvasH), 0, 0);

@@ -855,9 +855,10 @@ namespace PSDSimpleEditor
 
         /// <summary>
         /// トップダウンの生バッファから Texture2D を作る。
-        /// linear:true (sRGB 変換を通さない) + 上下反転 (Unity 標準向き、UV(0,0)=左下)。
+        /// 上下反転 (Unity 標準向き、UV(0,0)=左下) する。
+        /// linear パラメータで sRGB/Linear 挙動を設定（デフォルトは true で sRGB 変換バイパス）。
         /// </summary>
-        static Texture2D CreateTexture(byte[] topDownPixels, int w, int h, TextureFormat format, string name)
+        static Texture2D CreateTexture(byte[] topDownPixels, int w, int h, TextureFormat format, string name, bool linear = true)
         {
             int bpp      = format == TextureFormat.RGBA32 ? 4 : 1;
             int rowBytes = w * bpp;
@@ -865,7 +866,7 @@ namespace PSDSimpleEditor
             for (int y = 0; y < h; y++)
                 Buffer.BlockCopy(topDownPixels, y * rowBytes, flipped, (h - 1 - y) * rowBytes, rowBytes);
 
-            var tex = new Texture2D(w, h, format, false, true)
+            var tex = new Texture2D(w, h, format, false, linear)
             {
                 name      = name,
                 hideFlags = HideFlags.HideAndDontSave,
@@ -1005,7 +1006,8 @@ namespace PSDSimpleEditor
                 byte[] rgba = AssembleMergedPixels(psd, planes, w, h);
                 if (rgba == null) return;
 
-                psd.MergedComposite = CreateTexture(rgba, w, h, TextureFormat.RGBA32, "Merged Composite");
+                // マージ参照用テクスチャはエディタGUIでのプレビュー表示専用のため、linear: false (sRGB) で作成する
+                psd.MergedComposite = CreateTexture(rgba, w, h, TextureFormat.RGBA32, "Merged Composite", false);
                 vlog?.AppendLine($"  マージ画像: {w}x{h} compression={compression}");
             }
             catch (Exception e)
