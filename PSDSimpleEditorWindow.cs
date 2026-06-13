@@ -20,12 +20,12 @@ namespace PSDSimpleEditor
         }
 
         // ── 定数 ───────────────────────────────────────────────────────────
-        const float LayerPanelWidth = 270f;   // 左パネル固定幅
         const float BottomBarHeight = 22f;    // 下部バー高さ
         const float IndentWidth     = 14f;    // ツリー 1 段あたりのインデント
         const float CheckerCellPx   = 8f;     // チェッカー 1 マスの画面ピクセル数
 
         // ── 状態 ───────────────────────────────────────────────────────────
+        [SerializeField] float _layerPanelWidth = 270f; // 左パネル幅
         string _psdPath = "";                 // 入力中の PSD パス (リロード後も保持)
         bool   _showMergedRef;                // マージ済み画像の参照表示
 
@@ -36,8 +36,15 @@ namespace PSDSimpleEditor
         [NonSerialized] bool            _needsRecomposite;   // 変更フラグ → Repaint 時に合成
 
         Vector2 _layerScroll;
+        [NonSerialized] bool _isResizing;             // リサイズ中フラグ
+        [NonSerialized] bool _isSplitterHovered;      // スプリッターホバーフラグ
 
         // ── ライフサイクル ─────────────────────────────────────────────────
+
+        void OnEnable()
+        {
+            wantsMouseMove = true;
+        }
 
         void OnDestroy() => Cleanup();
 
@@ -94,8 +101,14 @@ namespace PSDSimpleEditor
                                  - EditorStyles.toolbar.fixedHeight
                                  - BottomBarHeight - 6f;
 
+                // レイヤーパネルの幅をウィンドウサイズに応じて制限
+                float minWidth = 150f;
+                float maxWidth = Mathf.Max(minWidth, position.width - 150f);
+                _layerPanelWidth = Mathf.Clamp(_layerPanelWidth, minWidth, maxWidth);
+
                 EditorGUILayout.BeginHorizontal(GUILayout.Height(mainHeight));
                 DrawLayerPanel(mainHeight);
+                DrawSplitter(mainHeight);
                 DrawPreviewPanel();
                 EditorGUILayout.EndHorizontal();
 
@@ -144,7 +157,7 @@ namespace PSDSimpleEditor
 
         void DrawLayerPanel(float panelHeight)
         {
-            EditorGUILayout.BeginVertical(GUILayout.Width(LayerPanelWidth),
+            EditorGUILayout.BeginVertical(GUILayout.Width(_layerPanelWidth),
                                           GUILayout.Height(panelHeight));
             GUILayout.Label("レイヤー", EditorStyles.boldLabel);
 
@@ -154,6 +167,73 @@ namespace PSDSimpleEditor
             EditorGUILayout.EndScrollView();
 
             EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>レイヤーパネルとプレビューパネルの境界をドラッグで調整するためのスプリッターを描画する。</summary>
+        void DrawSplitter(float height)
+        {
+            // 8px 幅のホバー/インタラクション領域を確保
+            Rect rect = GUILayoutUtility.GetRect(8f, height, GUILayout.Width(8f), GUILayout.Height(height));
+
+            // ホバー時のカーソル形状を左右矢印に変更
+            EditorGUIUtility.AddCursorRect(rect, MouseCursor.ResizeHorizontal);
+
+            // ホバー状態の更新
+            Event currentEvent = Event.current;
+            bool isHovered = rect.Contains(currentEvent.mousePosition);
+            if (isHovered != _isSplitterHovered)
+            {
+                _isSplitterHovered = isHovered;
+                Repaint();
+            }
+
+            // スプリッターの背景/線の描画色を決定
+            Color dividerColor;
+            if (_isResizing)
+            {
+                dividerColor = new Color(0.24f, 0.48f, 0.9f); // ドラッグ中のアクセントブルー
+            }
+            else if (_isSplitterHovered)
+            {
+                dividerColor = EditorGUIUtility.isProSkin ? new Color(0.4f, 0.4f, 0.4f) : new Color(0.7f, 0.7f, 0.7f); // ホバー時
+            }
+            else
+            {
+                dividerColor = EditorGUIUtility.isProSkin ? new Color(0.18f, 0.18f, 0.18f) : new Color(0.65f, 0.65f, 0.65f); // 通常時
+            }
+
+            // 視覚的に美しい 2px 幅の中央線として描画
+            Rect visualRect = new Rect(rect.x + (rect.width - 2f) / 2f, rect.y, 2f, rect.height);
+            EditorGUI.DrawRect(visualRect, dividerColor);
+
+            // マウス入力によるリサイズ処理
+            switch (currentEvent.type)
+            {
+                case EventType.MouseDown:
+                    if (rect.Contains(currentEvent.mousePosition) && currentEvent.button == 0)
+                    {
+                        _isResizing = true;
+                        currentEvent.Use();
+                    }
+                    break;
+
+                case EventType.MouseDrag:
+                    if (_isResizing)
+                    {
+                        _layerPanelWidth = currentEvent.mousePosition.x;
+                        currentEvent.Use();
+                        Repaint();
+                    }
+                    break;
+
+                case EventType.MouseUp:
+                    if (_isResizing)
+                    {
+                        _isResizing = false;
+                        currentEvent.Use();
+                    }
+                    break;
+            }
         }
 
         /// <summary>
