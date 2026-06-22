@@ -163,6 +163,9 @@ namespace PSDSimpleEditor
             if (GUILayout.Button("Load", EditorStyles.toolbarButton, GUILayout.Width(44)))
                 LoadPSD();
 
+            if (GUILayout.Button("履歴 ▾", EditorStyles.toolbarDropDown, GUILayout.Width(60)))
+                ShowHistoryMenu();
+
             GUILayout.Space(8);
 
             _showMergedRef = GUILayout.Toggle(_showMergedRef, "マージ参照",
@@ -1201,6 +1204,9 @@ namespace PSDSimpleEditor
                 EditorUtility.DisplayProgressBar("PSD 読み込み中", "ファイルを解析しています...", 0.4f);
                 _psdFile = PSDParser.Parse(_psdPath);
 
+                // 読み込みに成功したパスを履歴へ記録
+                AddToHistory(resolved);
+
                 EditorUtility.DisplayProgressBar("PSD 読み込み中", "コンポジターを初期化しています...", 0.85f);
                 _compositor = new LayerCompositor(_psdFile.Width, _psdFile.Height);
                 if (!_compositor.IsValid)
@@ -1375,6 +1381,9 @@ namespace PSDSimpleEditor
 
                 Debug.Log($"[PSDSimpleEditor] PSD を保存しました: {savePath}");
 
+                // 新規 PSD として保存したパスを履歴へ記録
+                AddToHistory(savePath.Replace('\\', '/'));
+
                 string normalizedSavePath = savePath.Replace('\\', '/');
                 int assetsIndex = normalizedSavePath.IndexOf("/Assets/", StringComparison.OrdinalIgnoreCase);
                 if (assetsIndex != -1)
@@ -1427,6 +1436,108 @@ namespace PSDSimpleEditor
                 }
             }
             return _psdPath;
+        }
+
+        // ── 履歴 ───────────────────────────────────────────────────────────
+
+        const int HistoryMaxCount = 20;   // プロジェクトごとの履歴保存上限
+
+        /// <summary>JsonUtility 用の履歴シリアライズコンテナ。</summary>
+        [Serializable]
+        class HistoryData { public List<string> paths = new List<string>(); }
+
+        [NonSerialized] List<string> _history; // 遅延ロードされる履歴 (新しいものが先頭)
+
+        /// <summary>EditorPrefs はインストール全体で共有されるため、プロジェクトパスでキーを分けて「プロジェクトごと」にする。</summary>
+        static string HistoryPrefsKey =>
+            "PSDSimpleEditor.History." + Application.dataPath.GetHashCode().ToString("X8");
+
+        /// <summary>履歴を (遅延) ロードする。</summary>
+        List<string> LoadHistory()
+        {
+            if (_history != null) return _history;
+            _history = new List<string>();
+
+            string json = EditorPrefs.GetString(HistoryPrefsKey, "");
+            if (!string.IsNullOrEmpty(json))
+            {
+                try
+                {
+                    var data = JsonUtility.FromJson<HistoryData>(json);
+                    if (data?.paths != null) _history = data.paths;
+                }
+                catch { /* 壊れた値は無視して空履歴とする */ }
+            }
+            return _history;
+        }
+
+        /// <summary>現在の履歴を EditorPrefs へ書き戻す。</summary>
+        void SaveHistory()
+        {
+            if (_history == null) return;
+            EditorPrefs.SetString(HistoryPrefsKey, JsonUtility.ToJson(new HistoryData { paths = _history }));
+        }
+
+        /// <summary>パスを履歴の先頭へ追加する。重複は除去し、上限 (20件) を超えた分は切り捨てる。</summary>
+        void AddToHistory(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return;
+
+            var list = LoadHistory();
+            // 同一パス (大文字小文字無視) を除去してから先頭へ挿入
+            list.RemoveAll(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase));
+            list.Insert(0, path);
+            if (list.Count > HistoryMaxCount)
+                list.RemoveRange(HistoryMaxCount, list.Count - HistoryMaxCount);
+
+            SaveHistory();
+        }
+
+        /// <summary>履歴ドロップダウンを表示する。項目選択で即ロードする。</summary>
+        void ShowHistoryMenu()
+        {
+            var list = LoadHistory();
+            var menu = new GenericMenu();
+
+            if (list.Count == 0)
+            {
+                menu.AddDisabledItem(new GUIContent("(履歴なし)"));
+            }
+            else
+            {
+                for (int i = 0; i < list.Count; i++)
+                {
+                    string path = list[i];
+                    bool exists = File.Exists(path);
+                    // GenericMenu は '/' をサブメニュー区切りとして解釈するため除算記号へ置換
+                    string display = $"{i + 1}: {path}".Replace('/', '∕');
+                    if (!exists) display += "  (見つかりません)";
+
+                    if (exists)
+                        menu.AddItem(new GUIContent(display), false, () => LoadFromHistory(path));
+                    else
+                        menu.AddDisabledItem(new GUIContent(display));
+                }
+                menu.AddSeparator("");
+                menu.AddItem(new GUIContent("履歴をクリア"), false, ClearHistory);
+            }
+
+            menu.ShowAsContext();
+        }
+
+        /// <summary>履歴から選んだパスを入力欄へ反映してロードする。</summary>
+        void LoadFromHistory(string path)
+        {
+            _psdPath = path;
+            GUI.FocusControl(null);  // テキストフィールドの古い表示を解除
+            LoadPSD();
+        }
+
+        /// <summary>このプロジェクトの履歴を全消去する。</summary>
+        void ClearHistory()
+        {
+            _history = new List<string>();
+            SaveHistory();
         }
     }
 }
