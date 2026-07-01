@@ -113,19 +113,49 @@ namespace PSDSimpleEditor
                 DrawLayerNode(layers[i], depth);
         }
 
+        // レイヤーコントロール行の縦間隔 (詰まり防止)
+        const float RowGap = 5f;
+
+        // 横並びコントロールの標準高さ。ラベル/入力/ボタンを同一高さに揃えて縦中央そろえし、
+        // かつ行が縦方向に過剰に伸びる (stretchHeight 由来) のを防ぐ。
+        internal const float RowH = 20f;
+
+        /// <summary>コントロール 1 行分の縦余白を空ける。</summary>
+        static void RowSpace() => EditorGUILayout.Space(RowGap);
+
         /// <summary>▸ / ▾ の展開ボタン。押されたら反転した状態を返す。</summary>
         bool DrawFoldoutButton(bool expanded)
         {
             if (GUILayout.Button(expanded ? "▾" : "▸", PSDEditorTheme.FoldoutButtonStyle,
-                                 GUILayout.Width(16), GUILayout.Height(16)))
+                                 GUILayout.Width(18), GUILayout.Height(RowH)))
                 return !expanded;
             return expanded;
+        }
+
+        /// <summary>
+        /// テーマ管理の折りたたみ見出し (EditorGUILayout.Foldout の置き換え)。
+        /// ライト/ダーク両モードで文字色が破綻しないよう ▸/▾ ボタン + クリック可能ラベルで構成する。
+        /// </summary>
+        bool DrawSectionFoldout(string label, bool expanded, int indent)
+        {
+            bool result = expanded;
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(indent * IndentWidth + 18f);
+            if (GUILayout.Button(expanded ? "▾" : "▸", PSDEditorTheme.FoldoutButtonStyle,
+                                 GUILayout.Width(18), GUILayout.Height(RowH)))
+                result = !expanded;
+            if (GUILayout.Button(label, PSDEditorTheme.FoldoutLabelStyle, GUILayout.ExpandWidth(true),
+                                 GUILayout.Height(RowH)))
+                result = !expanded;
+            EditorGUILayout.EndHorizontal();
+            return result;
         }
 
         /// <summary>表示トグル (目のチェックボックス相当)。変更時に再合成。</summary>
         void DrawVisibilityToggle(PSDLayer layer)
         {
-            bool newVisible = EditorGUILayout.Toggle(layer.UIVisible, GUILayout.Width(16));
+            bool newVisible = GUILayout.Toggle(layer.UIVisible, "",
+                                               GUILayout.Width(16), GUILayout.Height(RowH));
             if (newVisible != layer.UIVisible)
             {
                 layer.UIVisible   = newVisible;
@@ -150,7 +180,8 @@ namespace PSDSimpleEditor
             layer.IsExpanded = DrawFoldoutButton(layer.IsExpanded);
             DrawVisibilityToggle(layer);
             string label = BuildLayerLabel(layer, true);
-            GUILayout.Label(new GUIContent(label, label), PSDEditorTheme.LayerNameStyle, GUILayout.ExpandWidth(true));
+            GUILayout.Label(new GUIContent(label, label), PSDEditorTheme.LayerNameStyle,
+                            GUILayout.ExpandWidth(true), GUILayout.Height(RowH));
             DrawBlendModePopup(layer, true);
             EditorGUILayout.EndHorizontal();
 
@@ -176,10 +207,11 @@ namespace PSDSimpleEditor
             EditorGUILayout.BeginVertical(PSDEditorTheme.LayerLeafCardStyle);
 
             EditorGUILayout.BeginHorizontal();
-            GUILayout.Space(16f);   // グループの折りたたみボタン位置に合わせる
+            GUILayout.Space(18f);   // グループの折りたたみボタン位置に合わせる
             DrawVisibilityToggle(layer);
             string label = BuildLayerLabel(layer, false);
-            GUILayout.Label(new GUIContent(label, label), PSDEditorTheme.LayerNameStyle, GUILayout.ExpandWidth(true));
+            GUILayout.Label(new GUIContent(label, label), PSDEditorTheme.LayerNameStyle,
+                            GUILayout.ExpandWidth(true), GUILayout.Height(RowH));
             DrawBlendModePopup(layer, false);
             EditorGUILayout.EndHorizontal();
 
@@ -279,9 +311,12 @@ namespace PSDSimpleEditor
             {
                 EditorGUILayout.BeginHorizontal();
                 GUILayout.Space(indent * IndentWidth + 18f);
-                GUILayout.Label("塗り色", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(48));
-                Color nc = EditorGUILayout.ColorField(layer.Adjustment.SolidColor);
+                GUILayout.Label("塗り色", PSDEditorTheme.ControlLabelStyle,
+                                GUILayout.Width(48), GUILayout.Height(RowH));
+                Color nc = EditorGUILayout.ColorField(GUIContent.none, layer.Adjustment.SolidColor,
+                                                      GUILayout.Height(RowH));
                 EditorGUILayout.EndHorizontal();
+                RowSpace();
                 if (nc != layer.Adjustment.SolidColor)
                 {
                     layer.Adjustment.SolidColor = nc;
@@ -304,8 +339,9 @@ namespace PSDSimpleEditor
                 EditorGUILayout.BeginHorizontal();
                 GUILayout.Space(indent * IndentWidth + 18f);
                 GUILayout.Label("マスク: " + (layer.MaskIsDisabled ? "無効" : "有効"),
-                                PSDEditorTheme.ControlLabelStyle);
+                                PSDEditorTheme.ControlLabelStyle, GUILayout.Height(RowH));
                 EditorGUILayout.EndHorizontal();
+                RowSpace();
             }
         }
 
@@ -394,7 +430,8 @@ namespace PSDSimpleEditor
             // Unknown 等で候補に無い場合は index 0 を仮表示 (ユーザー操作があるまで書き換えない)
             int curIndex = Mathf.Max(0, Array.IndexOf(modes, cur));
 
-            int newIndex = EditorGUILayout.Popup(curIndex, labels, GUILayout.Width(74));
+            int newIndex = EditorGUILayout.Popup(curIndex, labels,
+                                                 GUILayout.Width(74), GUILayout.Height(RowH));
             if (newIndex != curIndex)
             {
                 if (isGroup) layer.GroupBlendMode = modes[newIndex];

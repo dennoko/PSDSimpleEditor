@@ -76,6 +76,7 @@ namespace PSDSimpleEditor
         public static GUIStyle MiniButtonStyle       { get; private set; }
         public static GUIStyle ToolbarButtonStyle    { get; private set; }
         public static GUIStyle FoldoutButtonStyle    { get; private set; } // ▸ / ▾ 展開ボタン
+        public static GUIStyle FoldoutLabelStyle     { get; private set; } // 展開ボタン横のクリック可能ラベル
 
         // Layer tree (skill 非定義・独自)
         public static GUIStyle LayerLeafCardStyle    { get; private set; } // 通常レイヤーのカード
@@ -166,7 +167,8 @@ namespace PSDSimpleEditor
 
             CaptionStyle = new GUIStyle();
             CaptionStyle.fontSize = 9;
-            FixAllTextColors(CaptionStyle, TextTertiary);
+            CaptionStyle.alignment = TextAnchor.MiddleLeft;
+            FixAllTextColors(CaptionStyle, TextPrimary);
 
             CenteredCaptionStyle = new GUIStyle();
             CenteredCaptionStyle.fontSize  = 10;
@@ -177,14 +179,13 @@ namespace PSDSimpleEditor
             ControlLabelStyle = new GUIStyle();
             ControlLabelStyle.fontSize  = 10;
             ControlLabelStyle.alignment = TextAnchor.MiddleLeft;
-            ControlLabelStyle.padding   = new RectOffset(0, 0, 2, 0);
-            FixAllTextColors(ControlLabelStyle, TextTertiary);
+            FixAllTextColors(ControlLabelStyle, TextPrimary);
 
             LayerNameStyle = new GUIStyle();
             LayerNameStyle.fontSize  = 11;
             LayerNameStyle.alignment = TextAnchor.MiddleLeft;
             LayerNameStyle.clipping  = TextClipping.Clip;
-            FixAllTextColors(LayerNameStyle, TextSecondary);
+            FixAllTextColors(LayerNameStyle, TextPrimary);
 
             // ── Toolbar Button ────────────────────────────────────────────────
 
@@ -291,12 +292,31 @@ namespace PSDSimpleEditor
             FoldoutButtonStyle.border    = new RectOffset(0, 0, 0, 0);
             FoldoutButtonStyle.margin    = new RectOffset(0, 0, 0, 0);
             FoldoutButtonStyle.padding   = new RectOffset(0, 0, 0, 0);
-            FoldoutButtonStyle.fontSize  = 11;
+            FoldoutButtonStyle.fontSize  = 14;   // ▸/▾ を視認しやすいサイズに拡大
             FoldoutButtonStyle.alignment = TextAnchor.MiddleCenter;
-            FoldoutButtonStyle.normal.textColor  = TextTertiary;
+            FoldoutButtonStyle.normal.textColor  = TextPrimary;
             FoldoutButtonStyle.hover.textColor   = TextPrimary;
             FoldoutButtonStyle.active.textColor  = TextPrimary;
-            FoldoutButtonStyle.focused.textColor = TextTertiary;
+            FoldoutButtonStyle.focused.textColor = TextPrimary;
+
+            // 展開ボタン横のクリック可能ラベル (テーマ管理で light/dark 両対応)
+            FoldoutLabelStyle = new GUIStyle();
+            FoldoutLabelStyle.normal.background = null;
+            FoldoutLabelStyle.hover.background  = null;
+            FoldoutLabelStyle.active.background = null;
+            FoldoutLabelStyle.border    = new RectOffset(0, 0, 0, 0);
+            FoldoutLabelStyle.margin    = new RectOffset(0, 0, 0, 0);
+            FoldoutLabelStyle.padding   = new RectOffset(2, 2, 0, 0);
+            FoldoutLabelStyle.fontSize  = 11;
+            FoldoutLabelStyle.alignment = TextAnchor.MiddleLeft;
+            FoldoutLabelStyle.normal.textColor    = TextPrimary;
+            FoldoutLabelStyle.hover.textColor     = TextPrimary;
+            FoldoutLabelStyle.active.textColor    = TextPrimary;
+            FoldoutLabelStyle.focused.textColor   = TextPrimary;
+            FoldoutLabelStyle.onNormal.textColor  = TextPrimary;
+            FoldoutLabelStyle.onHover.textColor   = TextPrimary;
+            FoldoutLabelStyle.onActive.textColor  = TextPrimary;
+            FoldoutLabelStyle.onFocused.textColor = TextPrimary;
 
             // ── Layer tree (独自: 入れ子・グループ表現) ───────────────────────
 
@@ -449,16 +469,16 @@ namespace PSDSimpleEditor
                 _settingsBackupActive = true;
             }
 
-            // ─ テキスト色を固定
-            FixAllTextColors(EditorStyles.label, TextSecondary);
-            FixAllTextColors(EditorStyles.objectField, TextSecondary);
-            FixAllTextColors(EditorStyles.numberField, TextSecondary);
-            FixAllTextColors(EditorStyles.textField,   TextSecondary);
-            FixAllTextColors(EditorStyles.popup,       TextSecondary);
-            FixAllTextColors(EditorStyles.toggle,      TextSecondary);
-            FixAllTextColors(EditorStyles.foldout,     TextSecondary);
-            FixAllTextColors(GUI.skin.textField,       TextSecondary);
-            FixAllTextColors(GUI.skin.label,           TextSecondary);
+            // ─ テキスト色を固定 (無効化されていないパラメーター/表記は完全な白)
+            FixAllTextColors(EditorStyles.label, TextPrimary);
+            FixAllTextColors(EditorStyles.objectField, TextPrimary);
+            FixAllTextColors(EditorStyles.numberField, TextPrimary);
+            FixAllTextColors(EditorStyles.textField,   TextPrimary);
+            FixAllTextColors(EditorStyles.popup,       TextPrimary);
+            FixAllTextColors(EditorStyles.toggle,      TextPrimary);
+            FixAllTextColors(EditorStyles.foldout,     TextPrimary);
+            FixAllTextColors(GUI.skin.textField,       TextPrimary);
+            FixAllTextColors(GUI.skin.label,           TextPrimary);
 
             // ─ 背景テクスチャをすべての状態でダーク色＋ボーダーに固定
             FixAllStateBackgrounds(EditorStyles.objectField, _texSearchField);

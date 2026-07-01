@@ -10,11 +10,9 @@ namespace PSDSimpleEditor
         /// <summary>「色調補正」フォールドアウト。明るさ/コントラスト/色相/彩度/明度 + グラデーションマップ。</summary>
         void DrawAdjustmentFoldout(PSDLayer layer, int indent)
         {
-            EditorGUILayout.BeginHorizontal();
-            GUILayout.Space(indent * IndentWidth + 18f);
-            layer.UIAdjustExpanded = EditorGUILayout.Foldout(layer.UIAdjustExpanded, "色調補正", true);
-            EditorGUILayout.EndHorizontal();
-            if (!layer.UIAdjustExpanded) return;
+            layer.UIAdjustExpanded = DrawSectionFoldout("色調補正", layer.UIAdjustExpanded, indent);
+            if (!layer.UIAdjustExpanded) { RowSpace(); return; }
+            RowSpace();
 
             int ci = indent + 1;
 
@@ -53,8 +51,10 @@ namespace PSDSimpleEditor
         {
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            bool en = EditorGUILayout.ToggleLeft("着色 (白黒にも色を入れる)", layer.UIColorize);
+            bool en = EditorGUILayout.ToggleLeft("着色 (白黒にも色を入れる)", layer.UIColorize,
+                                                 GUILayout.Height(RowH));
             EditorGUILayout.EndHorizontal();
+            RowSpace();
             if (en != layer.UIColorize)
             {
                 layer.UIColorize  = en;
@@ -67,8 +67,9 @@ namespace PSDSimpleEditor
         {
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            bool en = EditorGUILayout.ToggleLeft("階調反転", layer.UIInvert);
+            bool en = EditorGUILayout.ToggleLeft("階調反転", layer.UIInvert, GUILayout.Height(RowH));
             EditorGUILayout.EndHorizontal();
+            RowSpace();
             if (en != layer.UIInvert)
             {
                 layer.UIInvert    = en;
@@ -81,8 +82,9 @@ namespace PSDSimpleEditor
         {
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            bool en = EditorGUILayout.ToggleLeft("しきい値", layer.UIThresholdEnabled);
+            bool en = EditorGUILayout.ToggleLeft("しきい値", layer.UIThresholdEnabled, GUILayout.Height(RowH));
             EditorGUILayout.EndHorizontal();
+            RowSpace();
             if (en != layer.UIThresholdEnabled)
             {
                 layer.UIThresholdEnabled = en;
@@ -103,8 +105,10 @@ namespace PSDSimpleEditor
         {
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            bool en = EditorGUILayout.ToggleLeft("ポスタリゼーション", layer.UIPosterizeEnabled);
+            bool en = EditorGUILayout.ToggleLeft("ポスタリゼーション", layer.UIPosterizeEnabled,
+                                                 GUILayout.Height(RowH));
             EditorGUILayout.EndHorizontal();
+            RowSpace();
             if (en != layer.UIPosterizeEnabled)
             {
                 layer.UIPosterizeEnabled = en;
@@ -148,8 +152,9 @@ namespace PSDSimpleEditor
         {
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            bool en = EditorGUILayout.ToggleLeft("トーンカーブ", layer.UICurveEnabled);
+            bool en = EditorGUILayout.ToggleLeft("トーンカーブ", layer.UICurveEnabled, GUILayout.Height(RowH));
             EditorGUILayout.EndHorizontal();
+            RowSpace();
             if (en != layer.UICurveEnabled)
             {
                 layer.UICurveEnabled = en;
@@ -162,11 +167,13 @@ namespace PSDSimpleEditor
 
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            GUILayout.Label("カーブ", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(48));
+            GUILayout.Label("カーブ", PSDEditorTheme.ControlLabelStyle,
+                            GUILayout.Width(48), GUILayout.Height(RowH));
             EditorGUI.BeginChangeCheck();
             AnimationCurve nc = EditorGUILayout.CurveField(layer.UICurve, GUILayout.Height(60));
             bool curveChanged = EditorGUI.EndChangeCheck();
             EditorGUILayout.EndHorizontal();
+            RowSpace();
             if (curveChanged)
             {
                 layer.UICurve = nc;
@@ -218,8 +225,10 @@ namespace PSDSimpleEditor
         {
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            bool en = EditorGUILayout.ToggleLeft("画像クリップ合成", layer.UIImageClipEnabled);
+            bool en = EditorGUILayout.ToggleLeft("画像クリップ合成", layer.UIImageClipEnabled,
+                                                 GUILayout.Height(RowH));
             EditorGUILayout.EndHorizontal();
+            RowSpace();
             if (en != layer.UIImageClipEnabled)
             {
                 layer.UIImageClipEnabled = en;
@@ -230,9 +239,12 @@ namespace PSDSimpleEditor
             // 画像
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            GUILayout.Label("画像", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(48));
-            var tex = (Texture2D)EditorGUILayout.ObjectField(layer.UIImageClipTex, typeof(Texture2D), false);
+            GUILayout.Label("画像", PSDEditorTheme.ControlLabelStyle,
+                            GUILayout.Width(48), GUILayout.Height(RowH));
+            var tex = (Texture2D)EditorGUILayout.ObjectField(layer.UIImageClipTex, typeof(Texture2D), false,
+                                                             GUILayout.Height(RowH));
             EditorGUILayout.EndHorizontal();
+            RowSpace();
             if (tex != layer.UIImageClipTex)
             {
                 layer.UIImageClipTex = tex;
@@ -242,9 +254,12 @@ namespace PSDSimpleEditor
             // タイル反復数 (X,Y)
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            GUILayout.Label("タイル", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(48));
-            Vector2 nt = EditorGUILayout.Vector2Field(GUIContent.none, layer.UIImageClipTile);
+            GUILayout.Label("タイル", PSDEditorTheme.ControlLabelStyle,
+                            GUILayout.Width(48), GUILayout.Height(RowH));
+            Vector2 nt = EditorGUILayout.Vector2Field(GUIContent.none, layer.UIImageClipTile,
+                                                      GUILayout.Height(RowH));
             EditorGUILayout.EndHorizontal();
+            RowSpace();
             if (nt != layer.UIImageClipTile)
             {
                 // 0 / 負値はタイリングが破綻するため下限でクランプ
@@ -255,12 +270,14 @@ namespace PSDSimpleEditor
             // 合成モード
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            GUILayout.Label("合成", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(48));
+            GUILayout.Label("合成", PSDEditorTheme.ControlLabelStyle,
+                            GUILayout.Width(48), GUILayout.Height(RowH));
             BlendMode[] modes  = _blendModesNormal;
             string[]    labels = _blendLabelsNormal ?? (_blendLabelsNormal = BuildBlendLabels(_blendModesNormal));
             int curIndex = Mathf.Max(0, Array.IndexOf(modes, layer.UIImageClipBlend));
-            int newIndex = EditorGUILayout.Popup(curIndex, labels);
+            int newIndex = EditorGUILayout.Popup(curIndex, labels, GUILayout.Height(RowH));
             EditorGUILayout.EndHorizontal();
+            RowSpace();
             if (newIndex != curIndex)
             {
                 layer.UIImageClipBlend = modes[newIndex];
@@ -281,8 +298,10 @@ namespace PSDSimpleEditor
         {
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            bool en = EditorGUILayout.ToggleLeft("グラデーションマップ", layer.UIGradientMapEnabled);
+            bool en = EditorGUILayout.ToggleLeft("グラデーションマップ", layer.UIGradientMapEnabled,
+                                                 GUILayout.Height(RowH));
             EditorGUILayout.EndHorizontal();
+            RowSpace();
             if (en != layer.UIGradientMapEnabled)
             {
                 layer.UIGradientMapEnabled = en;
@@ -297,8 +316,9 @@ namespace PSDSimpleEditor
             GUILayout.Space(indent * IndentWidth + 18f);
             bool normalize = EditorGUILayout.ToggleLeft(
                 new GUIContent("輝度を正規化", "レイヤーの最暗色〜最明色を 0..1 にストレッチしてからグラデーションを適用する"),
-                layer.UIGradientMapNormalize);
+                layer.UIGradientMapNormalize, GUILayout.Height(RowH));
             EditorGUILayout.EndHorizontal();
+            RowSpace();
             if (normalize != layer.UIGradientMapNormalize)
             {
                 layer.UIGradientMapNormalize = normalize;
@@ -308,11 +328,13 @@ namespace PSDSimpleEditor
 
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            GUILayout.Label("階調", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(48));
+            GUILayout.Label("階調", PSDEditorTheme.ControlLabelStyle,
+                            GUILayout.Width(48), GUILayout.Height(RowH));
             EditorGUI.BeginChangeCheck();
-            Gradient ng = EditorGUILayout.GradientField(layer.UIGradient);
+            Gradient ng = EditorGUILayout.GradientField(layer.UIGradient, GUILayout.Height(RowH));
             bool gradientChanged = EditorGUI.EndChangeCheck();
             EditorGUILayout.EndHorizontal();
+            RowSpace();
             if (gradientChanged)
             {
                 layer.UIGradient = ng;
@@ -388,14 +410,21 @@ namespace PSDSimpleEditor
             layer._gradientLumMax = max;
         }
 
-        /// <summary>インデント付きのラベル + スライダー 1 行。</summary>
+        /// <summary>インデント付きのラベル + スライダー 1 行 (行間の縦余白付き)。</summary>
         static float IndentedSlider(string label, float value, float min, float max, int indent)
         {
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            GUILayout.Label(label, PSDEditorTheme.ControlLabelStyle, GUILayout.Width(48));
-            float result = EditorGUILayout.Slider(value, min, max);
+            GUILayout.Label(label, PSDEditorTheme.ControlLabelStyle,
+                            GUILayout.Width(48), GUILayout.Height(RowH));
+
+            float originalWidth = EditorGUIUtility.labelWidth;
+            EditorGUIUtility.labelWidth = 1f;
+            float result = EditorGUILayout.Slider(value, min, max, GUILayout.Height(RowH));
+            EditorGUIUtility.labelWidth = originalWidth;
+
             EditorGUILayout.EndHorizontal();
+            RowSpace();
             return result;
         }
     }

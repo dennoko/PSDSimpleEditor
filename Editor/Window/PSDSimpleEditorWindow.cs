@@ -214,7 +214,7 @@ namespace PSDSimpleEditor
             GUILayout.FlexibleSpace();
             GUILayout.Space(12);
             EditorGUILayout.EndHorizontal();
-            EditorGUILayout.Space(6);
+            EditorGUILayout.Space(2);
             DrawSeparator();
         }
 
@@ -263,6 +263,7 @@ namespace PSDSimpleEditor
         /// <summary>Outline 色の 1px 横区切り線 (前後に余白)。</summary>
         void DrawSeparator()
         {
+            EditorGUILayout.Space(4);
             var rect = GUILayoutUtility.GetRect(0, 1, GUILayout.ExpandWidth(true));
             EditorGUI.DrawRect(rect, PSDEditorTheme.Outline);
             EditorGUILayout.Space(4);

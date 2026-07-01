@@ -14,25 +14,27 @@ namespace PSDSimpleEditor
         /// </summary>
         void DrawColorRangeMaskControls(PSDLayer layer, int indent)
         {
-            EditorGUILayout.BeginHorizontal();
-            GUILayout.Space(indent * IndentWidth + 18f);
-            layer.UIColorRangeExpanded = EditorGUILayout.Foldout(layer.UIColorRangeExpanded, "色域選択マスク", true);
-            EditorGUILayout.EndHorizontal();
+            layer.UIColorRangeExpanded = DrawSectionFoldout("色域選択マスク", layer.UIColorRangeExpanded, indent);
             if (!layer.UIColorRangeExpanded)
             {
                 // フォールドアウトを閉じたら、このレイヤーのスポイト待機・ハイライトを解除する
                 if (_eyedropperTarget == layer)        _eyedropperTarget = null;
                 if (_colorRangePreviewLayer == layer)  EndColorRangePreview();
+                RowSpace();
                 return;
             }
+            RowSpace();
 
             // 対象色 + スポイトトグル
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            GUILayout.Label("対象色", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(48));
-            Color nc = EditorGUILayout.ColorField(GUIContent.none, layer.UIColorRangeTarget, true, false, false);
+            GUILayout.Label("対象色", PSDEditorTheme.ControlLabelStyle,
+                            GUILayout.Width(48), GUILayout.Height(RowH));
+            Color nc = EditorGUILayout.ColorField(GUIContent.none, layer.UIColorRangeTarget, true, false, false,
+                                                  GUILayout.Height(RowH));
             bool armed = _eyedropperTarget == layer;
-            bool newArmed = GUILayout.Toggle(armed, "スポイト", PSDEditorTheme.MiniButtonStyle, GUILayout.Width(60));
+            bool newArmed = GUILayout.Toggle(armed, "スポイト", PSDEditorTheme.MiniButtonStyle,
+                                             GUILayout.Width(60), GUILayout.Height(RowH));
             EditorGUILayout.EndHorizontal();
             if (nc != layer.UIColorRangeTarget)
             {
@@ -44,14 +46,16 @@ namespace PSDSimpleEditor
                 _eyedropperTarget = newArmed ? layer : null;
                 Repaint();
             }
+            RowSpace();
 
             if (_eyedropperTarget == layer)
             {
                 EditorGUILayout.BeginHorizontal();
                 GUILayout.Space(indent * IndentWidth + 18f);
                 GUILayout.Label("プレビュー上の対象レイヤー領域をクリックで色を取得",
-                                PSDEditorTheme.ControlLabelStyle);
+                                PSDEditorTheme.ControlLabelStyle, GUILayout.Height(RowH));
                 EditorGUILayout.EndHorizontal();
+                RowSpace();
             }
 
             // 閾値
@@ -73,6 +77,7 @@ namespace PSDSimpleEditor
             if (GUILayout.Button("マスクを PNG 出力", PSDEditorTheme.ToolButtonStyle, GUILayout.Width(160)))
                 ExportColorRangeMask(layer);
             EditorGUILayout.EndHorizontal();
+            RowSpace();
         }
 
         /// <summary>指定レイヤーの色域選択ハイライトプレビューを開始/更新する。</summary>

@@ -11,6 +11,9 @@ namespace PSDSimpleEditor
     {
         void DrawBottomBar()
         {
+            // 書き出しボタン (28) の高さに各要素を合わせて縦中央そろえにする。
+            // CaptionStyle の stretchHeight を廃止済みのため、行はこの内容高さ + カード余白に収まる。
+            const float BarH = 28f;
             EditorGUILayout.BeginHorizontal(PSDEditorTheme.CardStyle);
 
             GUILayout.Label(
@@ -18,13 +21,17 @@ namespace PSDSimpleEditor
                 $"レイヤー数 {CountLayersRecursive(_psdFile.Layers)}   |   " +
                 $"{_psdFile.BitDepth}bit   |   " +
                 ColorModeName(_psdFile.ColorMode),
-                PSDEditorTheme.CaptionStyle);
+                PSDEditorTheme.CaptionStyle, GUILayout.Height(BarH));
 
             GUILayout.FlexibleSpace();
 
             // エクスポート形式の選択
-            GUILayout.Label("形式", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(30));
-            _exportFormat = (ExportFormat)EditorGUILayout.EnumPopup(_exportFormat, GUILayout.Width(80));
+            GUILayout.Label("形式", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(30), GUILayout.Height(BarH));
+            float originalLabelWidth = EditorGUIUtility.labelWidth;
+            EditorGUIUtility.labelWidth = 1f;
+            _exportFormat = (ExportFormat)EditorGUILayout.EnumPopup(_exportFormat,
+                                                                    GUILayout.Width(80), GUILayout.Height(RowH));
+            EditorGUIUtility.labelWidth = originalLabelWidth;
 
             bool canExport = false;
             if (_exportFormat == ExportFormat.PNG || _exportFormat == ExportFormat.TGA)

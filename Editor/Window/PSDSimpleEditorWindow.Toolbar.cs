@@ -15,12 +15,14 @@ namespace PSDSimpleEditor
         void DrawSettingsCard()
         {
             EditorGUILayout.BeginVertical(PSDEditorTheme.CardStyle);
+            EditorGUILayout.Space(2);
 
             DrawPsdInputRow();
             DrawSeparator();
             DrawExportDirRow();
             DrawSeparator();
             DrawRealtimePreviewRow();
+            EditorGUILayout.Space(4);
 
             EditorGUILayout.EndVertical();
         }
@@ -29,9 +31,10 @@ namespace PSDSimpleEditor
         void DrawPsdInputRow()
         {
             EditorGUILayout.BeginHorizontal();
-            GUILayout.Label("PSD", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(SettingsLabelWidth));
+            GUILayout.Label("PSD", PSDEditorTheme.ControlLabelStyle,
+                            GUILayout.Width(SettingsLabelWidth), GUILayout.Height(RowH));
 
-            _psdPath = EditorGUILayout.TextField(_psdPath, GUILayout.ExpandWidth(true));
+            _psdPath = EditorGUILayout.TextField(_psdPath, GUILayout.ExpandWidth(true), GUILayout.Height(RowH));
 
             if (GUILayout.Button("参照", PSDEditorTheme.ToolButtonStyle, GUILayout.Width(SettingsButtonWidth)))
             {
@@ -63,9 +66,10 @@ namespace PSDSimpleEditor
         void DrawExportDirRow()
         {
             EditorGUILayout.BeginHorizontal();
-            GUILayout.Label("出力先", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(SettingsLabelWidth));
+            GUILayout.Label("出力先", PSDEditorTheme.ControlLabelStyle,
+                            GUILayout.Width(SettingsLabelWidth), GUILayout.Height(RowH));
 
-            _exportDir = EditorGUILayout.TextField(_exportDir, GUILayout.ExpandWidth(true));
+            _exportDir = EditorGUILayout.TextField(_exportDir, GUILayout.ExpandWidth(true), GUILayout.Height(RowH));
 
             if (GUILayout.Button("参照", PSDEditorTheme.ToolButtonStyle, GUILayout.Width(SettingsButtonWidth)))
             {
@@ -94,11 +98,16 @@ namespace PSDSimpleEditor
         void DrawRealtimePreviewRow()
         {
             EditorGUILayout.BeginHorizontal();
-            GUILayout.Label("3D反映", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(SettingsLabelWidth));
+            GUILayout.Label("3D反映", PSDEditorTheme.ControlLabelStyle,
+                            GUILayout.Width(SettingsLabelWidth), GUILayout.Height(RowH));
+
+            float originalLabelWidth = EditorGUIUtility.labelWidth;
+            EditorGUIUtility.labelWidth = 1f;
 
             // マテリアル選択フィールド
             Material prevMat = (Material)EditorGUILayout.ObjectField(
-                GUIContent.none, _previewMaterial, typeof(Material), true, GUILayout.Width(160));
+                GUIContent.none, _previewMaterial, typeof(Material), true,
+                GUILayout.Width(160), GUILayout.Height(RowH));
 
             if (prevMat != _previewMaterial)
             {
@@ -107,8 +116,13 @@ namespace PSDSimpleEditor
                 _needsRecomposite = true;
             }
 
-            GUILayout.Label("スロット", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(48));
-            string prevSlot = EditorGUILayout.TextField(_previewSlotName, GUILayout.Width(110));
+            GUILayout.Label("スロット", PSDEditorTheme.ControlLabelStyle,
+                            GUILayout.Width(48), GUILayout.Height(RowH));
+            string prevSlot = EditorGUILayout.TextField(_previewSlotName,
+                GUILayout.Width(110), GUILayout.Height(RowH));
+
+            EditorGUIUtility.labelWidth = originalLabelWidth;
+
             if (prevSlot != _previewSlotName)
             {
                 RevertRealtimePreview();
