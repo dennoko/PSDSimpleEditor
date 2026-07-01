@@ -375,7 +375,8 @@ namespace PSDSimpleEditor
                 prefix += "[SoCo] ";
             else if (!isGroup && layer.IsAdjustmentLayer &&
                      layer.Adjustment != null &&
-                     (layer.Adjustment.HasBrightnessContrast || layer.Adjustment.HasHueSaturation))
+                     (layer.Adjustment.HasBrightnessContrast || layer.Adjustment.HasHueSaturation ||
+                      layer.Adjustment.HasInvert || layer.Adjustment.HasThreshold || layer.Adjustment.HasPosterize))
                 prefix += "[調整] ";
 
             if (layer.Effects != null && layer.Effects.HasColorOverlay)
@@ -421,6 +422,18 @@ namespace PSDSimpleEditor
                 }
                 DrawColorizeToggle(layer, indent);
             }
+
+            // 階調反転 (invr)
+            if (layer.Adjustment != null && layer.Adjustment.HasInvert)
+                DrawInvertToggle(layer, indent);
+
+            // しきい値 (thrs)
+            if (layer.Adjustment != null && layer.Adjustment.HasThreshold)
+                DrawThresholdControls(layer, indent);
+
+            // ポスタリゼーション (post)
+            if (layer.Adjustment != null && layer.Adjustment.HasPosterize)
+                DrawPosterizeControls(layer, indent);
 
             // ベタ塗りカラー (SoCo)
             if (layer.Adjustment != null && layer.Adjustment.HasSolidColor)
@@ -500,6 +513,9 @@ namespace PSDSimpleEditor
                 _needsRecomposite  = true;
             }
             DrawColorizeToggle(layer, ci);
+            DrawInvertToggle(layer, ci);
+            DrawThresholdControls(layer, ci);
+            DrawPosterizeControls(layer, ci);
 
             DrawGradientMapControls(layer, ci);
             DrawImageClipControls(layer, ci);
@@ -515,6 +531,64 @@ namespace PSDSimpleEditor
             if (en != layer.UIColorize)
             {
                 layer.UIColorize  = en;
+                _needsRecomposite = true;
+            }
+        }
+
+        /// <summary>「階調反転」トグル (非破壊。全ピクセルレイヤーに適用可)。</summary>
+        void DrawInvertToggle(PSDLayer layer, int indent)
+        {
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(indent * IndentWidth + 18f);
+            bool en = EditorGUILayout.ToggleLeft("階調反転", layer.UIInvert);
+            EditorGUILayout.EndHorizontal();
+            if (en != layer.UIInvert)
+            {
+                layer.UIInvert    = en;
+                _needsRecomposite = true;
+            }
+        }
+
+        /// <summary>「しきい値」有効トグル + レベルスライダー (非破壊。全ピクセルレイヤーに適用可)。</summary>
+        void DrawThresholdControls(PSDLayer layer, int indent)
+        {
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(indent * IndentWidth + 18f);
+            bool en = EditorGUILayout.ToggleLeft("しきい値", layer.UIThresholdEnabled);
+            EditorGUILayout.EndHorizontal();
+            if (en != layer.UIThresholdEnabled)
+            {
+                layer.UIThresholdEnabled = en;
+                _needsRecomposite = true;
+            }
+            if (!en) return;
+
+            float nl = IndentedSlider("レベル", layer.UIThresholdLevel, 0f, 255f, indent);
+            if (!Mathf.Approximately(nl, layer.UIThresholdLevel))
+            {
+                layer.UIThresholdLevel = nl;
+                _needsRecomposite = true;
+            }
+        }
+
+        /// <summary>「ポスタリゼーション」有効トグル + 階調数スライダー (非破壊。全ピクセルレイヤーに適用可)。</summary>
+        void DrawPosterizeControls(PSDLayer layer, int indent)
+        {
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(indent * IndentWidth + 18f);
+            bool en = EditorGUILayout.ToggleLeft("ポスタリゼーション", layer.UIPosterizeEnabled);
+            EditorGUILayout.EndHorizontal();
+            if (en != layer.UIPosterizeEnabled)
+            {
+                layer.UIPosterizeEnabled = en;
+                _needsRecomposite = true;
+            }
+            if (!en) return;
+
+            float nl = IndentedSlider("階調数", layer.UIPosterizeLevels, 2f, 255f, indent);
+            if (!Mathf.Approximately(nl, layer.UIPosterizeLevels))
+            {
+                layer.UIPosterizeLevels = nl;
                 _needsRecomposite = true;
             }
         }
@@ -1020,18 +1094,40 @@ namespace PSDSimpleEditor
             Texture2D maskTex = null;
             try
             {
-                var pixels = ColorRangeMask.BuildMaskPixels(
+                var layerPixels = ColorRangeMask.BuildMaskPixels(
                     layer, layer.UIColorRangeTarget, layer.UIColorRangeThreshold,
-                    out int w, out int h);
-                if (pixels == null)
+                    out int lw, out int lh);
+                if (layerPixels == null)
                 {
                     EditorUtility.DisplayDialog("エラー", "マスクの生成に失敗しました。", "OK");
                     return;
                 }
 
-                maskTex = new Texture2D(w, h, TextureFormat.RGBA32, false, linear: false)
+                // キャンバス全体サイズで黒マスクを作り、レイヤー位置へ貼り付ける
+                int cw = _psdFile.Width;
+                int ch = _psdFile.Height;
+                var canvas = new Color32[cw * ch];
+                for (int i = 0; i < canvas.Length; i++)
+                    canvas[i] = new Color32(0, 0, 0, 255);
+
+                // Unity テクスチャはボトムアップ。レイヤー pixel y=0 は PSD 下端 (Bottom-1行目)
+                // キャンバス上の対応行: ch - layer.Bottom + y_l
+                int baseRow = ch - layer.Bottom;
+                for (int y = 0; y < lh; y++)
+                {
+                    int canvasY = baseRow + y;
+                    if (canvasY < 0 || canvasY >= ch) continue;
+                    for (int x = 0; x < lw; x++)
+                    {
+                        int canvasX = layer.Left + x;
+                        if (canvasX < 0 || canvasX >= cw) continue;
+                        canvas[canvasY * cw + canvasX] = layerPixels[y * lw + x];
+                    }
+                }
+
+                maskTex = new Texture2D(cw, ch, TextureFormat.RGBA32, false, linear: false)
                 { hideFlags = HideFlags.HideAndDontSave };
-                maskTex.SetPixels32(pixels);
+                maskTex.SetPixels32(canvas);
                 maskTex.Apply(false);
 
                 string psdName  = string.IsNullOrEmpty(_psdPath)

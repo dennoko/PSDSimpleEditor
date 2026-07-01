@@ -410,6 +410,9 @@ namespace PSDSimpleEditor
                 || !Mathf.Approximately(layer.UISaturation, 0f)
                 || !Mathf.Approximately(layer.UILightness,  0f)
                 || layer.UIColorize
+                || layer.UIInvert
+                || layer.UIThresholdEnabled
+                || layer.UIPosterizeEnabled
                 || (layer.UIGradientMapEnabled && layer._gradientLut != null);
         }
 

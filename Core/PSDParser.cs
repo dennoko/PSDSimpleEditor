@@ -447,6 +447,18 @@ namespace PSDSimpleEditor
                     HandleLrFX(r, layer, len);
                     break;
 
+                case "invr": // 階調反転 (パラメータなし。キー存在のみで判定)
+                    layer.Adjustment.HasInvert = true;
+                    break;
+
+                case "thrs": // しきい値
+                    HandleThreshold(r, layer);
+                    break;
+
+                case "post": // ポスタリゼーション
+                    HandlePosterize(r, layer);
+                    break;
+
                 default:
                     // その他のキーは読まずにスキップ (境界 seek は呼び出し側)
                     break;
@@ -540,6 +552,22 @@ namespace PSDSimpleEditor
             {
                 Debug.LogWarning($"[PSDParser] レイヤー '{layer.Name}' のべた塗りは RGB 以外のカラー形式のため未対応です。");
             }
+        }
+
+        static void HandleThreshold(BigEndianBinaryReader r, PSDLayer layer)
+        {
+            r.ReadUInt16();                     // version (=1)
+            ushort level = r.ReadUInt16();       // 0 .. 255
+            layer.Adjustment.HasThreshold  = true;
+            layer.Adjustment.ThresholdLevel = level;
+        }
+
+        static void HandlePosterize(BigEndianBinaryReader r, PSDLayer layer)
+        {
+            r.ReadUInt16();                     // version (=1)
+            ushort levels = r.ReadUInt16();      // 2 .. 255
+            layer.Adjustment.HasPosterize     = true;
+            layer.Adjustment.PosterizeLevels = Mathf.Max(2, (int)levels);
         }
 
         static void HandleLfx2(BigEndianBinaryReader r, PSDLayer layer)
@@ -962,6 +990,11 @@ namespace PSDSimpleEditor
                 l.UIHue        = l.Adjustment.HasHueSaturation ? l.Adjustment.Hue        : 0f;
                 l.UISaturation = l.Adjustment.HasHueSaturation ? l.Adjustment.Saturation : 0f;
                 l.UILightness  = l.Adjustment.HasHueSaturation ? l.Adjustment.Lightness  : 0f;
+                l.UIInvert            = l.Adjustment.HasInvert;
+                l.UIThresholdEnabled  = l.Adjustment.HasThreshold;
+                l.UIThresholdLevel    = l.Adjustment.HasThreshold ? l.Adjustment.ThresholdLevel : 128f;
+                l.UIPosterizeEnabled  = l.Adjustment.HasPosterize;
+                l.UIPosterizeLevels   = l.Adjustment.HasPosterize ? l.Adjustment.PosterizeLevels : 4f;
                 InitUIState(l.Children);
             }
         }
@@ -1291,6 +1324,9 @@ namespace PSDSimpleEditor
             if (layer.Adjustment.HasBrightnessContrast) adj += $" brit({layer.Adjustment.Brightness},{layer.Adjustment.Contrast})";
             if (layer.Adjustment.HasHueSaturation)      adj += $" hue2({layer.Adjustment.Hue},{layer.Adjustment.Saturation},{layer.Adjustment.Lightness})";
             if (layer.Adjustment.HasSolidColor)         adj += $" SoCo({layer.Adjustment.SolidColor})";
+            if (layer.Adjustment.HasInvert)             adj += " Invert";
+            if (layer.Adjustment.HasThreshold)          adj += $" Threshold({layer.Adjustment.ThresholdLevel})";
+            if (layer.Adjustment.HasPosterize)          adj += $" Posterize({layer.Adjustment.PosterizeLevels})";
             if (layer.Effects != null && layer.Effects.HasColorOverlay) adj += " ColorOverlay";
 
             vlog.AppendLine(

@@ -67,6 +67,14 @@ namespace PSDSimpleEditor
 
         public bool  HasSolidColor;          // SoCo
         public Color SolidColor;
+
+        public bool  HasInvert;              // invr (データなし、キー存在のみで判定)
+
+        public bool  HasThreshold;           // thrs
+        public float ThresholdLevel = 128f;  // 0 .. 255
+
+        public bool  HasPosterize;           // post
+        public float PosterizeLevels = 4f;   // 2 .. 255
     }
 
     // ─── レイヤーエフェクト (lfx2 / lrFX, best effort) ───────────────────────
@@ -127,6 +135,13 @@ namespace PSDSimpleEditor
         public float UIHue;          // -180 .. 180
         public float UISaturation;   // -100 .. 100
         public float UILightness;    // -100 .. 100
+
+        // ── 階調反転・しきい値・ポスタリゼーション (非破壊。全ピクセルレイヤーに適用可) ──
+        public bool  UIInvert;               // 階調反転 ON/OFF (invr はパラメータを持たないため有効フラグそのもの)
+        public bool  UIThresholdEnabled;
+        public float UIThresholdLevel = 128f;  // 0 .. 255
+        public bool  UIPosterizeEnabled;
+        public float UIPosterizeLevels = 4f;   // 2 .. 255
 
         // ── 着色 (Colorize): ON で絶対値の色相・彩度を強制し、白黒 (彩度0) にも着色する ──
         [System.NonSerialized] public bool UIColorize;

@@ -251,7 +251,10 @@ namespace PSDSimpleEditor
             {
                 bool hasAdj = layer.Adjustment.HasBrightnessContrast
                            || layer.Adjustment.HasHueSaturation
-                           || layer.UIColorize;
+                           || layer.UIColorize
+                           || layer.UIInvert
+                           || layer.UIThresholdEnabled
+                           || layer.UIPosterizeEnabled;
                 // 補正項目を持たない調整レイヤーは素通し (バッファは変化しないため描画自体を省略)
                 if (!hasAdj) return;
 
@@ -583,6 +586,11 @@ namespace PSDSimpleEditor
             public Texture ClipMaskTex;  // null → _HasClipMask = 0
             public float   Brightness, Contrast, Hue, Saturation, Lightness; // 正規化済み -1..1
             public bool    Colorize;     // true → 絶対値の色相・彩度を強制 (白黒着色)
+            public bool    Invert;       // true → 階調反転
+            public bool    Threshold;    // true → しきい値有効
+            public float   ThresholdLevel;   // 0..1 (実値/255)
+            public bool    Posterize;    // true → ポスタリゼーション有効
+            public float   PosterizeLevels;  // 2..255
             public Texture GradientMapTex;     // null → グラデーションマップ無効
             public float   GradientMapOpacity; // 0..1
         }
@@ -604,6 +612,9 @@ namespace PSDSimpleEditor
                 ClipMaskTex = null,
                 Brightness = 0f, Contrast = 0f, Hue = 0f, Saturation = 0f, Lightness = 0f,
                 Colorize = false,
+                Invert = false,
+                Threshold = false, ThresholdLevel = 0.5f,
+                Posterize = false, PosterizeLevels = 4f,
                 GradientMapTex = null, GradientMapOpacity = 1f
             };
         }
@@ -647,6 +658,11 @@ namespace PSDSimpleEditor
             _mat.SetFloat("_Saturation", Mathf.Clamp(p.Saturation, -1f, 1f));
             _mat.SetFloat("_Lightness",  Mathf.Clamp(p.Lightness,  -1f, 1f));
             _mat.SetInt  ("_Colorize",   p.Colorize ? 1 : 0);
+            _mat.SetInt  ("_HasInvert",    p.Invert ? 1 : 0);
+            _mat.SetInt  ("_HasThreshold", p.Threshold ? 1 : 0);
+            _mat.SetFloat("_ThresholdLevel", Mathf.Clamp01(p.ThresholdLevel));
+            _mat.SetInt  ("_HasPosterize", p.Posterize ? 1 : 0);
+            _mat.SetFloat("_PosterizeLevels", Mathf.Max(2f, p.PosterizeLevels));
 
             // グラデーションマップ (LUT 未設定時は無効)
             bool hasGrad = p.GradientMapTex != null;
@@ -675,6 +691,12 @@ namespace PSDSimpleEditor
             p.Saturation = layer.UISaturation / 100f;
             p.Lightness  = layer.UILightness  / 100f;
             p.Colorize   = layer.UIColorize;
+
+            p.Invert          = layer.UIInvert;
+            p.Threshold       = layer.UIThresholdEnabled;
+            p.ThresholdLevel  = layer.UIThresholdLevel / 255f;
+            p.Posterize       = layer.UIPosterizeEnabled;
+            p.PosterizeLevels = layer.UIPosterizeLevels;
 
             if (layer.UIGradientMapEnabled && layer._gradientLut != null)
             {

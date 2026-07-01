@@ -38,6 +38,11 @@ Shader "PSDSimpleEditor/LayerBlend"
         _Saturation   ("彩度 -1..1 (実値/100)",         Float)  = 0
         _Lightness    ("明度 -1..1 (実値/100)",         Float)  = 0
         _Colorize     ("着色 0/1",                      Int)    = 0
+        _HasInvert    ("階調反転有効 0/1",              Int)    = 0
+        _HasThreshold ("しきい値有効 0/1",              Int)    = 0
+        _ThresholdLevel ("しきい値 0..1 (実値/255)",    Float)  = 0.5
+        _HasPosterize ("ポスタリゼーション有効 0/1",    Int)    = 0
+        _PosterizeLevels ("階調数 (2..255)",            Float)  = 4
         _HasGradientMap     ("グラデーションマップ有効 0/1", Int)   = 0
         _GradientMapTex     ("グラデーション LUT (256x1)",   2D)    = "white" {}
         _GradientMapOpacity ("グラデーションマップ適用率 0..1", Float) = 1
@@ -82,6 +87,11 @@ Shader "PSDSimpleEditor/LayerBlend"
             float     _Saturation;    // -1..1 (実値 / 100)
             float     _Lightness;     // -1..1 (実値 / 100)
             int       _Colorize;      // 1 = 絶対値の色相・彩度を強制 (白黒着色)
+            int       _HasInvert;        // 0/1
+            int       _HasThreshold;     // 0/1
+            float     _ThresholdLevel;   // 0..1 (実値 / 255)
+            int       _HasPosterize;     // 0/1
+            float     _PosterizeLevels;  // 2..255
             int       _HasGradientMap;     // 0/1
             sampler2D _GradientMapTex;     // 256x1 LUT (輝度 → 色)
             float     _GradientMapOpacity; // 0..1
@@ -382,6 +392,24 @@ Shader "PSDSimpleEditor/LayerBlend"
             // ════════════════════════════════════════════════════════════════
             float3 ApplyAdjustments(float3 col)
             {
+                // ── 階調反転 ──
+                if (_HasInvert == 1)
+                    col = saturate(1.0 - col);
+
+                // ── ポスタリゼーション: 各チャンネルを指定階調数へ量子化 ──
+                if (_HasPosterize == 1)
+                {
+                    float levels = max(_PosterizeLevels, 2.0);
+                    col = round(col * (levels - 1.0)) / (levels - 1.0);
+                }
+
+                // ── しきい値: 輝度がしきい値以上なら白、未満なら黒 ──
+                if (_HasThreshold == 1)
+                {
+                    float lum = Lum(col);
+                    col = (lum >= _ThresholdLevel) ? float3(1, 1, 1) : float3(0, 0, 0);
+                }
+
                 // ── 明るさ: 加算系 ──
                 col = saturate(col + _Brightness);
 
