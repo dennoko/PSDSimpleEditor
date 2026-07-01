@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace PSDSimpleEditor
@@ -59,6 +60,14 @@ namespace PSDSimpleEditor
 
                 case "post": // ポスタリゼーション
                     HandlePosterize(r, layer);
+                    break;
+
+                case "levl": // レベル補正
+                    HandleLevels(r, layer);
+                    break;
+
+                case "curv": // トーンカーブ
+                    HandleCurves(r, layer);
                     break;
 
                 default:
@@ -170,6 +179,49 @@ namespace PSDSimpleEditor
             ushort levels = r.ReadUInt16();      // 2 .. 255
             layer.Adjustment.HasPosterize     = true;
             layer.Adjustment.PosterizeLevels = Mathf.Max(2, (int)levels);
+        }
+
+        static void HandleLevels(BigEndianBinaryReader r, PSDLayer layer)
+        {
+            // 形式: version(2B, =2) + 複合チャンネルの 10 バイトレコード
+            //       (残りの per-channel レコードは呼び出し側の境界 seek でスキップされる)
+            r.ReadUInt16();                       // version
+            ushort shadowInput     = r.ReadUInt16();
+            ushort highlightInput  = r.ReadUInt16();
+            ushort shadowOutput    = r.ReadUInt16();
+            ushort highlightOutput = r.ReadUInt16();
+            ushort midtoneGamma    = r.ReadUInt16(); // 実値 ×100 (100 = ガンマ 1.00)
+
+            layer.Adjustment.HasLevels        = true;
+            layer.Adjustment.LevelsInputBlack  = shadowInput;
+            layer.Adjustment.LevelsInputWhite  = highlightInput;
+            layer.Adjustment.LevelsGamma       = Mathf.Max(0.01f, midtoneGamma / 100f);
+            layer.Adjustment.LevelsOutputBlack = shadowOutput;
+            layer.Adjustment.LevelsOutputWhite = highlightOutput;
+        }
+
+        static void HandleCurves(BigEndianBinaryReader r, PSDLayer layer)
+        {
+            // 形式: version(2B, =1) + channelCount(2B) + 各チャンネル (channelId(2B) + pointCount(2B)
+            //       + pointCount × (outputValue(2B) inputValue(2B)))。
+            //       複合/コンポジットチャンネル (先頭) のみ v1 で対応する。
+            r.ReadUInt16();                       // version
+            ushort channelCount = r.ReadUInt16();
+            if (channelCount == 0) return;
+
+            r.ReadUInt16();                       // channelId (先頭チャンネル)
+            ushort pointCount = r.ReadUInt16();
+            var points = new List<Vector2>(pointCount);
+            for (int i = 0; i < pointCount; i++)
+            {
+                ushort output = r.ReadUInt16();
+                ushort input  = r.ReadUInt16();
+                points.Add(new Vector2(input, output));
+            }
+            if (points.Count < 2) return;
+
+            layer.Adjustment.HasCurves    = true;
+            layer.Adjustment.CurvePoints = points;
         }
 
         static void HandleLfx2(BigEndianBinaryReader r, PSDLayer layer)

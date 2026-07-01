@@ -258,7 +258,9 @@ namespace PSDSimpleEditor
                            || layer.UIColorize
                            || layer.UIInvert
                            || layer.UIThresholdEnabled
-                           || layer.UIPosterizeEnabled;
+                           || layer.UIPosterizeEnabled
+                           || layer.Adjustment.HasLevels
+                           || layer.UICurveEnabled;
                 // 補正項目を持たない調整レイヤーは素通し (バッファは変化しないため描画自体を省略)
                 if (!hasAdj) return;
 

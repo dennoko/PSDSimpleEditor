@@ -124,8 +124,28 @@ namespace PSDSimpleEditor
                 l.UIThresholdLevel    = l.Adjustment.HasThreshold ? l.Adjustment.ThresholdLevel : 128f;
                 l.UIPosterizeEnabled  = l.Adjustment.HasPosterize;
                 l.UIPosterizeLevels   = l.Adjustment.HasPosterize ? l.Adjustment.PosterizeLevels : 4f;
+                l.UILevelsInputBlack  = l.Adjustment.HasLevels ? l.Adjustment.LevelsInputBlack  : 0f;
+                l.UILevelsInputWhite  = l.Adjustment.HasLevels ? l.Adjustment.LevelsInputWhite  : 255f;
+                l.UILevelsGamma       = l.Adjustment.HasLevels ? l.Adjustment.LevelsGamma       : 1f;
+                l.UILevelsOutputBlack = l.Adjustment.HasLevels ? l.Adjustment.LevelsOutputBlack : 0f;
+                l.UILevelsOutputWhite = l.Adjustment.HasLevels ? l.Adjustment.LevelsOutputWhite : 255f;
+                l.UICurveEnabled = l.Adjustment.HasCurves;
+                if (l.Adjustment.HasCurves && l.Adjustment.CurvePoints != null && l.Adjustment.CurvePoints.Count >= 2)
+                    l.UICurve = BuildAnimationCurveFromPoints(l.Adjustment.CurvePoints);
                 InitUIState(l.Children);
             }
+        }
+
+        /// <summary>curv の制御点 (0..255 空間) から滑らかな 0..1 空間の AnimationCurve を組み立てる。</summary>
+        static AnimationCurve BuildAnimationCurveFromPoints(List<Vector2> points)
+        {
+            var keys = new Keyframe[points.Count];
+            for (int i = 0; i < points.Count; i++)
+                keys[i] = new Keyframe(points[i].x / 255f, points[i].y / 255f);
+            var curve = new AnimationCurve(keys);
+            for (int i = 0; i < keys.Length; i++)
+                curve.SmoothTangents(i, 0f);
+            return curve;
         }
     }
 }

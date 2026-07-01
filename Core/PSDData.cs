@@ -75,6 +75,16 @@ namespace PSDSimpleEditor
 
         public bool  HasPosterize;           // post
         public float PosterizeLevels = 4f;   // 2 .. 255
+
+        public bool  HasLevels;              // levl (複合/コンポジットチャンネルのみ v1 対応)
+        public float LevelsInputBlack  = 0f;    // 0 .. 255
+        public float LevelsInputWhite  = 255f;  // 0 .. 255
+        public float LevelsGamma       = 1f;    // 0.01 .. 9.99
+        public float LevelsOutputBlack = 0f;    // 0 .. 255
+        public float LevelsOutputWhite = 255f;  // 0 .. 255
+
+        public bool          HasCurves;      // curv (複合/コンポジットチャンネルのみ v1 対応)
+        public List<Vector2> CurvePoints;    // (入力, 出力) 0..255 空間の制御点。null = 未設定
     }
 
     // ─── レイヤーエフェクト (lfx2 / lrFX, best effort) ───────────────────────
@@ -143,6 +153,18 @@ namespace PSDSimpleEditor
         public bool  UIPosterizeEnabled;
         public float UIPosterizeLevels = 4f;   // 2 .. 255
 
+        // ── レベル補正 (非破壊。全ピクセルレイヤーに適用可。既定値は恒等変換) ──
+        public float UILevelsInputBlack  = 0f;    // 0 .. 255
+        public float UILevelsInputWhite  = 255f;  // 0 .. 255
+        public float UILevelsGamma       = 1f;    // 0.01 .. 9.99
+        public float UILevelsOutputBlack = 0f;    // 0 .. 255
+        public float UILevelsOutputWhite = 255f;  // 0 .. 255
+
+        // ── トーンカーブ (非破壊。全ピクセルレイヤーに適用可) ──
+        [System.NonSerialized] public bool           UICurveEnabled;
+        [System.NonSerialized] public AnimationCurve  UICurve;    // 既定: 直線 (0,0)-(1,1)
+        [System.NonSerialized] public Texture2D       _curveLut;  // 256×1 焼き込み LUT (window が管理)
+
         // ── 着色 (Colorize): ON で絶対値の色相・彩度を強制し、白黒 (彩度0) にも着色する ──
         [System.NonSerialized] public bool UIColorize;
 
@@ -158,6 +180,9 @@ namespace PSDSimpleEditor
         [System.NonSerialized] public Gradient  UIGradient;            // 既定: 黒→白
         [System.NonSerialized] public float     UIGradientMapOpacity = 1f; // 0 .. 1
         [System.NonSerialized] public Texture2D _gradientLut;          // 256×1 焼き込み LUT (window が管理)
+        [System.NonSerialized] public bool      UIGradientMapNormalize;    // true: 輝度を対象レイヤーの最暗〜最明で 0..1 に正規化
+        [System.NonSerialized] public float     _gradientLumMin = 0f;      // 正規化用レンジ (window が非透明画素から計算)
+        [System.NonSerialized] public float     _gradientLumMax = 1f;
 
         // ── UI フォールドアウト状態 (色調補正セクションの開閉) ──
         [System.NonSerialized] public bool UIAdjustExpanded;

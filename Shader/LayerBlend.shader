@@ -43,9 +43,19 @@ Shader "PSDSimpleEditor/LayerBlend"
         _ThresholdLevel ("しきい値 0..1 (実値/255)",    Float)  = 0.5
         _HasPosterize ("ポスタリゼーション有効 0/1",    Int)    = 0
         _PosterizeLevels ("階調数 (2..255)",            Float)  = 4
+        _LevelsInBlack  ("レベル 入力シャドウ 0..1",    Float)  = 0
+        _LevelsInWhite  ("レベル 入力ハイライト 0..1",  Float)  = 1
+        _LevelsGamma    ("レベル 中間調ガンマ",         Float)  = 1
+        _LevelsOutBlack ("レベル 出力シャドウ 0..1",    Float)  = 0
+        _LevelsOutWhite ("レベル 出力ハイライト 0..1",  Float)  = 1
+        _HasCurveLut  ("トーンカーブ LUT 有効 0/1",     Int)    = 0
+        _CurveLutTex  ("トーンカーブ LUT (256x1)",      2D)     = "white" {}
         _HasGradientMap     ("グラデーションマップ有効 0/1", Int)   = 0
         _GradientMapTex     ("グラデーション LUT (256x1)",   2D)    = "white" {}
         _GradientMapOpacity ("グラデーションマップ適用率 0..1", Float) = 1
+        _GradientMapNormalize ("グラデーションマップ輝度正規化 0/1", Int) = 0
+        _GradientMapLumMin  ("グラデーションマップ正規化 輝度下限 0..1", Float) = 0
+        _GradientMapLumMax  ("グラデーションマップ正規化 輝度上限 0..1", Float) = 1
     }
 
     SubShader
@@ -92,9 +102,19 @@ Shader "PSDSimpleEditor/LayerBlend"
             float     _ThresholdLevel;   // 0..1 (実値 / 255)
             int       _HasPosterize;     // 0/1
             float     _PosterizeLevels;  // 2..255
+            float     _LevelsInBlack;    // 0..1
+            float     _LevelsInWhite;    // 0..1
+            float     _LevelsGamma;      // 実値 (既定 1 = 恒等)
+            float     _LevelsOutBlack;   // 0..1
+            float     _LevelsOutWhite;   // 0..1
+            int       _HasCurveLut;      // 0/1
+            sampler2D _CurveLutTex;      // 256x1 LUT (入力輝度 → 出力値、R=G=B)
             int       _HasGradientMap;     // 0/1
             sampler2D _GradientMapTex;     // 256x1 LUT (輝度 → 色)
             float     _GradientMapOpacity; // 0..1
+            int       _GradientMapNormalize; // 0/1: 輝度を [Min,Max] → [0,1] にストレッチしてから LUT を引く
+            float     _GradientMapLumMin;    // 正規化下限 (対象レイヤーの不透明画素の最小輝度)
+            float     _GradientMapLumMax;    // 正規化上限 (同、最大輝度)
 
             // ゼロ除算ガード用の微小値
             #define EPS 1e-5
@@ -387,14 +407,39 @@ Shader "PSDSimpleEditor/LayerBlend"
             }
 
             // ════════════════════════════════════════════════════════════════
+            //  ハッシュノイズ (スクリーン座標 → 0..1)。Dissolve とグラデーションマップの
+            //  正規化ディザで共用するため ApplyAdjustments より前に定義する
+            // ════════════════════════════════════════════════════════════════
+            float Hash21(float2 p)
+            {
+                return frac(sin(dot(p, float2(12.9898, 78.233))) * 43758.5453);
+            }
+
+            // ════════════════════════════════════════════════════════════════
             //  色調補正 (_Brightness / _Contrast / _Hue / _Saturation / _Lightness)
             //  すべて -1..1 に正規化済み (§3)
             // ════════════════════════════════════════════════════════════════
-            float3 ApplyAdjustments(float3 col)
+            // ditherSeed: グラデーションマップの輝度正規化ディザ用シード (スクリーン座標)
+            float3 ApplyAdjustments(float3 col, float2 ditherSeed)
             {
                 // ── 階調反転 ──
                 if (_HasInvert == 1)
                     col = saturate(1.0 - col);
+
+                // ── レベル補正: 入力レンジ → ガンマ → 出力レンジ (既定値は恒等変換) ──
+                {
+                    float3 t = saturate((col - _LevelsInBlack) / max(_LevelsInWhite - _LevelsInBlack, EPS));
+                    t = pow(t, 1.0 / max(_LevelsGamma, 0.01));
+                    col = saturate(_LevelsOutBlack + t * (_LevelsOutWhite - _LevelsOutBlack));
+                }
+
+                // ── トーンカーブ: 256×1 LUT を各チャンネルへ同一適用 (複合/コンポジットカーブ) ──
+                if (_HasCurveLut == 1)
+                {
+                    col.r = tex2D(_CurveLutTex, float2(saturate(col.r), 0.5)).r;
+                    col.g = tex2D(_CurveLutTex, float2(saturate(col.g), 0.5)).g;
+                    col.b = tex2D(_CurveLutTex, float2(saturate(col.b), 0.5)).b;
+                }
 
                 // ── ポスタリゼーション: 各チャンネルを指定階調数へ量子化 ──
                 if (_HasPosterize == 1)
@@ -452,18 +497,16 @@ Shader "PSDSimpleEditor/LayerBlend"
                 if (_HasGradientMap == 1)
                 {
                     float lum = Lum(col);
+                    if (_GradientMapNormalize == 1)
+                    {
+                        lum = saturate((lum - _GradientMapLumMin) / max(_GradientMapLumMax - _GradientMapLumMin, EPS));
+                        // ── ディザ: 正規化で拡大された量子化ステップをノイズでほぐし階調とびを目立たなくする (±0.5 LUT texel) ──
+                        lum = saturate(lum + (Hash21(ditherSeed) - 0.5) / 256.0);
+                    }
                     float3 g  = tex2D(_GradientMapTex, float2(saturate(lum), 0.5)).rgb;
                     col = lerp(col, g, saturate(_GradientMapOpacity));
                 }
                 return col;
-            }
-
-            // ════════════════════════════════════════════════════════════════
-            //  Dissolve 用ハッシュノイズ (スクリーン座標 → 0..1)
-            // ════════════════════════════════════════════════════════════════
-            float Hash21(float2 p)
-            {
-                return frac(sin(dot(p, float2(12.9898, 78.233))) * 43758.5453);
             }
 
             // ════════════════════════════════════════════════════════════════
@@ -502,7 +545,7 @@ Shader "PSDSimpleEditor/LayerBlend"
                 if (_IsAdjustment == 1)
                 {
                     float  amount   = _Opacity * maskVal * clipVal;
-                    float3 adjusted = ApplyAdjustments(bg.rgb);
+                    float3 adjusted = ApplyAdjustments(bg.rgb, i.pos.xy);
                     return float4(lerp(bg.rgb, adjusted, amount), bg.a);
                 }
 
@@ -527,7 +570,7 @@ Shader "PSDSimpleEditor/LayerBlend"
                 }
 
                 // 通常パスでも色調補正はレイヤー色に適用 (グループの 1 枚畳み込み用)
-                float3 cs = ApplyAdjustments(layer.rgb);
+                float3 cs = ApplyAdjustments(layer.rgb, i.pos.xy);
 
                 // ── ソースα: レイヤーα × _Opacity × マスク × クリップマスク【凍結】──
                 float alphaS = layer.a * _Opacity * maskVal * clipVal;

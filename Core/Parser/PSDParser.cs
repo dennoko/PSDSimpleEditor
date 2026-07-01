@@ -111,6 +111,8 @@ namespace PSDSimpleEditor
             if (layer.Adjustment.HasInvert)             adj += " Invert";
             if (layer.Adjustment.HasThreshold)          adj += $" Threshold({layer.Adjustment.ThresholdLevel})";
             if (layer.Adjustment.HasPosterize)          adj += $" Posterize({layer.Adjustment.PosterizeLevels})";
+            if (layer.Adjustment.HasLevels)             adj += $" Levels({layer.Adjustment.LevelsInputBlack},{layer.Adjustment.LevelsInputWhite},{layer.Adjustment.LevelsGamma},{layer.Adjustment.LevelsOutputBlack},{layer.Adjustment.LevelsOutputWhite})";
+            if (layer.Adjustment.HasCurves)             adj += $" Curves({layer.Adjustment.CurvePoints?.Count ?? 0}pts)";
             if (layer.Effects != null && layer.Effects.HasColorOverlay) adj += " ColorOverlay";
 
             vlog.AppendLine(

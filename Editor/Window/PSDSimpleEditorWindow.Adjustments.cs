@@ -41,6 +41,8 @@ namespace PSDSimpleEditor
             DrawInvertToggle(layer, ci);
             DrawThresholdControls(layer, ci);
             DrawPosterizeControls(layer, ci);
+            DrawLevelsControls(layer, ci);
+            DrawCurveControls(layer, ci);
 
             DrawGradientMapControls(layer, ci);
             DrawImageClipControls(layer, ci);
@@ -116,6 +118,99 @@ namespace PSDSimpleEditor
                 layer.UIPosterizeLevels = nl;
                 _needsRecomposite = true;
             }
+        }
+
+        /// <summary>「レベル補正」5 スライダー (非破壊。既定値は恒等変換のため常時表示)。</summary>
+        void DrawLevelsControls(PSDLayer layer, int indent)
+        {
+            float nib = IndentedSlider("入力シャドウ", layer.UILevelsInputBlack,  0f, 255f, indent);
+            float niw = IndentedSlider("入力ハイライト", layer.UILevelsInputWhite,  0f, 255f, indent);
+            float ng  = IndentedSlider("ガンマ",        layer.UILevelsGamma,       0.01f, 9.99f, indent);
+            float nob = IndentedSlider("出力シャドウ",   layer.UILevelsOutputBlack, 0f, 255f, indent);
+            float now = IndentedSlider("出力ハイライト", layer.UILevelsOutputWhite, 0f, 255f, indent);
+            if (!Mathf.Approximately(nib, layer.UILevelsInputBlack)  ||
+                !Mathf.Approximately(niw, layer.UILevelsInputWhite)  ||
+                !Mathf.Approximately(ng,  layer.UILevelsGamma)       ||
+                !Mathf.Approximately(nob, layer.UILevelsOutputBlack) ||
+                !Mathf.Approximately(now, layer.UILevelsOutputWhite))
+            {
+                layer.UILevelsInputBlack  = nib;
+                layer.UILevelsInputWhite  = niw;
+                layer.UILevelsGamma       = ng;
+                layer.UILevelsOutputBlack = nob;
+                layer.UILevelsOutputWhite = now;
+                _needsRecomposite = true;
+            }
+        }
+
+        /// <summary>「トーンカーブ」有効トグル + カーブエディタ (非破壊。全ピクセルレイヤーに適用可)。</summary>
+        void DrawCurveControls(PSDLayer layer, int indent)
+        {
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(indent * IndentWidth + 18f);
+            bool en = EditorGUILayout.ToggleLeft("トーンカーブ", layer.UICurveEnabled);
+            EditorGUILayout.EndHorizontal();
+            if (en != layer.UICurveEnabled)
+            {
+                layer.UICurveEnabled = en;
+                _needsRecomposite = true;
+            }
+            if (!en) return;
+
+            // 初回描画時 (parse 済みレイヤーの初回表示含む) に LUT が無ければ焼く
+            EnsureCurveLut(layer);
+
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(indent * IndentWidth + 18f);
+            GUILayout.Label("カーブ", EditorStyles.miniLabel, GUILayout.Width(48));
+            EditorGUI.BeginChangeCheck();
+            AnimationCurve nc = EditorGUILayout.CurveField(layer.UICurve, GUILayout.Height(60));
+            bool curveChanged = EditorGUI.EndChangeCheck();
+            EditorGUILayout.EndHorizontal();
+            if (curveChanged)
+            {
+                layer.UICurve = nc;
+                BakeCurveLut(layer);
+                _needsRecomposite = true;
+            }
+        }
+
+        static AnimationCurve CreateDefaultCurve()
+        {
+            var c = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(1f, 1f));
+            for (int i = 0; i < c.length; i++) c.SmoothTangents(i, 0f);
+            return c;
+        }
+
+        /// <summary>トーンカーブ有効時に LUT が無ければ焼く。</summary>
+        void EnsureCurveLut(PSDLayer layer)
+        {
+            if (layer.UICurve == null) layer.UICurve = CreateDefaultCurve();
+            if (layer._curveLut == null) BakeCurveLut(layer);
+        }
+
+        /// <summary>UICurve を 256×1 の LUT テクスチャ (linear, R=G=B=出力値) に焼き込む。</summary>
+        static void BakeCurveLut(PSDLayer layer)
+        {
+            const int N = 256;
+            if (layer._curveLut == null)
+            {
+                layer._curveLut = new Texture2D(N, 1, TextureFormat.RGBA32, false, linear: true)
+                {
+                    hideFlags  = HideFlags.HideAndDontSave,
+                    wrapMode   = TextureWrapMode.Clamp,
+                    filterMode = FilterMode.Bilinear,
+                };
+            }
+            var px = new Color32[N];
+            for (int i = 0; i < N; i++)
+            {
+                float v = Mathf.Clamp01(layer.UICurve.Evaluate(i / (float)(N - 1)));
+                byte  b = (byte)Mathf.RoundToInt(v * 255f);
+                px[i] = new Color32(b, b, b, 255);
+            }
+            layer._curveLut.SetPixels32(px);
+            layer._curveLut.Apply(false);
         }
 
         /// <summary>画像クリップ合成: 任意画像をレイヤーα形状へクリップ・タイリング・ブレンド。</summary>
@@ -200,6 +295,19 @@ namespace PSDSimpleEditor
 
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
+            bool normalize = EditorGUILayout.ToggleLeft(
+                new GUIContent("輝度を正規化", "レイヤーの最暗色〜最明色を 0..1 にストレッチしてからグラデーションを適用する"),
+                layer.UIGradientMapNormalize);
+            EditorGUILayout.EndHorizontal();
+            if (normalize != layer.UIGradientMapNormalize)
+            {
+                layer.UIGradientMapNormalize = normalize;
+                if (normalize) ComputeGradientLumRange(layer);
+                _needsRecomposite = true;
+            }
+
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(indent * IndentWidth + 18f);
             GUILayout.Label("階調", EditorStyles.miniLabel, GUILayout.Width(48));
             EditorGUI.BeginChangeCheck();
             Gradient ng = EditorGUILayout.GradientField(layer.UIGradient);
@@ -254,6 +362,30 @@ namespace PSDSimpleEditor
                 px[i] = layer.UIGradient.Evaluate(i / (float)(N - 1));
             layer._gradientLut.SetPixels32(px);
             layer._gradientLut.Apply(false);
+        }
+
+        /// <summary>
+        /// 輝度正規化トグル ON 時に、レイヤーの不透明画素から輝度の最小・最大を求めて layer にキャッシュする。
+        /// (完全透明画素は未定義色のことがあるため範囲計算から除外。不透明画素が無ければ 0..1 のまま = 無効果)
+        /// </summary>
+        static void ComputeGradientLumRange(PSDLayer layer)
+        {
+            float min = 1f, max = 0f;
+            var tex = layer.Texture;
+            if (tex != null)
+            {
+                var px = tex.GetPixels32();
+                for (int i = 0; i < px.Length; i++)
+                {
+                    if (px[i].a == 0) continue;
+                    float lum = (0.3f * px[i].r + 0.59f * px[i].g + 0.11f * px[i].b) / 255f;
+                    if (lum < min) min = lum;
+                    if (lum > max) max = lum;
+                }
+            }
+            if (min > max) { min = 0f; max = 1f; } // 不透明画素なし → フォールバック (正規化を実質無効化)
+            layer._gradientLumMin = min;
+            layer._gradientLumMax = max;
         }
 
         /// <summary>インデント付きのラベル + スライダー 1 行。</summary>

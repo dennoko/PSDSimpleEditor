@@ -177,7 +177,8 @@ namespace PSDSimpleEditor
             else if (!isGroup && layer.IsAdjustmentLayer &&
                      layer.Adjustment != null &&
                      (layer.Adjustment.HasBrightnessContrast || layer.Adjustment.HasHueSaturation ||
-                      layer.Adjustment.HasInvert || layer.Adjustment.HasThreshold || layer.Adjustment.HasPosterize))
+                      layer.Adjustment.HasInvert || layer.Adjustment.HasThreshold || layer.Adjustment.HasPosterize ||
+                      layer.Adjustment.HasLevels || layer.Adjustment.HasCurves))
                 prefix += "[調整] ";
 
             if (layer.Effects != null && layer.Effects.HasColorOverlay)
@@ -235,6 +236,14 @@ namespace PSDSimpleEditor
             // ポスタリゼーション (post)
             if (layer.Adjustment != null && layer.Adjustment.HasPosterize)
                 DrawPosterizeControls(layer, indent);
+
+            // レベル補正 (levl)
+            if (layer.Adjustment != null && layer.Adjustment.HasLevels)
+                DrawLevelsControls(layer, indent);
+
+            // トーンカーブ (curv)
+            if (layer.Adjustment != null && layer.Adjustment.HasCurves)
+                DrawCurveControls(layer, indent);
 
             // ベタ塗りカラー (SoCo)
             if (layer.Adjustment != null && layer.Adjustment.HasSolidColor)

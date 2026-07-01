@@ -28,8 +28,12 @@ namespace PSDSimpleEditor
             public float   ThresholdLevel;   // 0..1 (実値/255)
             public bool    Posterize;    // true → ポスタリゼーション有効
             public float   PosterizeLevels;  // 2..255
+            public float   LevelsInBlack, LevelsInWhite, LevelsGamma, LevelsOutBlack, LevelsOutWhite; // 0..1 (Gamma は実値)
+            public Texture CurveLutTex;  // null → トーンカーブ無効
             public Texture GradientMapTex;     // null → グラデーションマップ無効
             public float   GradientMapOpacity; // 0..1
+            public bool    GradientMapNormalize; // true → 輝度を [LumMin,LumMax] → [0,1] に正規化してから LUT を引く
+            public float   GradientMapLumMin, GradientMapLumMax; // 正規化レンジ (0..1)
         }
 
         static DrawParams NewParams()
@@ -52,7 +56,11 @@ namespace PSDSimpleEditor
                 Invert = false,
                 Threshold = false, ThresholdLevel = 0.5f,
                 Posterize = false, PosterizeLevels = 4f,
-                GradientMapTex = null, GradientMapOpacity = 1f
+                LevelsInBlack = 0f, LevelsInWhite = 1f, LevelsGamma = 1f,
+                LevelsOutBlack = 0f, LevelsOutWhite = 1f,
+                CurveLutTex = null,
+                GradientMapTex = null, GradientMapOpacity = 1f,
+                GradientMapNormalize = false, GradientMapLumMin = 0f, GradientMapLumMax = 1f
             };
         }
 
@@ -100,12 +108,25 @@ namespace PSDSimpleEditor
             _mat.SetFloat("_ThresholdLevel", Mathf.Clamp01(p.ThresholdLevel));
             _mat.SetInt  ("_HasPosterize", p.Posterize ? 1 : 0);
             _mat.SetFloat("_PosterizeLevels", Mathf.Max(2f, p.PosterizeLevels));
+            _mat.SetFloat("_LevelsInBlack",  Mathf.Clamp01(p.LevelsInBlack));
+            _mat.SetFloat("_LevelsInWhite",  Mathf.Clamp01(p.LevelsInWhite));
+            _mat.SetFloat("_LevelsGamma",    Mathf.Max(0.01f, p.LevelsGamma));
+            _mat.SetFloat("_LevelsOutBlack", Mathf.Clamp01(p.LevelsOutBlack));
+            _mat.SetFloat("_LevelsOutWhite", Mathf.Clamp01(p.LevelsOutWhite));
+
+            // トーンカーブ (LUT 未設定時は無効)
+            bool hasCurve = p.CurveLutTex != null;
+            _mat.SetInt    ("_HasCurveLut", hasCurve ? 1 : 0);
+            _mat.SetTexture("_CurveLutTex", hasCurve ? p.CurveLutTex : (Texture)Texture2D.whiteTexture);
 
             // グラデーションマップ (LUT 未設定時は無効)
             bool hasGrad = p.GradientMapTex != null;
             _mat.SetInt    ("_HasGradientMap",     hasGrad ? 1 : 0);
             _mat.SetTexture("_GradientMapTex",     hasGrad ? p.GradientMapTex : (Texture)Texture2D.whiteTexture);
             _mat.SetFloat  ("_GradientMapOpacity", Mathf.Clamp01(p.GradientMapOpacity));
+            _mat.SetInt    ("_GradientMapNormalize", p.GradientMapNormalize ? 1 : 0);
+            _mat.SetFloat  ("_GradientMapLumMin", Mathf.Clamp01(p.GradientMapLumMin));
+            _mat.SetFloat  ("_GradientMapLumMax", Mathf.Clamp01(p.GradientMapLumMax));
         }
 
         // レイヤーのマスク情報を DrawParams へ反映 (無効・テクスチャなしは「マスクなし」扱い)
@@ -135,10 +156,22 @@ namespace PSDSimpleEditor
             p.Posterize       = layer.UIPosterizeEnabled;
             p.PosterizeLevels = layer.UIPosterizeLevels;
 
+            p.LevelsInBlack  = layer.UILevelsInputBlack  / 255f;
+            p.LevelsInWhite  = layer.UILevelsInputWhite  / 255f;
+            p.LevelsGamma    = Mathf.Max(0.01f, layer.UILevelsGamma);
+            p.LevelsOutBlack = layer.UILevelsOutputBlack / 255f;
+            p.LevelsOutWhite = layer.UILevelsOutputWhite / 255f;
+
+            if (layer.UICurveEnabled && layer._curveLut != null)
+                p.CurveLutTex = layer._curveLut;
+
             if (layer.UIGradientMapEnabled && layer._gradientLut != null)
             {
-                p.GradientMapTex     = layer._gradientLut;
-                p.GradientMapOpacity = layer.UIGradientMapOpacity;
+                p.GradientMapTex       = layer._gradientLut;
+                p.GradientMapOpacity   = layer.UIGradientMapOpacity;
+                p.GradientMapNormalize = layer.UIGradientMapNormalize;
+                p.GradientMapLumMin    = layer._gradientLumMin;
+                p.GradientMapLumMax    = layer._gradientLumMax;
             }
         }
 
