@@ -34,8 +34,10 @@ namespace PSDSimpleEditor
         // ── 状態 ───────────────────────────────────────────────────────────
         [SerializeField] float _layerPanelWidth = 270f; // 左パネル幅
         [SerializeField] string _exportDir = "Assets/PSDSE_exported"; // PNG出力先フォルダ
+        [SerializeField] ExportFormat _exportFormat = ExportFormat.PNG; // エクスポートフォーマット
         string _psdPath = "";                 // 入力中の PSD パス (リロード後も保持)
         bool   _showMergedRef;                // マージ済み画像の参照表示
+
 
         [NonSerialized] PSDFile         _psdFile;            // 読み込み結果
         [NonSerialized] LayerCompositor _compositor;         // GPU 合成器
@@ -230,5 +232,13 @@ namespace PSDSimpleEditor
             }
             return _psdPath;
         }
+
+        public enum ExportFormat
+        {
+            PNG,
+            PSD,
+            TGA
+        }
     }
 }
+

@@ -22,16 +22,36 @@ namespace PSDSimpleEditor
 
             GUILayout.FlexibleSpace();
 
-            using (new EditorGUI.DisabledScope(_compositeTexture == null))
+            // エクスポート形式の選択
+            _exportFormat = (ExportFormat)EditorGUILayout.EnumPopup(_exportFormat, GUILayout.Width(80));
+
+            bool canExport = false;
+            if (_exportFormat == ExportFormat.PNG || _exportFormat == ExportFormat.TGA)
             {
-                if (GUILayout.Button("Export PNG", GUILayout.Width(100)))
-                    ExportPNG();
+                canExport = _compositeTexture != null;
+            }
+            else if (_exportFormat == ExportFormat.PSD)
+            {
+                canExport = _psdFile != null;
             }
 
-            using (new EditorGUI.DisabledScope(_psdFile == null))
+            using (new EditorGUI.DisabledScope(!canExport))
             {
-                if (GUILayout.Button("Export PSD...", GUILayout.Width(100)))
-                    ExportPSD();
+                if (GUILayout.Button("Export", GUILayout.Width(80)))
+                {
+                    switch (_exportFormat)
+                    {
+                        case ExportFormat.PNG:
+                            ExportPNG();
+                            break;
+                        case ExportFormat.PSD:
+                            ExportPSD();
+                            break;
+                        case ExportFormat.TGA:
+                            ExportTGA();
+                            break;
+                    }
+                }
             }
 
             EditorGUILayout.EndHorizontal();
@@ -227,6 +247,99 @@ namespace PSDSimpleEditor
             {
                 EditorUtility.ClearProgressBar();
             }
+        }
+
+        // ── TGA 書き出し ───────────────────────────────────────────────────
+
+        void ExportTGA()
+        {
+            if (_compositeTexture == null)
+            {
+                EditorUtility.DisplayDialog("エラー",
+                    "合成結果がありません。先に PSD を読み込んでください。", "OK");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(_exportDir))
+            {
+                EditorUtility.DisplayDialog("エラー",
+                    "出力先フォルダが指定されていません。", "OK");
+                return;
+            }
+
+            try
+            {
+                string baseName = "composite";
+                if (!string.IsNullOrEmpty(_psdPath))
+                {
+                    baseName = Path.GetFileNameWithoutExtension(_psdPath);
+                }
+
+                string savePath = GetUniqueExportPath(_exportDir, baseName, ".tga");
+
+                byte[] tga = EncodeToTGA(_compositeTexture);
+                File.WriteAllBytes(savePath, tga);
+                Debug.Log($"[PSDSimpleEditor] TGA を保存しました: {savePath}");
+
+                // プロジェクト内の出力ならAssetDatabaseをリフレッシュしてUnityエディタ上で見えるようにする
+                string normalizedSavePath = savePath.Replace('\\', '/');
+                int assetsIndex = normalizedSavePath.IndexOf("/Assets/", StringComparison.OrdinalIgnoreCase);
+                if (assetsIndex != -1)
+                {
+                    string assetPath = normalizedSavePath.Substring(assetsIndex + 1);
+                    AssetDatabase.Refresh();
+
+                    // プロジェクトビューで該当ファイルを選択してハイライト（Ping）する
+                    var obj = AssetDatabase.LoadMainAssetAtPath(assetPath);
+                    if (obj != null)
+                    {
+                        Selection.activeObject = obj;
+                        EditorGUIUtility.PingObject(obj);
+                    }
+                }
+                else
+                {
+                    EditorUtility.RevealInFinder(savePath);
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[PSDSimpleEditor] TGA 保存失敗: {e}");
+                EditorUtility.DisplayDialog("書き出しエラー",
+                    $"TGA の保存に失敗しました:\n{e.Message}", "OK");
+            }
+        }
+
+        /// <summary>32bit 未圧縮 TGA にエンコードする。</summary>
+        byte[] EncodeToTGA(Texture2D tex)
+        {
+            int width = tex.width;
+            int height = tex.height;
+            Color32[] pixels = tex.GetPixels32();
+
+            byte[] tga = new byte[18 + width * height * 4];
+
+            // TGAヘッダー(18バイト)
+            tga[2] = 2; // 未圧縮True-Color
+            tga[12] = (byte)(width & 0xFF);
+            tga[13] = (byte)((width >> 8) & 0xFF);
+            tga[14] = (byte)(height & 0xFF);
+            tga[15] = (byte)((height >> 8) & 0xFF);
+            tga[16] = 32; // 32bit (アルファあり)
+            tga[17] = 8;  // アルファチャンネルの深さは8bit
+
+            // ピクセルデータ書き込み (BGRA順)
+            int idx = 18;
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                Color32 p = pixels[i];
+                tga[idx++] = p.b;
+                tga[idx++] = p.g;
+                tga[idx++] = p.r;
+                tga[idx++] = p.a;
+            }
+
+            return tga;
         }
     }
 }
