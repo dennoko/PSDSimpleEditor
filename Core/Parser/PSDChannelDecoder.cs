@@ -46,7 +46,7 @@ namespace PSDSimpleEditor
                     byte[] plane = DecodeChannel(r, compression, w, h, bytesPerSample, ch.DataLength - 2);
                     if (plane == null) continue;
 
-                    // 16bit → 8bit: BE 各ペアの先頭 (上位) バイトを採用
+                    // 16bit → 8bit: 0..32768 レンジを 0..255 へスケール
                     if (psd.BitDepth == 16)
                         plane = Downsample16To8(plane, w * h);
 
@@ -187,13 +187,20 @@ namespace PSDSimpleEditor
             }
         }
 
-        /// <summary>16bit プレーン → 8bit プレーン (BE 各ペアの先頭 = 上位バイトを採用)。</summary>
+        /// <summary>
+        /// 16bit プレーン → 8bit プレーン。
+        /// Photoshop の 16bit チャンネルは 0..32768 (0x8000 = 白) のレンジで格納されるため、
+        /// BE ペアを 16bit 値へ復元してから 0..255 へスケールする (単純な上位バイト採用だと白が 128 になり半分の明るさになる)。
+        /// </summary>
         internal static byte[] Downsample16To8(byte[] plane16, int pixelCount)
         {
             var plane8 = new byte[pixelCount];
             int limit = Math.Min(pixelCount, plane16.Length / 2);
             for (int i = 0; i < limit; i++)
-                plane8[i] = plane16[i * 2];
+            {
+                int v = (plane16[i * 2] << 8) | plane16[i * 2 + 1];
+                plane8[i] = v >= 32768 ? (byte)255 : (byte)((v * 255 + 16384) / 32768);
+            }
             return plane8;
         }
 
