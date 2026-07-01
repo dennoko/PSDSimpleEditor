@@ -289,6 +289,9 @@ namespace PSDSimpleEditor
                 EditorUtility.DisplayProgressBar("PSD 読み込み中", "ファイルを解析しています...", 0.4f);
                 _psdFile = PSDParser.Parse(_psdPath);
 
+                // グラデーションマップ (grdm) 調整レイヤーの LUT を焼く (Editor 側でしか焼けないため)
+                BakeImportedGradientLuts(_psdFile.Layers);
+
                 // 読み込みに成功したパスを履歴へ記録
                 _history.Add(resolved);
 

@@ -124,6 +124,7 @@ namespace PSDSimpleEditor
                 l.UIThresholdLevel    = l.Adjustment.HasThreshold ? l.Adjustment.ThresholdLevel : 128f;
                 l.UIPosterizeEnabled  = l.Adjustment.HasPosterize;
                 l.UIPosterizeLevels   = l.Adjustment.HasPosterize ? l.Adjustment.PosterizeLevels : 4f;
+                l.UILevelsEnabled     = l.Adjustment.HasLevels;
                 l.UILevelsInputBlack  = l.Adjustment.HasLevels ? l.Adjustment.LevelsInputBlack  : 0f;
                 l.UILevelsInputWhite  = l.Adjustment.HasLevels ? l.Adjustment.LevelsInputWhite  : 255f;
                 l.UILevelsGamma       = l.Adjustment.HasLevels ? l.Adjustment.LevelsGamma       : 1f;
@@ -132,6 +133,24 @@ namespace PSDSimpleEditor
                 l.UICurveEnabled = l.Adjustment.HasCurves;
                 if (l.Adjustment.HasCurves && l.Adjustment.CurvePoints != null && l.Adjustment.CurvePoints.Count >= 2)
                     l.UICurve = BuildAnimationCurveFromPoints(l.Adjustment.CurvePoints);
+
+                // グラデーションマップ (LUT は Editor 側でロード後に焼く。ここでは有効化とグラデーションのみ)
+                if (l.Adjustment.HasGradientMap && l.Adjustment.GradientMapGradient != null)
+                {
+                    l.UIGradientMapEnabled = true;
+                    l.UIGradient           = l.Adjustment.GradientMapGradient;
+                }
+
+                // カラーバランス
+                l.UIColorBalanceEnabled = l.Adjustment.HasColorBalance;
+                if (l.Adjustment.HasColorBalance)
+                {
+                    l.UICBShadows            = l.Adjustment.CBShadows;
+                    l.UICBMidtones           = l.Adjustment.CBMidtones;
+                    l.UICBHighlights         = l.Adjustment.CBHighlights;
+                    l.UICBPreserveLuminosity = l.Adjustment.CBPreserveLuminosity;
+                }
+
                 InitUIState(l.Children);
             }
         }

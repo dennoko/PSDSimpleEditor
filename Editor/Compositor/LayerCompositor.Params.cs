@@ -34,6 +34,9 @@ namespace PSDSimpleEditor
             public float   GradientMapOpacity; // 0..1
             public bool    GradientMapNormalize; // true → 輝度を [LumMin,LumMax] → [0,1] に正規化してから LUT を引く
             public float   GradientMapLumMin, GradientMapLumMax; // 正規化レンジ (0..1)
+            public bool    ColorBalance;         // true → カラーバランス有効
+            public Vector3 CBShadows, CBMidtones, CBHighlights; // (CR,MG,YB) -1..1
+            public bool    CBPreserveLum;        // true → 輝度保持
         }
 
         static DrawParams NewParams()
@@ -60,7 +63,10 @@ namespace PSDSimpleEditor
                 LevelsOutBlack = 0f, LevelsOutWhite = 1f,
                 CurveLutTex = null,
                 GradientMapTex = null, GradientMapOpacity = 1f,
-                GradientMapNormalize = false, GradientMapLumMin = 0f, GradientMapLumMax = 1f
+                GradientMapNormalize = false, GradientMapLumMin = 0f, GradientMapLumMax = 1f,
+                ColorBalance = false,
+                CBShadows = Vector3.zero, CBMidtones = Vector3.zero, CBHighlights = Vector3.zero,
+                CBPreserveLum = true
             };
         }
 
@@ -127,6 +133,13 @@ namespace PSDSimpleEditor
             _mat.SetInt    ("_GradientMapNormalize", p.GradientMapNormalize ? 1 : 0);
             _mat.SetFloat  ("_GradientMapLumMin", Mathf.Clamp01(p.GradientMapLumMin));
             _mat.SetFloat  ("_GradientMapLumMax", Mathf.Clamp01(p.GradientMapLumMax));
+
+            // カラーバランス
+            _mat.SetInt    ("_HasColorBalance", p.ColorBalance ? 1 : 0);
+            _mat.SetVector ("_CBShadows",    p.CBShadows);
+            _mat.SetVector ("_CBMidtones",   p.CBMidtones);
+            _mat.SetVector ("_CBHighlights", p.CBHighlights);
+            _mat.SetInt    ("_CBPreserveLum", p.CBPreserveLum ? 1 : 0);
         }
 
         // レイヤーのマスク情報を DrawParams へ反映 (無効・テクスチャなしは「マスクなし」扱い)
@@ -156,11 +169,22 @@ namespace PSDSimpleEditor
             p.Posterize       = layer.UIPosterizeEnabled;
             p.PosterizeLevels = layer.UIPosterizeLevels;
 
-            p.LevelsInBlack  = layer.UILevelsInputBlack  / 255f;
-            p.LevelsInWhite  = layer.UILevelsInputWhite  / 255f;
-            p.LevelsGamma    = Mathf.Max(0.01f, layer.UILevelsGamma);
-            p.LevelsOutBlack = layer.UILevelsOutputBlack / 255f;
-            p.LevelsOutWhite = layer.UILevelsOutputWhite / 255f;
+            if (layer.UILevelsEnabled)
+            {
+                p.LevelsInBlack  = layer.UILevelsInputBlack  / 255f;
+                p.LevelsInWhite  = layer.UILevelsInputWhite  / 255f;
+                p.LevelsGamma    = Mathf.Max(0.01f, layer.UILevelsGamma);
+                p.LevelsOutBlack = layer.UILevelsOutputBlack / 255f;
+                p.LevelsOutWhite = layer.UILevelsOutputWhite / 255f;
+            }
+            else
+            {
+                p.LevelsInBlack  = 0f;
+                p.LevelsInWhite  = 1f;
+                p.LevelsGamma    = 1f;
+                p.LevelsOutBlack = 0f;
+                p.LevelsOutWhite = 1f;
+            }
 
             if (layer.UICurveEnabled && layer._curveLut != null)
                 p.CurveLutTex = layer._curveLut;
@@ -172,6 +196,15 @@ namespace PSDSimpleEditor
                 p.GradientMapNormalize = layer.UIGradientMapNormalize;
                 p.GradientMapLumMin    = layer._gradientLumMin;
                 p.GradientMapLumMax    = layer._gradientLumMax;
+            }
+
+            if (layer.UIColorBalanceEnabled)
+            {
+                p.ColorBalance   = true;
+                p.CBShadows      = layer.UICBShadows    / 100f;
+                p.CBMidtones     = layer.UICBMidtones   / 100f;
+                p.CBHighlights   = layer.UICBHighlights / 100f;
+                p.CBPreserveLum  = layer.UICBPreserveLuminosity;
             }
         }
 

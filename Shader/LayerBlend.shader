@@ -56,6 +56,11 @@ Shader "PSDSimpleEditor/LayerBlend"
         _GradientMapNormalize ("グラデーションマップ輝度正規化 0/1", Int) = 0
         _GradientMapLumMin  ("グラデーションマップ正規化 輝度下限 0..1", Float) = 0
         _GradientMapLumMax  ("グラデーションマップ正規化 輝度上限 0..1", Float) = 1
+        _HasColorBalance ("カラーバランス有効 0/1",      Int)    = 0
+        _CBShadows    ("CB シャドウ (CR,MG,YB) -1..1",   Vector) = (0,0,0,0)
+        _CBMidtones   ("CB 中間調 (CR,MG,YB) -1..1",     Vector) = (0,0,0,0)
+        _CBHighlights ("CB ハイライト (CR,MG,YB) -1..1", Vector) = (0,0,0,0)
+        _CBPreserveLum ("CB 輝度保持 0/1",               Int)    = 1
     }
 
     SubShader
@@ -115,6 +120,11 @@ Shader "PSDSimpleEditor/LayerBlend"
             int       _GradientMapNormalize; // 0/1: 輝度を [Min,Max] → [0,1] にストレッチしてから LUT を引く
             float     _GradientMapLumMin;    // 正規化下限 (対象レイヤーの不透明画素の最小輝度)
             float     _GradientMapLumMax;    // 正規化上限 (同、最大輝度)
+            int       _HasColorBalance;      // 0/1
+            float3    _CBShadows;            // (CR,MG,YB) -1..1
+            float3    _CBMidtones;
+            float3    _CBHighlights;
+            int       _CBPreserveLum;        // 0/1: 変換前後で輝度を保持
 
             // ゼロ除算ガード用の微小値
             #define EPS 1e-5
@@ -416,6 +426,24 @@ Shader "PSDSimpleEditor/LayerBlend"
             }
 
             // ════════════════════════════════════════════════════════════════
+            //  カラーバランス: 画素輝度で シャドウ/中間調/ハイライト の重みを求め、
+            //  各トーンの色シフト (CR,MG,YB = RGB 加算方向) を合成して適用する。
+            //  _CBPreserveLum=1 のとき変換前後の輝度を加算で復元する (Photoshop の輝度保持相当)。
+            // ════════════════════════════════════════════════════════════════
+            float3 ColorBalance(float3 col)
+            {
+                float lBefore = Lum(col);
+                float sW = saturate(1.0 - 2.0 * lBefore);   // 輝度0で最大、0.5 以上で0
+                float hW = saturate(2.0 * lBefore - 1.0);   // 輝度1で最大、0.5 以下で0
+                float mW = 1.0 - sW - hW;                    // 0.5 を頂点とするテント
+                float3 shift = (_CBShadows * sW + _CBMidtones * mW + _CBHighlights * hW) * 0.5;
+                float3 outc = saturate(col + shift);
+                if (_CBPreserveLum == 1)
+                    outc = saturate(outc + (lBefore - Lum(outc)));
+                return outc;
+            }
+
+            // ════════════════════════════════════════════════════════════════
             //  色調補正 (_Brightness / _Contrast / _Hue / _Saturation / _Lightness)
             //  すべて -1..1 に正規化済み (§3)
             // ════════════════════════════════════════════════════════════════
@@ -460,6 +488,10 @@ Shader "PSDSimpleEditor/LayerBlend"
 
                 // ── コントラスト: 中間値 0.5 基準のスケーリング ──
                 col = saturate((col - 0.5) * (1.0 + _Contrast) + 0.5);
+
+                // ── カラーバランス ──
+                if (_HasColorBalance == 1)
+                    col = ColorBalance(col);
 
                 // ── 色相・彩度・明度: RGB → HSL → RGB (Photoshop hue2 相当の見た目を目標) ──
                 if (abs(_Hue) > EPS || abs(_Saturation) > EPS || abs(_Lightness) > EPS || _Colorize == 1)

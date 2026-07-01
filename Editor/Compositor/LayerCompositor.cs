@@ -260,7 +260,9 @@ namespace PSDSimpleEditor
                            || layer.UIThresholdEnabled
                            || layer.UIPosterizeEnabled
                            || layer.Adjustment.HasLevels
-                           || layer.UICurveEnabled;
+                           || layer.UICurveEnabled
+                           || layer.UIColorBalanceEnabled
+                           || (layer.UIGradientMapEnabled && layer._gradientLut != null);
                 // 補正項目を持たない調整レイヤーは素通し (バッファは変化しないため描画自体を省略)
                 if (!hasAdj) return;
 

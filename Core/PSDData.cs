@@ -85,6 +85,15 @@ namespace PSDSimpleEditor
 
         public bool          HasCurves;      // curv (複合/コンポジットチャンネルのみ v1 対応)
         public List<Vector2> CurvePoints;    // (入力, 出力) 0..255 空間の制御点。null = 未設定
+
+        public bool     HasGradientMap;      // grdm (PSD のグラデーションマップ調整レイヤー)
+        public Gradient GradientMapGradient; // パース済みグラデーション (null = 未設定)
+
+        public bool    HasColorBalance;      // blnc
+        public Vector3 CBShadows;            // シャドウ (CR, MG, YB) 各 -100..100
+        public Vector3 CBMidtones;           // 中間調
+        public Vector3 CBHighlights;         // ハイライト
+        public bool    CBPreserveLuminosity = true;
     }
 
     // ─── レイヤーエフェクト (lfx2 / lrFX, best effort) ───────────────────────
@@ -154,6 +163,7 @@ namespace PSDSimpleEditor
         public float UIPosterizeLevels = 4f;   // 2 .. 255
 
         // ── レベル補正 (非破壊。全ピクセルレイヤーに適用可。既定値は恒等変換) ──
+        public bool  UILevelsEnabled;
         public float UILevelsInputBlack  = 0f;    // 0 .. 255
         public float UILevelsInputWhite  = 255f;  // 0 .. 255
         public float UILevelsGamma       = 1f;    // 0.01 .. 9.99
@@ -183,6 +193,13 @@ namespace PSDSimpleEditor
         [System.NonSerialized] public bool      UIGradientMapNormalize;    // true: 輝度を対象レイヤーの最暗〜最明で 0..1 に正規化
         [System.NonSerialized] public float     _gradientLumMin = 0f;      // 正規化用レンジ (window が非透明画素から計算)
         [System.NonSerialized] public float     _gradientLumMax = 1f;
+
+        // ── カラーバランス (非破壊。シャドウ/中間調/ハイライトごとの色味シフト) ──
+        public bool    UIColorBalanceEnabled;
+        public Vector3 UICBShadows;              // (CR, MG, YB) 各 -100..100
+        public Vector3 UICBMidtones;
+        public Vector3 UICBHighlights;
+        public bool    UICBPreserveLuminosity = true;
 
         // ── UI フォールドアウト状態 (色調補正セクションの開閉) ──
         [System.NonSerialized] public bool UIAdjustExpanded;

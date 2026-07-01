@@ -50,7 +50,8 @@ namespace PSDSimpleEditor
                     HandleLrFX(r, layer, len);
                     break;
 
-                case "invr": // 階調反転 (パラメータなし。キー存在のみで判定)
+                case "nvrt": // 階調反転 (仕様書の正式キー。パラメータなし、キー存在のみで判定)
+                case "invr": // 階調反転 (旧実装の別名。後方互換のため併記)
                     layer.Adjustment.HasInvert = true;
                     break;
 
@@ -68,6 +69,14 @@ namespace PSDSimpleEditor
 
                 case "curv": // トーンカーブ
                     HandleCurves(r, layer);
+                    break;
+
+                case "grdm": // グラデーションマップ
+                    HandleGradientMap(r, layer, len);
+                    break;
+
+                case "blnc": // カラーバランス
+                    HandleColorBalance(r, layer, len);
                     break;
 
                 default:
@@ -222,6 +231,139 @@ namespace PSDSimpleEditor
 
             layer.Adjustment.HasCurves    = true;
             layer.Adjustment.CurvePoints = points;
+        }
+
+        static void HandleGradientMap(BigEndianBinaryReader r, PSDLayer layer, uint len)
+        {
+            // grdm バイナリ構造 (libpsd / ag-psd 準拠):
+            //   version(2) reverse(1) dithered(1) name(Unicode) colorStopCount(2)
+            //   各カラーストップ: location(4, 0..4096) midpoint(4) colorSpace(2) 色成分(2×4) colorType(2)
+            //   transparencyStopCount(2) 各: location(4) midpoint(4) opacity(2, 0..100)
+            // 実バイト配置が想定と異なる場合は境界チェックで検出し途中で return する
+            // (呼び出し側が必ず境界 seek するため、部分読みでも全体のパースは壊れない)。
+            long end = r.Position + len;
+
+            r.ReadUInt16();                 // version (=1)
+            bool reverse = r.ReadByte() != 0;
+            r.ReadByte();                   // dithered (プレビューには未使用)
+            r.ReadUnicodeString();          // グラデーション名 (未使用)
+
+            if (r.Position + 2 > end) return;
+            int colorCount = r.ReadUInt16();
+            if (colorCount <= 0 || colorCount > 256) return;
+
+            // カラーストップを読み取り、成分の最大値から 8bit/16bit スケールを判定する
+            var locs  = new List<float>(colorCount);
+            var comps = new List<Vector3Int>(colorCount);
+            int maxComp = 0;
+            for (int i = 0; i < colorCount; i++)
+            {
+                if (r.Position + 20 > end) return; // 想定レイアウトと不一致
+                uint location = r.ReadUInt32();    // 0..4096
+                r.ReadUInt32();                     // midpoint (未使用)
+                r.ReadUInt16();                     // colorSpace (0=RGB 前提)
+                int c1 = r.ReadUInt16(), c2 = r.ReadUInt16(), c3 = r.ReadUInt16();
+                r.ReadUInt16();                     // 4 成分目 (RGB では未使用)
+                r.ReadUInt16();                     // colorType (user/fg/bg)
+                locs.Add(Mathf.Clamp01(location / 4096f));
+                comps.Add(new Vector3Int(c1, c2, c3));
+                maxComp = Mathf.Max(maxComp, Mathf.Max(c1, Mathf.Max(c2, c3)));
+            }
+            float scale = maxComp > 255 ? 65535f : 255f;
+
+            // 透明ストップ (best effort。失敗しても色キーは活かす)
+            var alphaLocs = new List<float>();
+            var alphaVals = new List<float>();
+            if (r.Position + 2 <= end)
+            {
+                int transCount = r.ReadUInt16();
+                if (transCount > 0 && transCount <= 256)
+                {
+                    for (int i = 0; i < transCount; i++)
+                    {
+                        if (r.Position + 10 > end) break;
+                        uint location = r.ReadUInt32();
+                        r.ReadUInt32();              // midpoint
+                        int opacity = r.ReadUInt16(); // 0..100
+                        alphaLocs.Add(Mathf.Clamp01(location / 4096f));
+                        alphaVals.Add(Mathf.Clamp01(opacity / 100f));
+                    }
+                }
+            }
+
+            var grad = BuildGradient(locs, comps, scale, alphaLocs, alphaVals, reverse);
+            if (grad == null) return;
+
+            layer.Adjustment.HasGradientMap      = true;
+            layer.Adjustment.GradientMapGradient = grad;
+        }
+
+        // grdm のカラー/透明ストップから Unity Gradient を構築する。
+        // Unity のキー数上限 (色 8 / α 8) を超える場合は端点を保ちつつ等間隔で間引く。
+        static Gradient BuildGradient(
+            List<float> locs, List<Vector3Int> comps, float scale,
+            List<float> alphaLocs, List<float> alphaVals, bool reverse)
+        {
+            int n = locs.Count;
+            if (n == 0) return null;
+
+            var color = new List<GradientColorKey>(n);
+            for (int i = 0; i < n; i++)
+            {
+                float t = reverse ? 1f - locs[i] : locs[i];
+                var c = comps[i];
+                color.Add(new GradientColorKey(new Color(c.x / scale, c.y / scale, c.z / scale), t));
+            }
+            color.Sort((a, b) => a.time.CompareTo(b.time));
+
+            var alpha = new List<GradientAlphaKey>(alphaLocs.Count);
+            for (int i = 0; i < alphaLocs.Count; i++)
+            {
+                float t = reverse ? 1f - alphaLocs[i] : alphaLocs[i];
+                alpha.Add(new GradientAlphaKey(alphaVals[i], t));
+            }
+            alpha.Sort((a, b) => a.time.CompareTo(b.time));
+            if (alpha.Count == 0)
+            {
+                alpha.Add(new GradientAlphaKey(1f, 0f));
+                alpha.Add(new GradientAlphaKey(1f, 1f));
+            }
+
+            var g = new Gradient { mode = GradientMode.Blend };
+            g.SetKeys(Downsample(color, 8), Downsample(alpha, 8));
+            return g;
+        }
+
+        // 端点を保持しつつ最大数まで等間隔サンプリングする。
+        static T[] Downsample<T>(List<T> keys, int max)
+        {
+            if (keys.Count <= max) return keys.ToArray();
+            var outp = new T[max];
+            for (int i = 0; i < max; i++)
+                outp[i] = keys[Mathf.RoundToInt(i * (keys.Count - 1) / (float)(max - 1))];
+            return outp;
+        }
+
+        static void HandleColorBalance(BigEndianBinaryReader r, PSDLayer layer, uint len)
+        {
+            // blnc バイナリ構造: シャドウ/中間調/ハイライトごとに int16×3
+            //   (cyan-red, magenta-green, yellow-blue, 各 -100..100)、末尾に preserveLuminosity(1B)。
+            // 一部ファイルは末尾バイトを欠くため best effort で読む。
+            long end = r.Position + len;
+            if (r.Position + 18 > end) return; // 9×int16 が入らない → 想定外レイアウト
+
+            short sr = r.ReadInt16(), sg = r.ReadInt16(), sb = r.ReadInt16();
+            short mr = r.ReadInt16(), mg = r.ReadInt16(), mb = r.ReadInt16();
+            short hr = r.ReadInt16(), hg = r.ReadInt16(), hb = r.ReadInt16();
+            bool preserveLum = true;
+            if (r.Position + 1 <= end)
+                preserveLum = r.ReadByte() != 0;
+
+            layer.Adjustment.HasColorBalance       = true;
+            layer.Adjustment.CBShadows             = new Vector3(sr, sg, sb);
+            layer.Adjustment.CBMidtones            = new Vector3(mr, mg, mb);
+            layer.Adjustment.CBHighlights          = new Vector3(hr, hg, hb);
+            layer.Adjustment.CBPreserveLuminosity  = preserveLum;
         }
 
         static void HandleLfx2(BigEndianBinaryReader r, PSDLayer layer)

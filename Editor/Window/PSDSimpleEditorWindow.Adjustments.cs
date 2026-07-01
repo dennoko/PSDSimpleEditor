@@ -41,6 +41,7 @@ namespace PSDSimpleEditor
             DrawPosterizeControls(layer, ci);
             DrawLevelsControls(layer, ci);
             DrawCurveControls(layer, ci);
+            DrawColorBalanceControls(layer, ci);
 
             DrawGradientMapControls(layer, ci);
             DrawImageClipControls(layer, ci);
@@ -124,14 +125,27 @@ namespace PSDSimpleEditor
             }
         }
 
-        /// <summary>「レベル補正」5 スライダー (非破壊。既定値は恒等変換のため常時表示)。</summary>
+        /// <summary>「レベル補正」有効トグル + 5 スライダー (非破壊)。</summary>
         void DrawLevelsControls(PSDLayer layer, int indent)
         {
-            float nib = IndentedSlider(new GUIContent("入力シャドウ", "最も暗い部分をどの入力レベル（0〜255）から開始するかを設定します。"), layer.UILevelsInputBlack,  0f, 255f, indent);
-            float niw = IndentedSlider(new GUIContent("入力ハイライト", "最も明るい部分をどの入力レベル（0〜255）で終了するかを設定します。"), layer.UILevelsInputWhite,  0f, 255f, indent);
-            float ng  = IndentedSlider(new GUIContent("ガンマ", "中間調の明るさ（ガンマ値、0.01〜9.99）を調整します。1.0が基準です。"),        layer.UILevelsGamma,       0.01f, 9.99f, indent);
-            float nob = IndentedSlider(new GUIContent("出力シャドウ", "出力される画像の最も暗い部分の明るさ下限（0〜255）を制限します。"),   layer.UILevelsOutputBlack, 0f, 255f, indent);
-            float now = IndentedSlider(new GUIContent("出力ハイライト", "出力される画像の最も明るい部分の明るさ上限（0〜255）を制限します。"), layer.UILevelsOutputWhite, 0f, 255f, indent);
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(indent * IndentWidth + 18f);
+            bool en = EditorGUILayout.ToggleLeft(new GUIContent("レベル補正", "ハイライト・シャドウや中間調の入力/出力レベルを調整して、画像の明暗のバランスを補正します。"), layer.UILevelsEnabled, GUILayout.Height(RowH));
+            EditorGUILayout.EndHorizontal();
+            RowSpace();
+            if (en != layer.UILevelsEnabled)
+            {
+                layer.UILevelsEnabled = en;
+                _needsRecomposite = true;
+            }
+            if (!en) return;
+
+            int ci = indent + 1;
+            float nib = IndentedSlider(new GUIContent("入力シャドウ", "最も暗い部分をどの入力レベル（0〜255）から開始するかを設定します。"), layer.UILevelsInputBlack,  0f, 255f, ci);
+            float niw = IndentedSlider(new GUIContent("入力ハイライト", "最も明るい部分をどの入力レベル（0〜255）で終了するかを設定します。"), layer.UILevelsInputWhite,  0f, 255f, ci);
+            float ng  = IndentedSlider(new GUIContent("ガンマ", "中間調の明るさ（ガンマ値、0.01〜9.99）を調整します。1.0が基準です。"),        layer.UILevelsGamma,       0.01f, 9.99f, ci);
+            float nob = IndentedSlider(new GUIContent("出力シャドウ", "出力される画像の最も暗い部分の明るさ下限（0〜255）を制限します。"),   layer.UILevelsOutputBlack, 0f, 255f, ci);
+            float now = IndentedSlider(new GUIContent("出力ハイライト", "出力される画像の最も明るい部分の明るさ上限（0〜255）を制限します。"), layer.UILevelsOutputWhite, 0f, 255f, ci);
             if (!Mathf.Approximately(nib, layer.UILevelsInputBlack)  ||
                 !Mathf.Approximately(niw, layer.UILevelsInputWhite)  ||
                 !Mathf.Approximately(ng,  layer.UILevelsGamma)       ||
@@ -144,6 +158,61 @@ namespace PSDSimpleEditor
                 layer.UILevelsOutputBlack = nob;
                 layer.UILevelsOutputWhite = now;
                 _needsRecomposite = true;
+            }
+        }
+
+        /// <summary>「カラーバランス」有効トグル + シャドウ/中間調/ハイライトの色シフト + 輝度保持。</summary>
+        void DrawColorBalanceControls(PSDLayer layer, int indent)
+        {
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(indent * IndentWidth + 18f);
+            bool en = EditorGUILayout.ToggleLeft(
+                new GUIContent("カラーバランス", "シャドウ・中間調・ハイライトごとに色味（シアン-赤/マゼンタ-緑/黄-青）を調整します。"),
+                layer.UIColorBalanceEnabled, GUILayout.Height(RowH));
+            EditorGUILayout.EndHorizontal();
+            RowSpace();
+            if (en != layer.UIColorBalanceEnabled)
+            {
+                layer.UIColorBalanceEnabled = en;
+                _needsRecomposite = true;
+            }
+            if (!en) return;
+
+            bool changed = false;
+            Vector3 DrawRange(string title, Vector3 v)
+            {
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.Space(indent * IndentWidth + 18f);
+                EditorGUILayout.LabelField(title, GUILayout.Height(RowH));
+                EditorGUILayout.EndHorizontal();
+                RowSpace();
+                float cr = IndentedSlider(new GUIContent("ｼｱﾝ-赤",   "シアン ←→ 赤（-100 〜 100）。"),   v.x, -100f, 100f, indent + 1);
+                float mg = IndentedSlider(new GUIContent("ﾏｾﾞﾝﾀ-緑", "マゼンタ ←→ 緑（-100 〜 100）。"), v.y, -100f, 100f, indent + 1);
+                float yb = IndentedSlider(new GUIContent("黄-青",     "黄 ←→ 青（-100 〜 100）。"),       v.z, -100f, 100f, indent + 1);
+                var nv = new Vector3(cr, mg, yb);
+                if (!Mathf.Approximately(nv.x, v.x) || !Mathf.Approximately(nv.y, v.y) || !Mathf.Approximately(nv.z, v.z))
+                    changed = true;
+                return nv;
+            }
+
+            var s = DrawRange("シャドウ",   layer.UICBShadows);
+            var m = DrawRange("中間調",     layer.UICBMidtones);
+            var h = DrawRange("ハイライト", layer.UICBHighlights);
+
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(indent * IndentWidth + 18f);
+            bool pl = EditorGUILayout.ToggleLeft(new GUIContent("輝度を保持", "色を変えても明るさ（輝度）を維持します。"),
+                                                 layer.UICBPreserveLuminosity, GUILayout.Height(RowH));
+            EditorGUILayout.EndHorizontal();
+            RowSpace();
+
+            if (changed || pl != layer.UICBPreserveLuminosity)
+            {
+                layer.UICBShadows            = s;
+                layer.UICBMidtones           = m;
+                layer.UICBHighlights         = h;
+                layer.UICBPreserveLuminosity = pl;
+                _needsRecomposite            = true;
             }
         }
 
@@ -357,6 +426,18 @@ namespace PSDSimpleEditor
                 new[] { new GradientColorKey(Color.black, 0f), new GradientColorKey(Color.white, 1f) },
                 new[] { new GradientAlphaKey(1f, 0f),          new GradientAlphaKey(1f, 1f) });
             return g;
+        }
+
+        /// <summary>PSD からインポートしたグラデーションマップ (grdm) レイヤーの LUT をロード直後に焼く (ツリー再帰)。</summary>
+        void BakeImportedGradientLuts(System.Collections.Generic.List<PSDLayer> layers)
+        {
+            if (layers == null) return;
+            foreach (var l in layers)
+            {
+                if (l.UIGradientMapEnabled && l.UIGradient != null)
+                    EnsureGradientLut(l);
+                BakeImportedGradientLuts(l.Children);
+            }
         }
 
         /// <summary>グラデーション有効時に LUT が無ければ焼く。</summary>

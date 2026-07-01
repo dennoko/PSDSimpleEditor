@@ -185,13 +185,16 @@ namespace PSDSimpleEditor
                 || layer.UIInvert
                 || layer.UIThresholdEnabled
                 || layer.UIPosterizeEnabled
-                || !Mathf.Approximately(layer.UILevelsInputBlack,  0f)
-                || !Mathf.Approximately(layer.UILevelsInputWhite,  255f)
-                || !Mathf.Approximately(layer.UILevelsGamma,       1f)
-                || !Mathf.Approximately(layer.UILevelsOutputBlack, 0f)
-                || !Mathf.Approximately(layer.UILevelsOutputWhite, 255f)
+                || (layer.UILevelsEnabled && (
+                       !Mathf.Approximately(layer.UILevelsInputBlack,  0f)
+                    || !Mathf.Approximately(layer.UILevelsInputWhite,  255f)
+                    || !Mathf.Approximately(layer.UILevelsGamma,       1f)
+                    || !Mathf.Approximately(layer.UILevelsOutputBlack, 0f)
+                    || !Mathf.Approximately(layer.UILevelsOutputWhite, 255f)
+                   ))
                 || (layer.UICurveEnabled && layer._curveLut != null)
-                || (layer.UIGradientMapEnabled && layer._gradientLut != null);
+                || (layer.UIGradientMapEnabled && layer._gradientLut != null)
+                || layer.UIColorBalanceEnabled;
         }
 
         static byte ToByteOpacity(float opacity01)
