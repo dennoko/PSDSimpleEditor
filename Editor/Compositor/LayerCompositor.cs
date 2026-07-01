@@ -25,7 +25,7 @@ namespace PSDSimpleEditor
     /// </summary>
     public partial class LayerCompositor
     {
-        const string ShaderPath = "Assets/dennokoworks/PSDSimpleEditor/Shader/LayerBlend.shader";
+        const string ShaderPath = "Assets/dennokoworks/DennokoPSDEditor/Shader/LayerBlend.shader";
 
         readonly int _canvasW;
         readonly int _canvasH;
