@@ -8,12 +8,31 @@ namespace PSDSimpleEditor
     {
         void DrawPreviewPanel()
         {
-            EditorGUILayout.BeginVertical();
-            GUILayout.Label("プレビュー", EditorStyles.boldLabel);
+            // パネル外枠 (border 付き)
+            EditorGUILayout.BeginVertical(PSDEditorTheme.PanelStyle,
+                                          GUILayout.ExpandWidth(true),
+                                          GUILayout.ExpandHeight(true));
+
+            // ヘッダ帯 (Surface2): タイトル + マージ参照トグル
+            EditorGUILayout.BeginHorizontal(PSDEditorTheme.ToolbarStyle);
+            GUILayout.Label("プレビュー", PSDEditorTheme.SectionHeaderStyle);
+            GUILayout.FlexibleSpace();
+            _showMergedRef = GUILayout.Toggle(_showMergedRef, "マージ参照",
+                                              PSDEditorTheme.ToolbarButtonStyle, GUILayout.Width(80));
+            EditorGUILayout.EndHorizontal();
+
+            // 本体 (手動パディング付きプレビュー領域)
+            GUILayout.Space(6);
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(6);
 
             Rect area = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none,
                                                  GUILayout.ExpandWidth(true),
                                                  GUILayout.ExpandHeight(true));
+
+            GUILayout.Space(6);
+            EditorGUILayout.EndHorizontal();
+            GUILayout.Space(6);
 
             bool hasPreview = _compositeTexture != null && area.width > 8f && area.height > 8f;
 
@@ -31,6 +50,9 @@ namespace PSDSimpleEditor
 
             if (Event.current.type == EventType.Repaint)
             {
+                // プレビュー領域の背景 (最暗面)
+                EditorGUI.DrawRect(area, PSDEditorTheme.Surface0);
+
                 if (hasPreview)
                 {
                     // 透明部可視化のチェッカー背景 → その上にアルファ合成で描画
@@ -46,7 +68,7 @@ namespace PSDSimpleEditor
                 }
                 else
                 {
-                    GUI.Label(area, "プレビューなし", EditorStyles.centeredGreyMiniLabel);
+                    GUI.Label(area, "プレビューなし", PSDEditorTheme.CenteredCaptionStyle);
                 }
             }
 
@@ -70,7 +92,7 @@ namespace PSDSimpleEditor
             DrawCheckerBackground(fit);
             GUI.DrawTexture(fit, merged, ScaleMode.StretchToFill, true);
             GUI.Label(new Rect(fit.x, fit.y - 15f, fit.width, 14f),
-                      "マージ参照", EditorStyles.centeredGreyMiniLabel);
+                      "マージ参照", PSDEditorTheme.CenteredCaptionStyle);
         }
 
         /// <summary>指定矩形にチェッカーパターンをタイル描画する。</summary>

@@ -57,6 +57,7 @@ namespace PSDSimpleEditor
         // Layout / Container
         public static GUIStyle CardStyle      { get; private set; } // sections (padding あり)
         public static GUIStyle CardOuterStyle { get; private set; } // ツールバー付き外枠 (padding なし)
+        public static GUIStyle PanelStyle     { get; private set; } // 左右パネル外枠 (padding/margin なし)
         public static GUIStyle ToolbarStyle   { get; private set; } // ツールバー行
 
         // Typography
@@ -131,6 +132,12 @@ namespace PSDSimpleEditor
             CardOuterStyle.border  = new RectOffset(1, 1, 1, 1);
             CardOuterStyle.padding = new RectOffset(0, 0, 0, 0);
             CardOuterStyle.margin  = new RectOffset(8, 8, 6, 6);
+
+            PanelStyle = new GUIStyle();
+            PanelStyle.normal.background = _texCard;
+            PanelStyle.border  = new RectOffset(1, 1, 1, 1);
+            PanelStyle.padding = new RectOffset(0, 0, 0, 0);
+            PanelStyle.margin  = new RectOffset(0, 0, 0, 0);
 
             ToolbarStyle = new GUIStyle();
             ToolbarStyle.normal.background = _texSurface2;
@@ -243,6 +250,9 @@ namespace PSDSimpleEditor
             ToolButtonStyle.fontSize    = 11;
             ToolButtonStyle.fixedHeight = 20;
             ToolButtonStyle.alignment   = TextAnchor.MiddleCenter;
+            ToolButtonStyle.onNormal.background  = MakeTex(Color.Lerp(Surface2, Accent, 0.25f));
+            ToolButtonStyle.onHover.background   = MakeTex(Color.Lerp(Surface2, Accent, 0.32f));
+            ToolButtonStyle.onActive.background  = MakeTex(Color.Lerp(Surface2, Accent, 0.40f));
             ToolButtonStyle.normal.textColor    = TextSecondary;
             ToolButtonStyle.hover.textColor     = TextPrimary;
             ToolButtonStyle.active.textColor    = TextPrimary;
@@ -262,6 +272,9 @@ namespace PSDSimpleEditor
             MiniButtonStyle.fontSize    = 10;
             MiniButtonStyle.fixedHeight = 18;
             MiniButtonStyle.alignment   = TextAnchor.MiddleCenter;
+            MiniButtonStyle.onNormal.background  = MakeTex(Color.Lerp(Surface2, Accent, 0.25f));
+            MiniButtonStyle.onHover.background   = MakeTex(Color.Lerp(Surface2, Accent, 0.32f));
+            MiniButtonStyle.onActive.background  = MakeTex(Color.Lerp(Surface2, Accent, 0.40f));
             MiniButtonStyle.normal.textColor    = TextTertiary;
             MiniButtonStyle.hover.textColor     = TextSecondary;
             MiniButtonStyle.active.textColor    = TextPrimary;

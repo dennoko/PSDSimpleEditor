@@ -11,18 +11,19 @@ namespace PSDSimpleEditor
     {
         void DrawBottomBar()
         {
-            EditorGUILayout.BeginHorizontal(GUILayout.Height(BottomBarHeight));
+            EditorGUILayout.BeginHorizontal(PSDEditorTheme.CardStyle);
 
             GUILayout.Label(
-                $"{_psdFile.Width} × {_psdFile.Height} px  |  " +
-                $"レイヤー数: {CountLayersRecursive(_psdFile.Layers)}  |  " +
-                $"{_psdFile.BitDepth}bit  |  " +
+                $"{_psdFile.Width} × {_psdFile.Height} px   |   " +
+                $"レイヤー数 {CountLayersRecursive(_psdFile.Layers)}   |   " +
+                $"{_psdFile.BitDepth}bit   |   " +
                 ColorModeName(_psdFile.ColorMode),
-                EditorStyles.miniLabel);
+                PSDEditorTheme.CaptionStyle);
 
             GUILayout.FlexibleSpace();
 
             // エクスポート形式の選択
+            GUILayout.Label("形式", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(30));
             _exportFormat = (ExportFormat)EditorGUILayout.EnumPopup(_exportFormat, GUILayout.Width(80));
 
             bool canExport = false;
@@ -37,7 +38,7 @@ namespace PSDSimpleEditor
 
             using (new EditorGUI.DisabledScope(!canExport))
             {
-                if (GUILayout.Button("Export", GUILayout.Width(80)))
+                if (GUILayout.Button("書き出し", PSDEditorTheme.ActionButtonStyle, GUILayout.Width(120)))
                 {
                     switch (_exportFormat)
                     {
@@ -114,6 +115,7 @@ namespace PSDSimpleEditor
                 byte[] png = _compositeTexture.EncodeToPNG();
                 File.WriteAllBytes(savePath, png);
                 Debug.Log($"[PSDSimpleEditor] PNG を保存しました: {savePath}");
+                SetStatus($"PNG を書き出しました: {Path.GetFileName(savePath)}", StatusType.Success);
 
                 // プロジェクト内の出力ならAssetDatabaseをリフレッシュしてUnityエディタ上で見えるようにする
                 string normalizedSavePath = savePath.Replace('\\', '/');
@@ -139,6 +141,7 @@ namespace PSDSimpleEditor
             catch (Exception e)
             {
                 Debug.LogError($"[PSDSimpleEditor] PNG 保存失敗: {e}");
+                SetStatus($"PNG の書き出しに失敗しました: {e.Message}", StatusType.Error);
                 EditorUtility.DisplayDialog("書き出しエラー",
                     $"PNG の保存に失敗しました:\n{e.Message}", "OK");
             }
@@ -213,6 +216,7 @@ namespace PSDSimpleEditor
                 PSDWriter.Save(_psdFile, _psdFile.Layers, _compositor, _compositeTexture, savePath);
 
                 Debug.Log($"[PSDSimpleEditor] PSD を保存しました: {savePath}");
+                SetStatus($"PSD を書き出しました: {Path.GetFileName(savePath)}", StatusType.Success);
 
                 // 新規 PSD として保存したパスを履歴へ記録
                 _history.Add(savePath.Replace('\\', '/'));
@@ -240,6 +244,7 @@ namespace PSDSimpleEditor
             catch (Exception e)
             {
                 Debug.LogError($"[PSDSimpleEditor] PSD 保存失敗: {e}");
+                SetStatus($"PSD の書き出しに失敗しました: {e.Message}", StatusType.Error);
                 EditorUtility.DisplayDialog("書き出しエラー",
                     $"PSD の保存に失敗しました:\n{e.Message}", "OK");
             }
@@ -280,6 +285,7 @@ namespace PSDSimpleEditor
                 byte[] tga = EncodeToTGA(_compositeTexture);
                 File.WriteAllBytes(savePath, tga);
                 Debug.Log($"[PSDSimpleEditor] TGA を保存しました: {savePath}");
+                SetStatus($"TGA を書き出しました: {Path.GetFileName(savePath)}", StatusType.Success);
 
                 // プロジェクト内の出力ならAssetDatabaseをリフレッシュしてUnityエディタ上で見えるようにする
                 string normalizedSavePath = savePath.Replace('\\', '/');
@@ -305,6 +311,7 @@ namespace PSDSimpleEditor
             catch (Exception e)
             {
                 Debug.LogError($"[PSDSimpleEditor] TGA 保存失敗: {e}");
+                SetStatus($"TGA の書き出しに失敗しました: {e.Message}", StatusType.Error);
                 EditorUtility.DisplayDialog("書き出しエラー",
                     $"TGA の保存に失敗しました:\n{e.Message}", "OK");
             }

@@ -27,12 +27,17 @@ namespace PSDSimpleEditor
         }
 
         // ── 定数 ───────────────────────────────────────────────────────────
-        const float BottomBarHeight = 22f;    // 下部バー高さ
-        const float IndentWidth     = 14f;    // ツリー 1 段あたりのインデント
+        const float IndentWidth     = 14f;    // コントロール行 1 段あたりのインデント
         const float CheckerCellPx   = 8f;     // チェッカー 1 マスの画面ピクセル数
 
+        // ── ステータス ──────────────────────────────────────────────────────
+        public enum StatusType { Info, Success, Error }
+        string     _statusMessage   = "PSD ファイルを読み込んでください。";
+        StatusType _statusType      = StatusType.Info;
+        double     _statusResetTime = -1.0;
+
         // ── 状態 ───────────────────────────────────────────────────────────
-        [SerializeField] float _layerPanelWidth = 270f; // 左パネル幅
+        [SerializeField] float _layerPanelWidth = 300f; // 左パネル幅
         [SerializeField] string _exportDir = "Assets/PSDSE_exported"; // PNG出力先フォルダ
         [SerializeField] ExportFormat _exportFormat = ExportFormat.PNG; // エクスポートフォーマット
         string _psdPath = "";                 // 入力中の PSD パス (リロード後も保持)
@@ -143,37 +148,124 @@ namespace PSDSimpleEditor
 
         void OnGUI()
         {
-            DrawToolbar();
-            DrawExportBar();
-            DrawPreviewBar();
-
-            if (_psdFile == null)
+            // ステータスの自動リセット (Info 以外を一定時間後に戻す)
+            if (_statusResetTime > 0 && EditorApplication.timeSinceStartup > _statusResetTime)
             {
-                EditorGUILayout.HelpBox("PSD ファイルを選択して「Load」を押してください。", MessageType.Info);
+                _statusMessage   = _psdFile != null ? "Ready" : "PSD ファイルを読み込んでください。";
+                _statusType      = StatusType.Info;
+                _statusResetTime = -1.0;
+                Repaint();
             }
-            else
+
+            PSDEditorTheme.Initialize();
+            PSDEditorTheme.PushEditorTheme();
+
+            try
             {
-                float mainHeight = position.height
-                                 - EditorStyles.toolbar.fixedHeight * 3f
-                                 - BottomBarHeight - 8f;
+                // ウィンドウ全面を surface.level0 で塗る
+                EditorGUI.DrawRect(new Rect(0f, 0f, position.width, position.height), PSDEditorTheme.Surface0);
 
-                // レイヤーパネルの幅をウィンドウサイズに応じて制限
-                float minWidth = 150f;
-                float maxWidth = Mathf.Max(minWidth, position.width - 150f);
-                _layerPanelWidth = Mathf.Clamp(_layerPanelWidth, minWidth, maxWidth);
+                DrawHeader();
+                DrawSettingsCard();
 
-                EditorGUILayout.BeginHorizontal(GUILayout.Height(mainHeight));
-                DrawLayerPanel(mainHeight);
-                DrawSplitter(mainHeight);
-                DrawPreviewPanel();
-                EditorGUILayout.EndHorizontal();
+                if (_psdFile == null)
+                {
+                    DrawEmptyState();
+                }
+                else
+                {
+                    // レイヤーパネルの幅をウィンドウサイズに応じて制限
+                    float minWidth = 180f;
+                    float maxWidth = Mathf.Max(minWidth, position.width - 220f);
+                    _layerPanelWidth = Mathf.Clamp(_layerPanelWidth, minWidth, maxWidth);
 
-                DrawBottomBar();
+                    Rect mainRect = EditorGUILayout.BeginHorizontal(GUILayout.ExpandHeight(true));
+                    GUILayout.Space(8);
+                    DrawLayerPanel();
+                    DrawSplitter(mainRect.x + 8f);
+                    DrawPreviewPanel();
+                    GUILayout.Space(8);
+                    EditorGUILayout.EndHorizontal();
+
+                    DrawBottomBar();
+                }
+
+                DrawStatusBar();
+            }
+            finally
+            {
+                PSDEditorTheme.PopEditorTheme();
             }
 
             // 変更があれば Repaint イベント中に再合成する (レイアウト中の構造変更を避ける)
             if (_needsRecomposite && Event.current.type == EventType.Repaint)
                 DoComposite();
+        }
+
+        // ── ヘッダー / 空状態 / ステータスバー ───────────────────────────────
+
+        /// <summary>ウィンドウタイトルと区切り線。</summary>
+        void DrawHeader()
+        {
+            EditorGUILayout.Space(8);
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(12);
+            GUILayout.Label("PSD Simple Editor", PSDEditorTheme.TitleStyle);
+            GUILayout.FlexibleSpace();
+            GUILayout.Space(12);
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.Space(6);
+            DrawSeparator();
+        }
+
+        /// <summary>PSD 未読み込み時の案内カード。</summary>
+        void DrawEmptyState()
+        {
+            GUILayout.FlexibleSpace();
+            EditorGUILayout.BeginVertical(PSDEditorTheme.CardStyle);
+            GUILayout.Label("PSD が読み込まれていません", PSDEditorTheme.SectionHeaderStyle);
+            DrawSeparator();
+            GUILayout.Label(
+                "上部の「PSD」欄でファイルを指定し、「読み込み」を押してください。\n" +
+                "履歴からの再読み込みも可能です。",
+                PSDEditorTheme.SecondaryTextStyle);
+            EditorGUILayout.EndVertical();
+            GUILayout.FlexibleSpace();
+        }
+
+        /// <summary>下端のステータスバー。</summary>
+        void DrawStatusBar()
+        {
+            GUILayout.Box(_statusMessage, GetStatusStyle(_statusType), GUILayout.ExpandWidth(true));
+        }
+
+        GUIStyle GetStatusStyle(StatusType type)
+        {
+            switch (type)
+            {
+                case StatusType.Success: return PSDEditorTheme.StatusSuccessStyle;
+                case StatusType.Error:   return PSDEditorTheme.StatusErrorStyle;
+                default:                 return PSDEditorTheme.StatusInfoStyle;
+            }
+        }
+
+        /// <summary>ステータスバーにメッセージを表示し、一定時間後に既定へ戻す。</summary>
+        void SetStatus(string message, StatusType type, double autoResetSeconds = 4.0)
+        {
+            _statusMessage   = message;
+            _statusType      = type;
+            _statusResetTime = type == StatusType.Info
+                ? -1.0
+                : EditorApplication.timeSinceStartup + autoResetSeconds;
+            Repaint();
+        }
+
+        /// <summary>Outline 色の 1px 横区切り線 (前後に余白)。</summary>
+        void DrawSeparator()
+        {
+            var rect = GUILayoutUtility.GetRect(0, 1, GUILayout.ExpandWidth(true));
+            EditorGUI.DrawRect(rect, PSDEditorTheme.Outline);
+            EditorGUILayout.Space(4);
         }
 
         // ── PSD 読み込み ───────────────────────────────────────────────────
@@ -183,6 +275,7 @@ namespace PSDSimpleEditor
             string resolved = ResolvePSDPath();
             if (string.IsNullOrEmpty(resolved) || !File.Exists(resolved))
             {
+                SetStatus("有効な PSD ファイルを指定してください。", StatusType.Error);
                 EditorUtility.DisplayDialog("エラー", "有効な PSD ファイルを指定してください。", "OK");
                 return;
             }
@@ -205,11 +298,13 @@ namespace PSDSimpleEditor
                                      "LayerBlend.shader を確認してください。");
 
                 _needsRecomposite = true;
+                SetStatus($"読み込み完了: {Path.GetFileName(resolved)}", StatusType.Success);
             }
             catch (Exception e)
             {
                 Debug.LogError($"[PSDSimpleEditor] PSD 読み込み失敗: {e}");
                 Cleanup();  // 中途半端な状態を残さない
+                SetStatus($"読み込みに失敗しました: {e.Message}", StatusType.Error);
                 EditorUtility.DisplayDialog("読み込みエラー",
                     $"PSD ファイルの読み込みに失敗しました:\n{e.Message}", "OK");
             }

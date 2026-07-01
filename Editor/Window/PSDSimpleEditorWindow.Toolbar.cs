@@ -5,18 +5,35 @@ using UnityEditor;
 
 namespace PSDSimpleEditor
 {
-    // ── ツールバー (PSD パス入力 / Export Dir 入力 / 履歴) ──────────────────
+    // ── 設定カード (PSD パス / 出力先 / 3D プレビュー反映 / 履歴) ────────────
     public partial class PSDSimpleEditorWindow
     {
-        void DrawToolbar()
+        const float SettingsLabelWidth = 68f;   // 設定カード左ラベル幅
+        const float SettingsButtonWidth = 60f;  // 「参照」等ボタン幅
+
+        /// <summary>入出力設定をまとめたカード。PSD 入力 / 出力先 / 3D プレビュー反映の 3 行。</summary>
+        void DrawSettingsCard()
         {
-            EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+            EditorGUILayout.BeginVertical(PSDEditorTheme.CardStyle);
 
-            GUILayout.Label("PSD:", GUILayout.Width(32));
-            _psdPath = EditorGUILayout.TextField(_psdPath, EditorStyles.toolbarTextField,
-                                                 GUILayout.ExpandWidth(true));
+            DrawPsdInputRow();
+            DrawSeparator();
+            DrawExportDirRow();
+            DrawSeparator();
+            DrawRealtimePreviewRow();
 
-            if (GUILayout.Button("Browse...", EditorStyles.toolbarButton, GUILayout.Width(68)))
+            EditorGUILayout.EndVertical();
+        }
+
+        // ── 行: PSD 入力 ────────────────────────────────────────────────────
+        void DrawPsdInputRow()
+        {
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label("PSD", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(SettingsLabelWidth));
+
+            _psdPath = EditorGUILayout.TextField(_psdPath, GUILayout.ExpandWidth(true));
+
+            if (GUILayout.Button("参照", PSDEditorTheme.ToolButtonStyle, GUILayout.Width(SettingsButtonWidth)))
             {
                 string dir = "";
                 try
@@ -33,31 +50,26 @@ namespace PSDSimpleEditor
                 }
             }
 
-            if (GUILayout.Button("Load", EditorStyles.toolbarButton, GUILayout.Width(44)))
+            if (GUILayout.Button("読み込み", PSDEditorTheme.ToolButtonStyle, GUILayout.Width(72)))
                 LoadPSD();
 
-            if (GUILayout.Button("履歴 ▾", EditorStyles.toolbarDropDown, GUILayout.Width(60)))
+            if (GUILayout.Button("履歴 ▾", PSDEditorTheme.ToolButtonStyle, GUILayout.Width(SettingsButtonWidth)))
                 ShowHistoryMenu();
-
-            GUILayout.Space(8);
-
-            _showMergedRef = GUILayout.Toggle(_showMergedRef, "マージ参照",
-                                              EditorStyles.toolbarButton, GUILayout.Width(76));
 
             EditorGUILayout.EndHorizontal();
         }
 
-        void DrawExportBar()
+        // ── 行: 出力先フォルダ ──────────────────────────────────────────────
+        void DrawExportDirRow()
         {
-            EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label("出力先", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(SettingsLabelWidth));
 
-            GUILayout.Label("Export Dir:", GUILayout.Width(72));
-            _exportDir = EditorGUILayout.TextField(_exportDir, EditorStyles.toolbarTextField,
-                                                   GUILayout.ExpandWidth(true));
+            _exportDir = EditorGUILayout.TextField(_exportDir, GUILayout.ExpandWidth(true));
 
-            if (GUILayout.Button("Browse...", EditorStyles.toolbarButton, GUILayout.Width(68)))
+            if (GUILayout.Button("参照", PSDEditorTheme.ToolButtonStyle, GUILayout.Width(SettingsButtonWidth)))
             {
-                string picked = EditorUtility.OpenFolderPanel("PNG出力先フォルダを選択", _exportDir, "");
+                string picked = EditorUtility.OpenFolderPanel("出力先フォルダを選択", _exportDir, "");
                 if (!string.IsNullOrEmpty(picked))
                 {
                     string projectPath = Path.GetFullPath(Application.dataPath);
@@ -78,16 +90,16 @@ namespace PSDSimpleEditor
             EditorGUILayout.EndHorizontal();
         }
 
-        void DrawPreviewBar()
+        // ── 行: 3D プレビュー反映 ───────────────────────────────────────────
+        void DrawRealtimePreviewRow()
         {
-            EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label("3D反映", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(SettingsLabelWidth));
 
-            GUILayout.Label("Preview Mat:", GUILayout.Width(76));
-            
             // マテリアル選択フィールド
             Material prevMat = (Material)EditorGUILayout.ObjectField(
-                GUIContent.none, _previewMaterial, typeof(Material), true, GUILayout.Width(150));
-            
+                GUIContent.none, _previewMaterial, typeof(Material), true, GUILayout.Width(160));
+
             if (prevMat != _previewMaterial)
             {
                 RevertRealtimePreview();
@@ -95,8 +107,8 @@ namespace PSDSimpleEditor
                 _needsRecomposite = true;
             }
 
-            GUILayout.Label("Slot:", GUILayout.Width(32));
-            string prevSlot = EditorGUILayout.TextField(_previewSlotName, EditorStyles.toolbarTextField, GUILayout.Width(100));
+            GUILayout.Label("スロット", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(48));
+            string prevSlot = EditorGUILayout.TextField(_previewSlotName, GUILayout.Width(110));
             if (prevSlot != _previewSlotName)
             {
                 RevertRealtimePreview();
@@ -104,12 +116,12 @@ namespace PSDSimpleEditor
                 _needsRecomposite = true;
             }
 
-            GUILayout.Space(8);
+            GUILayout.FlexibleSpace();
 
             // プレビューの有効化トグル
-            bool prevEnabled = GUILayout.Toggle(_isRealtimePreviewEnabled, "3Dプレビュー反映",
-                                                EditorStyles.toolbarButton, GUILayout.Width(110));
-            
+            bool prevEnabled = GUILayout.Toggle(_isRealtimePreviewEnabled, "反映",
+                                                PSDEditorTheme.ToolButtonStyle, GUILayout.Width(64));
+
             if (prevEnabled != _isRealtimePreviewEnabled)
             {
                 _isRealtimePreviewEnabled = prevEnabled;
@@ -124,11 +136,8 @@ namespace PSDSimpleEditor
                 _needsRecomposite = true;
             }
 
-            GUILayout.FlexibleSpace();
-
             EditorGUILayout.EndHorizontal();
         }
-
 
         // ── 履歴ドロップダウン ───────────────────────────────────────────────
 

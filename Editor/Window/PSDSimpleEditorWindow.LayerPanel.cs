@@ -8,25 +8,43 @@ namespace PSDSimpleEditor
     // ── レイヤーパネル (左): ツリー描画・スプリッター・ブレンドモード Popup ──
     public partial class PSDSimpleEditorWindow
     {
-        void DrawLayerPanel(float panelHeight)
+        void DrawLayerPanel()
         {
-            EditorGUILayout.BeginVertical(GUILayout.Width(_layerPanelWidth),
-                                          GUILayout.Height(panelHeight));
-            GUILayout.Label("レイヤー", EditorStyles.boldLabel);
+            // パネル外枠 (border 付き・padding/margin なし → スプリッター計算を単純化)
+            EditorGUILayout.BeginVertical(PSDEditorTheme.PanelStyle,
+                                          GUILayout.Width(_layerPanelWidth),
+                                          GUILayout.ExpandHeight(true));
 
-            _layerScroll = EditorGUILayout.BeginScrollView(_layerScroll,
-                                                           GUILayout.ExpandHeight(true));
+            // ヘッダ帯 (Surface2)
+            EditorGUILayout.BeginHorizontal(PSDEditorTheme.ToolbarStyle);
+            GUILayout.Label("レイヤー", PSDEditorTheme.SectionHeaderStyle);
+            GUILayout.FlexibleSpace();
+            EditorGUILayout.EndHorizontal();
+
+            // 本体 (手動パディング)
+            GUILayout.Space(6);
+            _layerScroll = EditorGUILayout.BeginScrollView(_layerScroll, GUILayout.ExpandHeight(true));
+
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(8);
+            EditorGUILayout.BeginVertical();
             DrawLayerListTopDown(_psdFile.Layers, 0);
+            EditorGUILayout.EndVertical();
+            GUILayout.Space(8);
+            EditorGUILayout.EndHorizontal();
+
             EditorGUILayout.EndScrollView();
+            GUILayout.Space(6);
 
             EditorGUILayout.EndVertical();
         }
 
         /// <summary>レイヤーパネルとプレビューパネルの境界をドラッグで調整するためのスプリッターを描画する。</summary>
-        void DrawSplitter(float height)
+        /// <param name="originX">メイン水平領域左端 (パネル開始) の X 座標。</param>
+        void DrawSplitter(float originX)
         {
-            // 8px 幅のホバー/インタラクション領域を確保
-            Rect rect = GUILayoutUtility.GetRect(8f, height, GUILayout.Width(8f), GUILayout.Height(height));
+            // 10px 幅のホバー/インタラクション領域を確保
+            Rect rect = GUILayoutUtility.GetRect(10f, 10f, GUILayout.Width(10f), GUILayout.ExpandHeight(true));
 
             // ホバー時のカーソル形状を左右矢印に変更
             EditorGUIUtility.AddCursorRect(rect, MouseCursor.ResizeHorizontal);
@@ -40,22 +58,16 @@ namespace PSDSimpleEditor
                 Repaint();
             }
 
-            // スプリッターの背景/線の描画色を決定
+            // スプリッターの線色 (テーマに合わせる)
             Color dividerColor;
             if (_isResizing)
-            {
-                dividerColor = new Color(0.24f, 0.48f, 0.9f); // ドラッグ中のアクセントブルー
-            }
+                dividerColor = PSDEditorTheme.SemanticInfo;                       // ドラッグ中
             else if (_isSplitterHovered)
-            {
-                dividerColor = EditorGUIUtility.isProSkin ? new Color(0.4f, 0.4f, 0.4f) : new Color(0.7f, 0.7f, 0.7f); // ホバー時
-            }
+                dividerColor = Color.Lerp(PSDEditorTheme.Outline, Color.white, 0.4f); // ホバー時
             else
-            {
-                dividerColor = EditorGUIUtility.isProSkin ? new Color(0.18f, 0.18f, 0.18f) : new Color(0.65f, 0.65f, 0.65f); // 通常時
-            }
+                dividerColor = PSDEditorTheme.Outline;                            // 通常時
 
-            // 視覚的に美しい 2px 幅の中央線として描画
+            // 2px 幅の中央線として描画
             Rect visualRect = new Rect(rect.x + (rect.width - 2f) / 2f, rect.y, 2f, rect.height);
             EditorGUI.DrawRect(visualRect, dividerColor);
 
@@ -73,7 +85,8 @@ namespace PSDSimpleEditor
                 case EventType.MouseDrag:
                     if (_isResizing)
                     {
-                        _layerPanelWidth = currentEvent.mousePosition.x;
+                        // パネル左端 (originX) からの相対幅
+                        _layerPanelWidth = currentEvent.mousePosition.x - originX;
                         currentEvent.Use();
                         Repaint();
                     }
@@ -91,73 +104,89 @@ namespace PSDSimpleEditor
 
         /// <summary>
         /// レイヤーリストを「上が最上層」になるよう逆順に描画する
-        /// (PSDFile.Layers は index 0 = 最下層)。
+        /// (PSDFile.Layers は index 0 = 最下層)。depth は入れ子カードの深さ。
         /// </summary>
-        void DrawLayerListTopDown(List<PSDLayer> layers, int indent)
+        void DrawLayerListTopDown(List<PSDLayer> layers, int depth)
         {
             if (layers == null) return;
             for (int i = layers.Count - 1; i >= 0; i--)
-                DrawLayerNode(layers[i], indent);
+                DrawLayerNode(layers[i], depth);
         }
 
-        void DrawLayerNode(PSDLayer layer, int indent)
+        /// <summary>▸ / ▾ の展開ボタン。押されたら反転した状態を返す。</summary>
+        bool DrawFoldoutButton(bool expanded)
         {
-            bool isGroup = layer.Children != null;
+            if (GUILayout.Button(expanded ? "▾" : "▸", PSDEditorTheme.FoldoutButtonStyle,
+                                 GUILayout.Width(16), GUILayout.Height(16)))
+                return !expanded;
+            return expanded;
+        }
 
-            EditorGUILayout.BeginVertical(GUI.skin.box);
-
-            // ── ヘッダ行: [折りたたみ] [表示] 名前 ... ブレンド ──
-            EditorGUILayout.BeginHorizontal();
-
-            if (indent > 0)
-                GUILayout.Space(indent * IndentWidth);
-
-            if (isGroup)
-            {
-                // Foldout は ExpandWidth しないよう固定幅で配置
-                layer.IsExpanded = EditorGUILayout.Foldout(layer.IsExpanded, GUIContent.none, true);
-            }
-            else
-            {
-                GUILayout.Space(14f);
-            }
-
-            // 表示トグル → 再合成
+        /// <summary>表示トグル (目のチェックボックス相当)。変更時に再合成。</summary>
+        void DrawVisibilityToggle(PSDLayer layer)
+        {
             bool newVisible = EditorGUILayout.Toggle(layer.UIVisible, GUILayout.Width(16));
             if (newVisible != layer.UIVisible)
             {
                 layer.UIVisible   = newVisible;
                 _needsRecomposite = true;
             }
+        }
 
-            // 名前 + 種別プレフィックス
-            string label = BuildLayerLabel(layer, isGroup);
-            GUILayout.Label(new GUIContent(label, label), GUILayout.ExpandWidth(true));
+        void DrawLayerNode(PSDLayer layer, int depth)
+        {
+            bool isGroup = layer.Children != null;
+            if (isGroup) DrawGroupNode(layer, depth);
+            else         DrawLeafNode(layer);
+        }
 
-            // ブレンドモード (編集可能な Popup)
-            DrawBlendModePopup(layer, isGroup);
+        /// <summary>グループ: Surface2 のタイトル帯 + 入れ子ボディを持つカード。</summary>
+        void DrawGroupNode(PSDLayer layer, int depth)
+        {
+            EditorGUILayout.BeginVertical(PSDEditorTheme.LayerGroupOuterStyle);
 
+            // ── タイトル帯 ──
+            EditorGUILayout.BeginHorizontal(PSDEditorTheme.LayerGroupHeaderStyle);
+            layer.IsExpanded = DrawFoldoutButton(layer.IsExpanded);
+            DrawVisibilityToggle(layer);
+            string label = BuildLayerLabel(layer, true);
+            GUILayout.Label(new GUIContent(label, label), PSDEditorTheme.LayerNameStyle, GUILayout.ExpandWidth(true));
+            DrawBlendModePopup(layer, true);
             EditorGUILayout.EndHorizontal();
 
-            // ── 詳細 (表示中レイヤーのみ) ──
+            // ── ボディ (表示中のみ) ──
             if (layer.UIVisible)
             {
-                if (isGroup)
-                {
-                    // グループ自身の不透明度 (PassThrough 以外で合成に効く)
-                    DrawOpacitySlider(layer, indent);
+                EditorGUILayout.BeginVertical(PSDEditorTheme.LayerGroupBodyStyle);
 
-                    if (layer.IsExpanded)
-                        DrawLayerListTopDown(layer.Children, indent + 1);
-                }
-                else
-                {
-                    DrawLayerControls(layer, indent);
-                }
+                DrawOpacitySlider(layer, 0);
+
+                if (layer.IsExpanded)
+                    DrawLayerListTopDown(layer.Children, depth + 1);
+
+                EditorGUILayout.EndVertical();
             }
 
             EditorGUILayout.EndVertical();
-            GUILayout.Space(1);
+        }
+
+        /// <summary>通常レイヤー: 1 枚のカード。</summary>
+        void DrawLeafNode(PSDLayer layer)
+        {
+            EditorGUILayout.BeginVertical(PSDEditorTheme.LayerLeafCardStyle);
+
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(16f);   // グループの折りたたみボタン位置に合わせる
+            DrawVisibilityToggle(layer);
+            string label = BuildLayerLabel(layer, false);
+            GUILayout.Label(new GUIContent(label, label), PSDEditorTheme.LayerNameStyle, GUILayout.ExpandWidth(true));
+            DrawBlendModePopup(layer, false);
+            EditorGUILayout.EndHorizontal();
+
+            if (layer.UIVisible)
+                DrawLayerControls(layer, 0);
+
+            EditorGUILayout.EndVertical();
         }
 
         /// <summary>種別プレフィックス付きのレイヤー名を組み立てる。</summary>
@@ -250,7 +279,7 @@ namespace PSDSimpleEditor
             {
                 EditorGUILayout.BeginHorizontal();
                 GUILayout.Space(indent * IndentWidth + 18f);
-                GUILayout.Label("塗り色", EditorStyles.miniLabel, GUILayout.Width(44));
+                GUILayout.Label("塗り色", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(48));
                 Color nc = EditorGUILayout.ColorField(layer.Adjustment.SolidColor);
                 EditorGUILayout.EndHorizontal();
                 if (nc != layer.Adjustment.SolidColor)
@@ -275,7 +304,7 @@ namespace PSDSimpleEditor
                 EditorGUILayout.BeginHorizontal();
                 GUILayout.Space(indent * IndentWidth + 18f);
                 GUILayout.Label("マスク: " + (layer.MaskIsDisabled ? "無効" : "有効"),
-                                EditorStyles.miniLabel);
+                                PSDEditorTheme.ControlLabelStyle);
                 EditorGUILayout.EndHorizontal();
             }
         }

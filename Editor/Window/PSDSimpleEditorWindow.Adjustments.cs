@@ -162,7 +162,7 @@ namespace PSDSimpleEditor
 
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            GUILayout.Label("カーブ", EditorStyles.miniLabel, GUILayout.Width(48));
+            GUILayout.Label("カーブ", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(48));
             EditorGUI.BeginChangeCheck();
             AnimationCurve nc = EditorGUILayout.CurveField(layer.UICurve, GUILayout.Height(60));
             bool curveChanged = EditorGUI.EndChangeCheck();
@@ -230,7 +230,7 @@ namespace PSDSimpleEditor
             // 画像
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            GUILayout.Label("画像", EditorStyles.miniLabel, GUILayout.Width(48));
+            GUILayout.Label("画像", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(48));
             var tex = (Texture2D)EditorGUILayout.ObjectField(layer.UIImageClipTex, typeof(Texture2D), false);
             EditorGUILayout.EndHorizontal();
             if (tex != layer.UIImageClipTex)
@@ -242,7 +242,7 @@ namespace PSDSimpleEditor
             // タイル反復数 (X,Y)
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            GUILayout.Label("タイル", EditorStyles.miniLabel, GUILayout.Width(48));
+            GUILayout.Label("タイル", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(48));
             Vector2 nt = EditorGUILayout.Vector2Field(GUIContent.none, layer.UIImageClipTile);
             EditorGUILayout.EndHorizontal();
             if (nt != layer.UIImageClipTile)
@@ -255,7 +255,7 @@ namespace PSDSimpleEditor
             // 合成モード
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            GUILayout.Label("合成", EditorStyles.miniLabel, GUILayout.Width(48));
+            GUILayout.Label("合成", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(48));
             BlendMode[] modes  = _blendModesNormal;
             string[]    labels = _blendLabelsNormal ?? (_blendLabelsNormal = BuildBlendLabels(_blendModesNormal));
             int curIndex = Mathf.Max(0, Array.IndexOf(modes, layer.UIImageClipBlend));
@@ -308,7 +308,7 @@ namespace PSDSimpleEditor
 
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            GUILayout.Label("階調", EditorStyles.miniLabel, GUILayout.Width(48));
+            GUILayout.Label("階調", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(48));
             EditorGUI.BeginChangeCheck();
             Gradient ng = EditorGUILayout.GradientField(layer.UIGradient);
             bool gradientChanged = EditorGUI.EndChangeCheck();
@@ -393,7 +393,7 @@ namespace PSDSimpleEditor
         {
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            GUILayout.Label(label, EditorStyles.miniLabel, GUILayout.Width(48));
+            GUILayout.Label(label, PSDEditorTheme.ControlLabelStyle, GUILayout.Width(48));
             float result = EditorGUILayout.Slider(value, min, max);
             EditorGUILayout.EndHorizontal();
             return result;

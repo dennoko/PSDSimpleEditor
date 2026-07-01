@@ -29,10 +29,10 @@ namespace PSDSimpleEditor
             // 対象色 + スポイトトグル
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            GUILayout.Label("対象色", EditorStyles.miniLabel, GUILayout.Width(48));
+            GUILayout.Label("対象色", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(48));
             Color nc = EditorGUILayout.ColorField(GUIContent.none, layer.UIColorRangeTarget, true, false, false);
             bool armed = _eyedropperTarget == layer;
-            bool newArmed = GUILayout.Toggle(armed, "スポイト", EditorStyles.miniButton, GUILayout.Width(56));
+            bool newArmed = GUILayout.Toggle(armed, "スポイト", PSDEditorTheme.MiniButtonStyle, GUILayout.Width(60));
             EditorGUILayout.EndHorizontal();
             if (nc != layer.UIColorRangeTarget)
             {
@@ -50,7 +50,7 @@ namespace PSDSimpleEditor
                 EditorGUILayout.BeginHorizontal();
                 GUILayout.Space(indent * IndentWidth + 18f);
                 GUILayout.Label("プレビュー上の対象レイヤー領域をクリックで色を取得",
-                                EditorStyles.miniLabel);
+                                PSDEditorTheme.ControlLabelStyle);
                 EditorGUILayout.EndHorizontal();
             }
 
@@ -67,10 +67,10 @@ namespace PSDSimpleEditor
             GUILayout.Space(indent * IndentWidth + 18f);
             using (new EditorGUI.DisabledScope(_colorRangePreviewLayer != layer))
             {
-                if (GUILayout.Button("プレビュー終了", GUILayout.Width(96)))
+                if (GUILayout.Button("プレビュー終了", PSDEditorTheme.ToolButtonStyle, GUILayout.Width(100)))
                     EndColorRangePreview();
             }
-            if (GUILayout.Button("マスクを PNG 出力", GUILayout.Width(160)))
+            if (GUILayout.Button("マスクを PNG 出力", PSDEditorTheme.ToolButtonStyle, GUILayout.Width(160)))
                 ExportColorRangeMask(layer);
             EditorGUILayout.EndHorizontal();
         }
@@ -243,6 +243,7 @@ namespace PSDSimpleEditor
                 byte[] png = maskTex.EncodeToPNG();
                 File.WriteAllBytes(savePath, png);
                 Debug.Log($"[PSDSimpleEditor] 色域選択マスクを保存しました: {savePath}");
+                SetStatus($"色域選択マスクを書き出しました: {Path.GetFileName(savePath)}", StatusType.Success);
 
                 // プロジェクト内なら AssetDatabase を更新して Ping、外なら Finder/Explorer を開く
                 string normalized = savePath.Replace('\\', '/');
