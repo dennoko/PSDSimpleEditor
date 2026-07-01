@@ -38,6 +38,12 @@ namespace PSDSimpleEditor
         string _psdPath = "";                 // 入力中の PSD パス (リロード後も保持)
         bool   _showMergedRef;                // マージ済み画像の参照表示
 
+        // ── リアルタイムプレビュー ──────────────────────────────────────────
+        [SerializeField] Material _previewMaterial;      // プレビュー対象マテリアル
+        [SerializeField] string _previewSlotName = "_MainTex"; // 対象スロット名
+        [SerializeField] bool _isRealtimePreviewEnabled; // プレビュー有効フラグ
+        [SerializeField] Texture _originalTexture;         // 元のテクスチャのバックアップ
+
 
         [NonSerialized] PSDFile         _psdFile;            // 読み込み結果
         [NonSerialized] LayerCompositor _compositor;         // GPU 合成器
@@ -64,13 +70,36 @@ namespace PSDSimpleEditor
         void OnEnable()
         {
             wantsMouseMove = true;
+
+            // ドメインリロード（コンパイル）後にプレビューが有効状態であれば、再度バインドとバックアップを登録する
+            if (_isRealtimePreviewEnabled && _previewMaterial != null)
+            {
+                EditorApplication.delayCall += () =>
+                {
+                    if (this != null && _isRealtimePreviewEnabled)
+                    {
+                        // 念のため _originalTexture が残っていなければ再設定する
+                        if (_originalTexture == null)
+                        {
+                            _originalTexture = _previewMaterial.GetTexture(_previewSlotName);
+                        }
+                        PSDPreviewRecovery.SaveBackup(_previewMaterial, _previewSlotName, _originalTexture);
+                        ApplyRealtimePreview();
+                        _needsRecomposite = true;
+                        Repaint();
+                    }
+                };
+            }
         }
+
 
         void OnDestroy() => Cleanup();
 
         /// <summary>全リソースを破棄する (再ロード前・ウィンドウ破棄時)。</summary>
         void Cleanup()
         {
+            RevertRealtimePreview(); // プレビューを解除して元に戻す
+
             _compositor?.Dispose();
             _compositor = null;
 
@@ -116,6 +145,7 @@ namespace PSDSimpleEditor
         {
             DrawToolbar();
             DrawExportBar();
+            DrawPreviewBar();
 
             if (_psdFile == null)
             {
@@ -124,7 +154,7 @@ namespace PSDSimpleEditor
             else
             {
                 float mainHeight = position.height
-                                 - EditorStyles.toolbar.fixedHeight * 2f
+                                 - EditorStyles.toolbar.fixedHeight * 3f
                                  - BottomBarHeight - 8f;
 
                 // レイヤーパネルの幅をウィンドウサイズに応じて制限
@@ -203,6 +233,10 @@ namespace PSDSimpleEditor
             try
             {
                 _compositeTexture = _compositor.Composite(_psdFile.Layers);
+                if (_isRealtimePreviewEnabled)
+                {
+                    ApplyRealtimePreview();
+                }
             }
             catch (Exception e)
             {
@@ -231,6 +265,36 @@ namespace PSDSimpleEditor
                 }
             }
             return _psdPath;
+        }
+
+        // ── リアルタイムプレビュー制御 ──────────────────────────────────────
+
+        /// <summary>編集中のテクスチャ（RenderTexture）をマテリアルへリアルタイムに適用する。</summary>
+        void ApplyRealtimePreview()
+        {
+            if (_previewMaterial == null || string.IsNullOrEmpty(_previewSlotName) || _compositeTexture == null)
+                return;
+
+            // 最初の一回だけ元のテクスチャを退避
+            if (_originalTexture == null)
+            {
+                _originalTexture = _previewMaterial.GetTexture(_previewSlotName);
+                // 異常終了に備えてバックアップを保存
+                PSDPreviewRecovery.SaveBackup(_previewMaterial, _previewSlotName, _originalTexture);
+            }
+
+            _previewMaterial.SetTexture(_previewSlotName, _compositeTexture);
+        }
+
+        /// <summary>リアルタイムプレビューを解除し、元のテクスチャを復元する。</summary>
+        void RevertRealtimePreview()
+        {
+            if (_previewMaterial != null && !string.IsNullOrEmpty(_previewSlotName) && _originalTexture != null)
+            {
+                _previewMaterial.SetTexture(_previewSlotName, _originalTexture);
+                _originalTexture = null;
+                PSDPreviewRecovery.ClearBackup();
+            }
         }
 
         public enum ExportFormat

@@ -78,6 +78,58 @@ namespace PSDSimpleEditor
             EditorGUILayout.EndHorizontal();
         }
 
+        void DrawPreviewBar()
+        {
+            EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+
+            GUILayout.Label("Preview Mat:", GUILayout.Width(76));
+            
+            // マテリアル選択フィールド
+            Material prevMat = (Material)EditorGUILayout.ObjectField(
+                GUIContent.none, _previewMaterial, typeof(Material), true, GUILayout.Width(150));
+            
+            if (prevMat != _previewMaterial)
+            {
+                RevertRealtimePreview();
+                _previewMaterial = prevMat;
+                _needsRecomposite = true;
+            }
+
+            GUILayout.Label("Slot:", GUILayout.Width(32));
+            string prevSlot = EditorGUILayout.TextField(_previewSlotName, EditorStyles.toolbarTextField, GUILayout.Width(100));
+            if (prevSlot != _previewSlotName)
+            {
+                RevertRealtimePreview();
+                _previewSlotName = prevSlot;
+                _needsRecomposite = true;
+            }
+
+            GUILayout.Space(8);
+
+            // プレビューの有効化トグル
+            bool prevEnabled = GUILayout.Toggle(_isRealtimePreviewEnabled, "3Dプレビュー反映",
+                                                EditorStyles.toolbarButton, GUILayout.Width(110));
+            
+            if (prevEnabled != _isRealtimePreviewEnabled)
+            {
+                _isRealtimePreviewEnabled = prevEnabled;
+                if (_isRealtimePreviewEnabled)
+                {
+                    ApplyRealtimePreview();
+                }
+                else
+                {
+                    RevertRealtimePreview();
+                }
+                _needsRecomposite = true;
+            }
+
+            GUILayout.FlexibleSpace();
+
+            EditorGUILayout.EndHorizontal();
+        }
+
+
         // ── 履歴ドロップダウン ───────────────────────────────────────────────
 
         /// <summary>履歴ドロップダウンを表示する。項目選択で即ロードする。</summary>
