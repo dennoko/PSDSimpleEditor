@@ -14,7 +14,7 @@ namespace PSDSimpleEditor
         /// </summary>
         void DrawColorRangeMaskControls(PSDLayer layer, int indent)
         {
-            layer.UIColorRangeExpanded = DrawSectionFoldout("色域選択マスク", layer.UIColorRangeExpanded, indent);
+            layer.UIColorRangeExpanded = DrawSectionFoldout(new GUIContent("色域選択マスク", "特定の色とその周辺色を抽出した選択範囲マスクを生成します。スポイトで色を選択し、閾値で範囲を広げられます。"), layer.UIColorRangeExpanded, indent);
             if (!layer.UIColorRangeExpanded)
             {
                 // フォールドアウトを閉じたら、このレイヤーのスポイト待機・ハイライトを解除する
@@ -28,12 +28,12 @@ namespace PSDSimpleEditor
             // 対象色 + スポイトトグル
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            GUILayout.Label("対象色", PSDEditorTheme.ControlLabelStyle,
+            GUILayout.Label(new GUIContent("対象色", "抽出する対象の色を指定します。"), PSDEditorTheme.ControlLabelStyle,
                             GUILayout.Width(48), GUILayout.Height(RowH));
-            Color nc = EditorGUILayout.ColorField(GUIContent.none, layer.UIColorRangeTarget, true, false, false,
+            Color nc = EditorGUILayout.ColorField(new GUIContent("", "抽出する対象の色を指定します。"), layer.UIColorRangeTarget, true, false, false,
                                                   GUILayout.Height(RowH));
             bool armed = _eyedropperTarget == layer;
-            bool newArmed = GUILayout.Toggle(armed, "スポイト", PSDEditorTheme.MiniButtonStyle,
+            bool newArmed = GUILayout.Toggle(armed, new GUIContent("スポイト", "スポイトツールを有効にします。プレビュー上でクリックした対象レイヤーの画素色を直接取得できます。"), PSDEditorTheme.MiniButtonStyle,
                                              GUILayout.Width(60), GUILayout.Height(RowH));
             EditorGUILayout.EndHorizontal();
             if (nc != layer.UIColorRangeTarget)
@@ -59,7 +59,7 @@ namespace PSDSimpleEditor
             }
 
             // 閾値
-            float nt = IndentedSlider("閾値", layer.UIColorRangeThreshold, 0f, 1f, indent);
+            float nt = IndentedSlider(new GUIContent("閾値", "指定した対象色から許容する色のズレ幅を設定します。値が大きいほど、似た色を広く含めるようになります（0.0で完全一致のみ）。"), layer.UIColorRangeThreshold, 0f, 1f, indent);
             if (!Mathf.Approximately(nt, layer.UIColorRangeThreshold))
             {
                 layer.UIColorRangeThreshold = nt;
@@ -71,10 +71,10 @@ namespace PSDSimpleEditor
             GUILayout.Space(indent * IndentWidth + 18f);
             using (new EditorGUI.DisabledScope(_colorRangePreviewLayer != layer))
             {
-                if (GUILayout.Button("プレビュー終了", PSDEditorTheme.ToolButtonStyle, GUILayout.Width(100)))
+                if (GUILayout.Button(new GUIContent("プレビュー終了", "画面上の赤色の選択範囲ハイライト表示を終了します。"), PSDEditorTheme.ToolButtonStyle, GUILayout.Width(100)))
                     EndColorRangePreview();
             }
-            if (GUILayout.Button("マスクを PNG 出力", PSDEditorTheme.ToolButtonStyle, GUILayout.Width(160)))
+            if (GUILayout.Button(new GUIContent("マスクを PNG 出力", "現在の選択範囲を白、それ以外を黒（透明部分含む）としたグレースケールのマスク画像（PNG）を出力先フォルダへ書き出します。"), PSDEditorTheme.ToolButtonStyle, GUILayout.Width(160)))
                 ExportColorRangeMask(layer);
             EditorGUILayout.EndHorizontal();
             RowSpace();

@@ -26,10 +26,10 @@ namespace PSDSimpleEditor
             GUILayout.FlexibleSpace();
 
             // エクスポート形式の選択
-            GUILayout.Label("形式", PSDEditorTheme.ControlLabelStyle, GUILayout.Width(30), GUILayout.Height(BarH));
+            GUILayout.Label(new GUIContent("形式", "書き出す画像のファイルフォーマットを指定します。\n・PNG: 合成結果をアルファ付きPNGとして書き出します。\n・PSD: 現在の編集パラメータを維持したままPSDとして書き出します。\n・TGA: 32bit（アルファあり）のTGA形式で書き出します。"), PSDEditorTheme.ControlLabelStyle, GUILayout.Width(30), GUILayout.Height(BarH));
             float originalLabelWidth = EditorGUIUtility.labelWidth;
             EditorGUIUtility.labelWidth = 1f;
-            _exportFormat = (ExportFormat)EditorGUILayout.EnumPopup(_exportFormat,
+            _exportFormat = (ExportFormat)EditorGUILayout.EnumPopup(new GUIContent("", "出力形式の選択"), _exportFormat,
                                                                     GUILayout.Width(80), GUILayout.Height(RowH));
             EditorGUIUtility.labelWidth = originalLabelWidth;
 
@@ -45,7 +45,7 @@ namespace PSDSimpleEditor
 
             using (new EditorGUI.DisabledScope(!canExport))
             {
-                if (GUILayout.Button("書き出し", PSDEditorTheme.ActionButtonStyle, GUILayout.Width(120)))
+                if (GUILayout.Button(new GUIContent("書き出し", "指定した形式で、出力先フォルダまたは指定したパスに画像を保存します。"), PSDEditorTheme.ActionButtonStyle, GUILayout.Width(120)))
                 {
                     switch (_exportFormat)
                     {

@@ -19,10 +19,10 @@ namespace PSDSimpleEditor
     /// </summary>
     public partial class PSDSimpleEditorWindow : EditorWindow
     {
-        [MenuItem("dennokoworks/PSD Simple Editor")]
+        [MenuItem("dennokoworks/Dennoko PSD Editor")]
         static void Open()
         {
-            var window = GetWindow<PSDSimpleEditorWindow>("PSD Simple Editor");
+            var window = GetWindow<PSDSimpleEditorWindow>("Dennoko PSD Editor");
             window.minSize = new Vector2(640f, 360f);
         }
 
@@ -210,7 +210,7 @@ namespace PSDSimpleEditor
             EditorGUILayout.Space(8);
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(12);
-            GUILayout.Label("PSD Simple Editor", PSDEditorTheme.TitleStyle);
+            GUILayout.Label("Dennoko PSD Editor", PSDEditorTheme.TitleStyle);
             GUILayout.FlexibleSpace();
             GUILayout.Space(12);
             EditorGUILayout.EndHorizontal();

@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// PSD Simple Editor — LayerBlend.shader
+// Dennoko PSD Editor — LayerBlend.shader
 //
 // 1 パスで「レイヤー画像 + レイヤーマスク + クリッピングマスク + 色調補正」を
 // 背景 (_MainTex) に合成するシェーダー。

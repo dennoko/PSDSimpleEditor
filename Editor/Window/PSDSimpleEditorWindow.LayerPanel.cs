@@ -17,7 +17,7 @@ namespace PSDSimpleEditor
 
             // ヘッダ帯 (Surface2)
             EditorGUILayout.BeginHorizontal(PSDEditorTheme.ToolbarStyle);
-            GUILayout.Label("レイヤー", PSDEditorTheme.SectionHeaderStyle);
+            GUILayout.Label(new GUIContent("レイヤー", "PSD内のレイヤー構造を表示します。\n・左の目のトグル: 表示/非表示\n・右のドロップダウン: ブレンドモード\n・フォルダやレイヤーを展開すると詳細パラメータが表示されます。"), PSDEditorTheme.SectionHeaderStyle);
             GUILayout.FlexibleSpace();
             EditorGUILayout.EndHorizontal();
 
@@ -136,7 +136,7 @@ namespace PSDSimpleEditor
         /// テーマ管理の折りたたみ見出し (EditorGUILayout.Foldout の置き換え)。
         /// ライト/ダーク両モードで文字色が破綻しないよう ▸/▾ ボタン + クリック可能ラベルで構成する。
         /// </summary>
-        bool DrawSectionFoldout(string label, bool expanded, int indent)
+        bool DrawSectionFoldout(GUIContent label, bool expanded, int indent)
         {
             bool result = expanded;
             EditorGUILayout.BeginHorizontal();
@@ -151,10 +151,15 @@ namespace PSDSimpleEditor
             return result;
         }
 
+        bool DrawSectionFoldout(string label, bool expanded, int indent)
+        {
+            return DrawSectionFoldout(new GUIContent(label), expanded, indent);
+        }
+
         /// <summary>表示トグル (目のチェックボックス相当)。変更時に再合成。</summary>
         void DrawVisibilityToggle(PSDLayer layer)
         {
-            bool newVisible = GUILayout.Toggle(layer.UIVisible, "",
+            bool newVisible = GUILayout.Toggle(layer.UIVisible, new GUIContent("", "このレイヤー/フォルダの表示・非表示を切り替えます。非表示にすると合成結果から除外されます。"),
                                                GUILayout.Width(16), GUILayout.Height(RowH));
             if (newVisible != layer.UIVisible)
             {
@@ -257,8 +262,8 @@ namespace PSDSimpleEditor
             // 明るさ・コントラスト (brit / CgEd)
             if (layer.Adjustment != null && layer.Adjustment.HasBrightnessContrast)
             {
-                float nb = IndentedSlider("明るさ", layer.UIBrightness, -150f, 150f, indent);
-                float nc = IndentedSlider("ｺﾝﾄﾗｽﾄ", layer.UIContrast,    -50f, 100f, indent);
+                float nb = IndentedSlider(new GUIContent("明るさ", "レイヤーの明るさを調整します（-150 〜 150）。"), layer.UIBrightness, -150f, 150f, indent);
+                float nc = IndentedSlider(new GUIContent("ｺﾝﾄﾗｽﾄ", "レイヤーのコントラスト（明暗差）を調整します（-50 〜 100）。"), layer.UIContrast,    -50f, 100f, indent);
                 if (!Mathf.Approximately(nb, layer.UIBrightness) ||
                     !Mathf.Approximately(nc, layer.UIContrast))
                 {
@@ -271,9 +276,9 @@ namespace PSDSimpleEditor
             // 色相・彩度・明度 (hue2)
             if (layer.Adjustment != null && layer.Adjustment.HasHueSaturation)
             {
-                float nh = IndentedSlider("色相", layer.UIHue,        -180f, 180f, indent);
-                float ns = IndentedSlider("彩度", layer.UISaturation, -100f, 100f, indent);
-                float nl = IndentedSlider("明度", layer.UILightness,  -100f, 100f, indent);
+                float nh = IndentedSlider(new GUIContent("色相", "レイヤーの色相（カラー）を調整します（-180度 〜 180度）。"), layer.UIHue,        -180f, 180f, indent);
+                float ns = IndentedSlider(new GUIContent("彩度", "レイヤーの彩度（鮮やかさ）を調整します（-100 〜 100）。"), layer.UISaturation, -100f, 100f, indent);
+                float nl = IndentedSlider(new GUIContent("明度", "レイヤーの明度を調整します（-100 〜 100）。"), layer.UILightness,  -100f, 100f, indent);
                 if (!Mathf.Approximately(nh, layer.UIHue) ||
                     !Mathf.Approximately(ns, layer.UISaturation) ||
                     !Mathf.Approximately(nl, layer.UILightness))
@@ -311,9 +316,9 @@ namespace PSDSimpleEditor
             {
                 EditorGUILayout.BeginHorizontal();
                 GUILayout.Space(indent * IndentWidth + 18f);
-                GUILayout.Label("塗り色", PSDEditorTheme.ControlLabelStyle,
+                GUILayout.Label(new GUIContent("塗り色", "ベタ塗りレイヤーの塗りつぶし色を設定します。"), PSDEditorTheme.ControlLabelStyle,
                                 GUILayout.Width(48), GUILayout.Height(RowH));
-                Color nc = EditorGUILayout.ColorField(GUIContent.none, layer.Adjustment.SolidColor,
+                Color nc = EditorGUILayout.ColorField(new GUIContent("", "ベタ塗りレイヤーの塗りつぶし色を設定します。"), layer.Adjustment.SolidColor,
                                                       GUILayout.Height(RowH));
                 EditorGUILayout.EndHorizontal();
                 RowSpace();
@@ -347,7 +352,7 @@ namespace PSDSimpleEditor
 
         void DrawOpacitySlider(PSDLayer layer, int indent)
         {
-            float newOpacity = IndentedSlider("不透明度", layer.UIOpacity, 0f, 1f, indent);
+            float newOpacity = IndentedSlider(new GUIContent("不透明度", "レイヤーの不透明度（アルファ）を 0.0（完全透明）から 1.0（完全不透明）の間で調整します。"), layer.UIOpacity, 0f, 1f, indent);
             if (!Mathf.Approximately(newOpacity, layer.UIOpacity))
             {
                 layer.UIOpacity   = newOpacity;
@@ -430,7 +435,7 @@ namespace PSDSimpleEditor
             // Unknown 等で候補に無い場合は index 0 を仮表示 (ユーザー操作があるまで書き換えない)
             int curIndex = Mathf.Max(0, Array.IndexOf(modes, cur));
 
-            int newIndex = EditorGUILayout.Popup(curIndex, labels,
+            int newIndex = EditorGUILayout.Popup(new GUIContent("", "このレイヤー/フォルダを下のレイヤーと合成する際のブレンドモードを指定します。"), curIndex, labels,
                                                  GUILayout.Width(74), GUILayout.Height(RowH));
             if (newIndex != curIndex)
             {

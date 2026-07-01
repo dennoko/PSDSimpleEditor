@@ -17,7 +17,7 @@ namespace PSDSimpleEditor
             EditorGUILayout.BeginHorizontal(PSDEditorTheme.ToolbarStyle);
             GUILayout.Label("プレビュー", PSDEditorTheme.SectionHeaderStyle);
             GUILayout.FlexibleSpace();
-            _showMergedRef = GUILayout.Toggle(_showMergedRef, "マージ参照",
+            _showMergedRef = GUILayout.Toggle(_showMergedRef, new GUIContent("マージ参照", "PSDファイル作成・保存時に内包されたPhotoshop側の合成画像（元の見た目）を、プレビューの右下に小窓表示して比較できるようにします。"),
                                               PSDEditorTheme.ToolbarButtonStyle, GUILayout.Width(80));
             EditorGUILayout.EndHorizontal();
 

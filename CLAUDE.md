@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Unity Editor extension that loads Adobe PSD files (parsed with a from-scratch C# binary parser — **no external libraries**, a deliberate constraint for asset-store licensing; see requirements.md), previews them with per-layer visibility/opacity/adjustment controls, and exports the composite as PNG. UI text and code comments are in Japanese.
 
-This repo is the `Assets/dennokoworks/PSDSimpleEditor` folder of a Unity project (VRChat Creator Companion). There is no standalone build or test command — code is compiled by the Unity Editor itself. Open the tool via the Unity menu **dennokoworks > PSD Simple Editor**. Check the Unity Console for compile errors and `[PSDParser]` / `[PSDSimpleEditor]` log messages.
+This repo is the `Assets/dennokoworks/PSDSimpleEditor` folder of a Unity project (VRChat Creator Companion). There is no standalone build or test command — code is compiled by the Unity Editor itself. Open the tool via the Unity menu **dennokoworks > Dennoko PSD Editor**. Check the Unity Console for compile errors and `[PSDParser]` / `[PSDSimpleEditor]` log messages.
 
 ## Folder structure
 

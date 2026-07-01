@@ -31,12 +31,12 @@ namespace PSDSimpleEditor
         void DrawPsdInputRow()
         {
             EditorGUILayout.BeginHorizontal();
-            GUILayout.Label("PSD", PSDEditorTheme.ControlLabelStyle,
+            GUILayout.Label(new GUIContent("PSD", "編集するPSDファイルの絶対パスまたはUnityプロジェクト内の相対パス。"), PSDEditorTheme.ControlLabelStyle,
                             GUILayout.Width(SettingsLabelWidth), GUILayout.Height(RowH));
 
-            _psdPath = EditorGUILayout.TextField(_psdPath, GUILayout.ExpandWidth(true), GUILayout.Height(RowH));
+            _psdPath = EditorGUILayout.TextField(new GUIContent("", "編集するPSDファイルのパス"), _psdPath, GUILayout.ExpandWidth(true), GUILayout.Height(RowH));
 
-            if (GUILayout.Button("参照", PSDEditorTheme.ToolButtonStyle, GUILayout.Width(SettingsButtonWidth)))
+            if (GUILayout.Button(new GUIContent("参照", "ファイル選択ダイアログを開き、PSDファイルを選択します。"), PSDEditorTheme.ToolButtonStyle, GUILayout.Width(SettingsButtonWidth)))
             {
                 string dir = "";
                 try
@@ -53,10 +53,10 @@ namespace PSDSimpleEditor
                 }
             }
 
-            if (GUILayout.Button("読み込み", PSDEditorTheme.ToolButtonStyle, GUILayout.Width(72)))
+            if (GUILayout.Button(new GUIContent("読み込み", "指定されたPSDファイルをパースし、レイヤー情報とプレビューをロードします。"), PSDEditorTheme.ToolButtonStyle, GUILayout.Width(72)))
                 LoadPSD();
 
-            if (GUILayout.Button("履歴 ▾", PSDEditorTheme.ToolButtonStyle, GUILayout.Width(SettingsButtonWidth)))
+            if (GUILayout.Button(new GUIContent("履歴 ▾", "過去に読み込んだPSDファイルの履歴を表示し、選択して素早く再ロードできます。"), PSDEditorTheme.ToolButtonStyle, GUILayout.Width(SettingsButtonWidth)))
                 ShowHistoryMenu();
 
             EditorGUILayout.EndHorizontal();
@@ -66,12 +66,12 @@ namespace PSDSimpleEditor
         void DrawExportDirRow()
         {
             EditorGUILayout.BeginHorizontal();
-            GUILayout.Label("出力先", PSDEditorTheme.ControlLabelStyle,
+            GUILayout.Label(new GUIContent("出力先", "合成完了したテクスチャの書き出し先フォルダ。Assetsから始まる相対パス、または絶対パスで指定できます。"), PSDEditorTheme.ControlLabelStyle,
                             GUILayout.Width(SettingsLabelWidth), GUILayout.Height(RowH));
 
-            _exportDir = EditorGUILayout.TextField(_exportDir, GUILayout.ExpandWidth(true), GUILayout.Height(RowH));
+            _exportDir = EditorGUILayout.TextField(new GUIContent("", "書き出し先フォルダのパス"), _exportDir, GUILayout.ExpandWidth(true), GUILayout.Height(RowH));
 
-            if (GUILayout.Button("参照", PSDEditorTheme.ToolButtonStyle, GUILayout.Width(SettingsButtonWidth)))
+            if (GUILayout.Button(new GUIContent("参照", "フォルダ選択ダイアログを開き、書き出し先フォルダを選択します。"), PSDEditorTheme.ToolButtonStyle, GUILayout.Width(SettingsButtonWidth)))
             {
                 string picked = EditorUtility.OpenFolderPanel("出力先フォルダを選択", _exportDir, "");
                 if (!string.IsNullOrEmpty(picked))
@@ -98,7 +98,7 @@ namespace PSDSimpleEditor
         void DrawRealtimePreviewRow()
         {
             EditorGUILayout.BeginHorizontal();
-            GUILayout.Label("3D反映", PSDEditorTheme.ControlLabelStyle,
+            GUILayout.Label(new GUIContent("3D反映", "合成された画像を、指定されたマテリアルのスロットにリアルタイムで反映させます。3Dモデルの見た目をその場で確認できます。"), PSDEditorTheme.ControlLabelStyle,
                             GUILayout.Width(SettingsLabelWidth), GUILayout.Height(RowH));
 
             float originalLabelWidth = EditorGUIUtility.labelWidth;
@@ -106,7 +106,7 @@ namespace PSDSimpleEditor
 
             // マテリアル選択フィールド
             Material prevMat = (Material)EditorGUILayout.ObjectField(
-                GUIContent.none, _previewMaterial, typeof(Material), true,
+                new GUIContent("", "リアルタイムプレビューを反映させたいマテリアルアセットを指定します。"), _previewMaterial, typeof(Material), true,
                 GUILayout.Width(160), GUILayout.Height(RowH));
 
             if (prevMat != _previewMaterial)
@@ -116,9 +116,9 @@ namespace PSDSimpleEditor
                 _needsRecomposite = true;
             }
 
-            GUILayout.Label("スロット", PSDEditorTheme.ControlLabelStyle,
+            GUILayout.Label(new GUIContent("スロット", "マテリアル内でテクスチャを割り当てるプロパティの名前（例: _MainTex, _BumpMap, _DetailAlbedoMap）。"), PSDEditorTheme.ControlLabelStyle,
                             GUILayout.Width(48), GUILayout.Height(RowH));
-            string prevSlot = EditorGUILayout.TextField(_previewSlotName,
+            string prevSlot = EditorGUILayout.TextField(new GUIContent("", "割り当てるマテリアルのテクスチャプロパティ名"), _previewSlotName,
                 GUILayout.Width(110), GUILayout.Height(RowH));
 
             EditorGUIUtility.labelWidth = originalLabelWidth;
@@ -133,7 +133,7 @@ namespace PSDSimpleEditor
             GUILayout.FlexibleSpace();
 
             // プレビューの有効化トグル
-            bool prevEnabled = GUILayout.Toggle(_isRealtimePreviewEnabled, "反映",
+            bool prevEnabled = GUILayout.Toggle(_isRealtimePreviewEnabled, new GUIContent("反映", "3D反映（リアルタイムプレビュー）の有効/無効を切り替えます。有効にすると編集結果が即座に割り当て先マテリアルに反映されます。"),
                                                 PSDEditorTheme.ToolButtonStyle, GUILayout.Width(64));
 
             if (prevEnabled != _isRealtimePreviewEnabled)
