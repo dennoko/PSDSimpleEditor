@@ -99,6 +99,8 @@ namespace PSDSimpleEditor
             _psdPathField = new TextField();
             _psdPathField.value = _psdPath;
             _psdPathField.style.flexGrow = 1;
+            _psdPathField.style.flexShrink = 1;
+            _psdPathField.style.width = 0;
             _psdPathField.RegisterValueChangedCallback(evt => {
                 _psdPath = evt.newValue;
             });
@@ -153,6 +155,8 @@ namespace PSDSimpleEditor
             _exportDirField = new TextField();
             _exportDirField.value = _exportDir;
             _exportDirField.style.flexGrow = 1;
+            _exportDirField.style.flexShrink = 1;
+            _exportDirField.style.width = 0;
             _exportDirField.RegisterValueChangedCallback(evt => {
                 _exportDir = evt.newValue;
             });
@@ -198,7 +202,9 @@ namespace PSDSimpleEditor
             row3.Add(previewLabel);
 
             _previewMaterialField = new ObjectField { objectType = typeof(Material), value = _previewMaterial, allowSceneObjects = true };
-            _previewMaterialField.style.width = 160;
+            _previewMaterialField.style.flexGrow = 1;
+            _previewMaterialField.style.flexShrink = 1;
+            _previewMaterialField.style.minWidth = 100;
             _previewMaterialField.RegisterValueChangedCallback(evt => {
                 var prevMat = (Material)evt.newValue;
                 if (prevMat != _previewMaterial)
@@ -218,7 +224,9 @@ namespace PSDSimpleEditor
 
             _previewSlotField = new TextField();
             _previewSlotField.value = _previewSlotName;
-            _previewSlotField.style.width = 110;
+            _previewSlotField.style.flexGrow = 1;
+            _previewSlotField.style.flexShrink = 1;
+            _previewSlotField.style.minWidth = 60;
             _previewSlotField.RegisterValueChangedCallback(evt => {
                 var prevSlot = evt.newValue;
                 if (prevSlot != _previewSlotName)
@@ -229,10 +237,6 @@ namespace PSDSimpleEditor
                 }
             });
             row3.Add(_previewSlotField);
-
-            var spacer = new VisualElement();
-            spacer.style.flexGrow = 1;
-            row3.Add(spacer);
 
             _realtimePreviewToggle = new Toggle("反映");
             _realtimePreviewToggle.value = _isRealtimePreviewEnabled;
