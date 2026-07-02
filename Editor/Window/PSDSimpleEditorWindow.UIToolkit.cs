@@ -240,8 +240,7 @@ namespace PSDSimpleEditor
 
             _realtimePreviewToggle = new Toggle("反映");
             _realtimePreviewToggle.value = _isRealtimePreviewEnabled;
-            _realtimePreviewToggle.AddToClassList("button-tool");
-            _realtimePreviewToggle.style.width = 64;
+            _realtimePreviewToggle.style.marginLeft = 8;
             _realtimePreviewToggle.RegisterValueChangedCallback(evt => {
                 var prevEnabled = evt.newValue;
                 if (prevEnabled != _isRealtimePreviewEnabled)
@@ -317,6 +316,7 @@ namespace PSDSimpleEditor
                 var layerPanel = new VisualElement();
                 layerPanel.AddToClassList("panel");
                 layerPanel.style.flexGrow = 1;
+                layerPanel.style.minWidth = 180;
 
                 var layerHeader = new VisualElement();
                 layerHeader.AddToClassList("toolbar-style");
@@ -339,6 +339,7 @@ namespace PSDSimpleEditor
                 var previewPanel = new VisualElement();
                 previewPanel.AddToClassList("panel");
                 previewPanel.style.flexGrow = 1;
+                previewPanel.style.minWidth = 200;
 
                 var previewHeader = new VisualElement();
                 previewHeader.AddToClassList("toolbar-style");

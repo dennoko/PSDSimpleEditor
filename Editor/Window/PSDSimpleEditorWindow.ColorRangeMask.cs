@@ -71,10 +71,10 @@ namespace PSDSimpleEditor
             GUILayout.Space(indent * IndentWidth + 18f);
             using (new EditorGUI.DisabledScope(_colorRangePreviewLayer != layer))
             {
-                if (GUILayout.Button(new GUIContent("プレビュー終了", "画面上の赤色の選択範囲ハイライト表示を終了します。"), PSDEditorTheme.ToolButtonStyle, GUILayout.Width(100)))
+                if (GUILayout.Button(new GUIContent("プレビュー終了", "画面上の赤色の選択範囲ハイライト表示を終了します。"), PSDEditorTheme.ToolButtonStyle, GUILayout.ExpandWidth(true)))
                     EndColorRangePreview();
             }
-            if (GUILayout.Button(new GUIContent("マスクを PNG 出力", "現在の選択範囲を白、それ以外を黒（透明部分含む）としたグレースケールのマスク画像（PNG）を出力先フォルダへ書き出します。"), PSDEditorTheme.ToolButtonStyle, GUILayout.Width(160)))
+            if (GUILayout.Button(new GUIContent("マスクを PNG 出力", "現在の選択範囲を白、それ以外を黒（透明部分含む）としたグレースケールのマスク画像（PNG）を出力先フォルダへ書き出します。"), PSDEditorTheme.ToolButtonStyle, GUILayout.ExpandWidth(true)))
                 ExportColorRangeMask(layer);
             EditorGUILayout.EndHorizontal();
             RowSpace();
