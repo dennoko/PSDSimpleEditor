@@ -13,6 +13,8 @@
     --semantic-success: #4caf50;
     --semantic-error: #ff6565;
     --input-outline: #5a5a5a;
+    --surface-hover: #3e3e3e;
+    --surface-active: #4e4e4e;
 }
 
 /* ── Container ──────────────────────────────────────────────────── */
@@ -110,6 +112,127 @@
     color: var(--text-primary);
     -unity-text-align: middle-left;
     overflow: hidden;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+/* ── Layout (旧 C# インライン style から移設) ─────────────────────── */
+
+/* 汎用: 余白を埋める / スペーサー */
+.grow {
+    flex-grow: 1;
+}
+
+/* ヘッダー (タイトル行) */
+.header {
+    flex-direction: row;
+    padding: 8px 12px;
+}
+
+/* 設定カード内の 1 行 (ラベル + 入力 + ボタン) */
+.settings-row {
+    flex-direction: row;
+    align-items: center;
+}
+
+.settings-label {
+    width: 68px;
+}
+
+/* テキスト入力: width 0 + flex-grow で行内の残り幅いっぱいに広げる */
+.settings-input {
+    flex-grow: 1;
+    flex-shrink: 1;
+    width: 0;
+}
+
+.settings-object-input {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 100px;
+}
+
+.settings-slot-label {
+    width: 48px;
+    margin-left: 8px;
+}
+
+.settings-slot-input {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 60px;
+}
+
+.settings-toggle {
+    margin-left: 8px;
+}
+
+.settings-button {
+    width: 60px;
+}
+
+.settings-button-wide {
+    width: 72px;
+}
+
+/* メインエリア / 空状態 */
+.main-area {
+    flex-grow: 1;
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
+.empty-state {
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1;
+    margin: 20px;
+}
+
+.empty-state-separator {
+    width: 200px;
+}
+
+/* スプリットビュー左右ペイン */
+.split-view {
+    flex-grow: 1;
+}
+
+.layer-panel {
+    flex-grow: 1;
+    min-width: 320px;
+}
+
+.preview-panel {
+    flex-grow: 1;
+    min-width: 400px;
+}
+
+.layer-tree-scroll {
+    flex-grow: 1;
+}
+
+.layer-tree-container {
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
+/* 下部バー (情報 + 形式 + 書き出し) */
+.bottom-bar {
+    flex-direction: row;
+    align-items: center;
+}
+
+.format-label {
+    width: 30px;
+}
+
+.format-field {
+    width: 80px;
+}
+
+.export-button {
+    width: 120px;
 }
 
 /* ── Buttons ────────────────────────────────────────────────────── */
@@ -126,10 +249,10 @@
     -unity-text-align: middle-center;
 }
 .button-primary:hover {
-    background-color: #3e3e3e;
+    background-color: var(--surface-hover);
 }
 .button-primary:active {
-    background-color: #4e4e4e;
+    background-color: var(--surface-active);
 }
 
 .button-secondary {
@@ -147,7 +270,7 @@
     color: var(--text-primary);
 }
 .button-secondary:active {
-    background-color: #3e3e3e;
+    background-color: var(--surface-hover);
     color: var(--text-primary);
 }
 
@@ -162,11 +285,11 @@
     -unity-text-align: middle-center;
 }
 .button-tool:hover {
-    background-color: #3e3e3e;
+    background-color: var(--surface-hover);
     color: var(--text-primary);
 }
 .button-tool:active {
-    background-color: #4e4e4e;
+    background-color: var(--surface-active);
     color: var(--text-primary);
 }
 
@@ -182,11 +305,11 @@
     -unity-text-align: middle-center;
 }
 .button-mini:hover {
-    background-color: #3e3e3e;
+    background-color: var(--surface-hover);
     color: var(--text-secondary);
 }
 .button-mini:active {
-    background-color: #4e4e4e;
+    background-color: var(--surface-active);
     color: var(--text-primary);
 }
 
@@ -212,6 +335,25 @@
 }
 
 /* ── Layer Tree ─────────────────────────────────────────────────── */
+
+.layer-leaf-header {
+    flex-direction: row;
+    align-items: center;
+}
+
+/* グループ行の ▾/▸ ボタン幅ぶんのインデント合わせ */
+.foldout-spacer {
+    width: 18px;
+}
+
+.blend-dropdown {
+    width: 74px;
+}
+
+/* レイヤー詳細コントロール (IMGUIContainer) */
+.layer-controls {
+    margin-top: 4px;
+}
 
 .layer-leaf-card {
     background-color: var(--surface-1);

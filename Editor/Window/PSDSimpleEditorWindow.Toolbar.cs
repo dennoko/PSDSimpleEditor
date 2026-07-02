@@ -8,11 +8,6 @@ namespace PSDSimpleEditor
     // ── 設定カード (PSD パス / 出力先 / 3D プレビュー反映 / 履歴) ────────────
     public partial class PSDSimpleEditorWindow
     {
-        const float SettingsLabelWidth = 68f;   // 設定カード左ラベル幅
-        const float SettingsButtonWidth = 60f;  // 「参照」等ボタン幅
-
-
-
         // ── 履歴ドロップダウン ───────────────────────────────────────────────
 
         /// <summary>履歴ドロップダウンを表示する。項目選択で即ロードする。</summary>

@@ -63,11 +63,7 @@ namespace PSDSimpleEditor
         void BuildHeader()
         {
             var header = new VisualElement();
-            header.style.flexDirection = FlexDirection.Row;
-            header.style.paddingLeft = 12;
-            header.style.paddingRight = 12;
-            header.style.paddingTop = 8;
-            header.style.paddingBottom = 8;
+            header.AddToClassList("header");
 
             var titleLabel = new Label("Dennoko PSD Editor");
             titleLabel.AddToClassList("title");
@@ -88,19 +84,16 @@ namespace PSDSimpleEditor
 
             // Row 1: PSD Input
             var row1 = new VisualElement();
-            row1.style.flexDirection = FlexDirection.Row;
-            row1.style.alignItems = Align.Center;
+            row1.AddToClassList("settings-row");
 
             var psdLabel = new Label("PSD");
             psdLabel.AddToClassList("control-label");
-            psdLabel.style.width = SettingsLabelWidth;
+            psdLabel.AddToClassList("settings-label");
             row1.Add(psdLabel);
 
             _psdPathField = new TextField();
             _psdPathField.value = _psdPath;
-            _psdPathField.style.flexGrow = 1;
-            _psdPathField.style.flexShrink = 1;
-            _psdPathField.style.width = 0;
+            _psdPathField.AddToClassList("settings-input");
             _psdPathField.RegisterValueChangedCallback(evt => {
                 _psdPath = evt.newValue;
             });
@@ -122,17 +115,17 @@ namespace PSDSimpleEditor
                 }
             }) { text = "参照" };
             browsePsdBtn.AddToClassList("button-tool");
-            browsePsdBtn.style.width = SettingsButtonWidth;
+            browsePsdBtn.AddToClassList("settings-button");
             row1.Add(browsePsdBtn);
 
             var loadPsdBtn = new Button(LoadPSD) { text = "読み込み" };
             loadPsdBtn.AddToClassList("button-tool");
-            loadPsdBtn.style.width = 72;
+            loadPsdBtn.AddToClassList("settings-button-wide");
             row1.Add(loadPsdBtn);
 
             var historyBtn = new Button(ShowHistoryMenu) { text = "履歴 ▾" };
             historyBtn.AddToClassList("button-tool");
-            historyBtn.style.width = SettingsButtonWidth;
+            historyBtn.AddToClassList("settings-button");
             row1.Add(historyBtn);
 
             card.Add(row1);
@@ -144,19 +137,16 @@ namespace PSDSimpleEditor
 
             // Row 2: Export Directory
             var row2 = new VisualElement();
-            row2.style.flexDirection = FlexDirection.Row;
-            row2.style.alignItems = Align.Center;
+            row2.AddToClassList("settings-row");
 
             var exportLabel = new Label("出力先");
             exportLabel.AddToClassList("control-label");
-            exportLabel.style.width = SettingsLabelWidth;
+            exportLabel.AddToClassList("settings-label");
             row2.Add(exportLabel);
 
             _exportDirField = new TextField();
             _exportDirField.value = _exportDir;
-            _exportDirField.style.flexGrow = 1;
-            _exportDirField.style.flexShrink = 1;
-            _exportDirField.style.width = 0;
+            _exportDirField.AddToClassList("settings-input");
             _exportDirField.RegisterValueChangedCallback(evt => {
                 _exportDir = evt.newValue;
             });
@@ -181,7 +171,7 @@ namespace PSDSimpleEditor
                 }
             }) { text = "参照" };
             browseExportBtn.AddToClassList("button-tool");
-            browseExportBtn.style.width = SettingsButtonWidth;
+            browseExportBtn.AddToClassList("settings-button");
             row2.Add(browseExportBtn);
 
             card.Add(row2);
@@ -193,18 +183,15 @@ namespace PSDSimpleEditor
 
             // Row 3: 3D Preview
             var row3 = new VisualElement();
-            row3.style.flexDirection = FlexDirection.Row;
-            row3.style.alignItems = Align.Center;
+            row3.AddToClassList("settings-row");
 
             var previewLabel = new Label("3D反映");
             previewLabel.AddToClassList("control-label");
-            previewLabel.style.width = SettingsLabelWidth;
+            previewLabel.AddToClassList("settings-label");
             row3.Add(previewLabel);
 
             _previewMaterialField = new ObjectField { objectType = typeof(Material), value = _previewMaterial, allowSceneObjects = true };
-            _previewMaterialField.style.flexGrow = 1;
-            _previewMaterialField.style.flexShrink = 1;
-            _previewMaterialField.style.minWidth = 100;
+            _previewMaterialField.AddToClassList("settings-object-input");
             _previewMaterialField.RegisterValueChangedCallback(evt => {
                 var prevMat = (Material)evt.newValue;
                 if (prevMat != _previewMaterial)
@@ -218,15 +205,12 @@ namespace PSDSimpleEditor
 
             var slotLabel = new Label("スロット");
             slotLabel.AddToClassList("control-label");
-            slotLabel.style.width = 48;
-            slotLabel.style.marginLeft = 8;
+            slotLabel.AddToClassList("settings-slot-label");
             row3.Add(slotLabel);
 
             _previewSlotField = new TextField();
             _previewSlotField.value = _previewSlotName;
-            _previewSlotField.style.flexGrow = 1;
-            _previewSlotField.style.flexShrink = 1;
-            _previewSlotField.style.minWidth = 60;
+            _previewSlotField.AddToClassList("settings-slot-input");
             _previewSlotField.RegisterValueChangedCallback(evt => {
                 var prevSlot = evt.newValue;
                 if (prevSlot != _previewSlotName)
@@ -240,7 +224,7 @@ namespace PSDSimpleEditor
 
             _realtimePreviewToggle = new Toggle("反映");
             _realtimePreviewToggle.value = _isRealtimePreviewEnabled;
-            _realtimePreviewToggle.style.marginLeft = 8;
+            _realtimePreviewToggle.AddToClassList("settings-toggle");
             _realtimePreviewToggle.RegisterValueChangedCallback(evt => {
                 var prevEnabled = evt.newValue;
                 if (prevEnabled != _isRealtimePreviewEnabled)
@@ -267,9 +251,7 @@ namespace PSDSimpleEditor
         void BuildMainArea()
         {
             _mainAreaContainer = new VisualElement();
-            _mainAreaContainer.style.flexGrow = 1;
-            _mainAreaContainer.style.paddingLeft = 8;
-            _mainAreaContainer.style.paddingRight = 8;
+            _mainAreaContainer.AddToClassList("main-area");
             _rootContainer.Add(_mainAreaContainer);
         }
 
@@ -283,13 +265,7 @@ namespace PSDSimpleEditor
                 // Empty state
                 var emptyState = new VisualElement();
                 emptyState.AddToClassList("card");
-                emptyState.style.alignItems = Align.Center;
-                emptyState.style.justifyContent = Justify.Center;
-                emptyState.style.flexGrow = 1;
-                emptyState.style.marginTop = 20;
-                emptyState.style.marginBottom = 20;
-                emptyState.style.marginLeft = 20;
-                emptyState.style.marginRight = 20;
+                emptyState.AddToClassList("empty-state");
 
                 var emptyHeader = new Label("PSD が読み込まれていません");
                 emptyHeader.AddToClassList("title");
@@ -297,7 +273,7 @@ namespace PSDSimpleEditor
 
                 var emptySep = new VisualElement();
                 emptySep.AddToClassList("separator");
-                emptySep.style.width = 200;
+                emptySep.AddToClassList("empty-state-separator");
                 emptyState.Add(emptySep);
 
                 var emptyText = new Label("上部の「PSD」欄でファイルを指定し、「読み込み」を押してください。\n履歴からの再読み込みも可能です。");
@@ -310,13 +286,12 @@ namespace PSDSimpleEditor
             {
                 // Split View with Layer panel and Preview panel
                 var splitView = new TwoPaneSplitView(0, _layerPanelWidth, TwoPaneSplitViewOrientation.Horizontal);
-                splitView.style.flexGrow = 1;
+                splitView.AddToClassList("split-view");
 
                 // Left Pane: Layer Panel
                 var layerPanel = new VisualElement();
                 layerPanel.AddToClassList("panel");
-                layerPanel.style.flexGrow = 1;
-                layerPanel.style.minWidth = 320;
+                layerPanel.AddToClassList("layer-panel");
 
                 var layerHeader = new VisualElement();
                 layerHeader.AddToClassList("toolbar-style");
@@ -328,25 +303,23 @@ namespace PSDSimpleEditor
                 layerPanel.Add(layerHeader);
 
                 _layerTreeScrollView = new ScrollView();
-                _layerTreeScrollView.style.flexGrow = 1;
+                _layerTreeScrollView.AddToClassList("layer-tree-scroll");
                 _layerTreeContainer = new VisualElement();
-                _layerTreeContainer.style.paddingLeft = 8;
-                _layerTreeContainer.style.paddingRight = 8;
+                _layerTreeContainer.AddToClassList("layer-tree-container");
                 _layerTreeScrollView.Add(_layerTreeContainer);
                 layerPanel.Add(_layerTreeScrollView);
 
                 // Right Pane: Preview Panel
                 var previewPanel = new VisualElement();
                 previewPanel.AddToClassList("panel");
-                previewPanel.style.flexGrow = 1;
-                previewPanel.style.minWidth = 400;
+                previewPanel.AddToClassList("preview-panel");
 
                 var previewHeader = new VisualElement();
                 previewHeader.AddToClassList("toolbar-style");
 
                 var previewTitle = new Label("プレビュー");
                 previewTitle.AddToClassList("section-header");
-                previewTitle.style.flexGrow = 1;
+                previewTitle.AddToClassList("grow");
                 previewHeader.Add(previewTitle);
 
                 var mergedToggle = new Toggle("マージ参照");
@@ -374,7 +347,7 @@ namespace PSDSimpleEditor
                         PSDEditorTheme.PopEditorTheme();
                     }
                 });
-                imguiPreview.style.flexGrow = 1;
+                imguiPreview.AddToClassList("grow");
                 previewPanel.Add(imguiPreview);
 
                 splitView.Add(layerPanel);
@@ -409,8 +382,7 @@ namespace PSDSimpleEditor
 
             _bottomBarContainer = new VisualElement();
             _bottomBarContainer.AddToClassList("card");
-            _bottomBarContainer.style.flexDirection = FlexDirection.Row;
-            _bottomBarContainer.style.alignItems = Align.Center;
+            _bottomBarContainer.AddToClassList("bottom-bar");
 
             // Info Label
             _bottomInfoLabel = new Label();
@@ -419,19 +391,19 @@ namespace PSDSimpleEditor
 
             // Spacer
             var spacer = new VisualElement();
-            spacer.style.flexGrow = 1;
+            spacer.AddToClassList("grow");
             _bottomBarContainer.Add(spacer);
 
             // Format Selector Label
             var formatLabel = new Label("形式");
             formatLabel.AddToClassList("control-label");
-            formatLabel.style.width = 30;
+            formatLabel.AddToClassList("format-label");
             formatLabel.tooltip = "書き出す画像のファイルフォーマットを指定します。\n・PNG: 合成結果をアルファ付きPNGとして書き出します。\n・PSD: 現在の編集パラメータを維持したままPSDとして書き出します。\n・TGA: 32bit（アルファあり）のTGA形式で書き出します。";
             _bottomBarContainer.Add(formatLabel);
 
             // Format Selector EnumField
             _exportFormatField = new EnumField(_exportFormat);
-            _exportFormatField.style.width = 80;
+            _exportFormatField.AddToClassList("format-field");
             _exportFormatField.RegisterValueChangedCallback(evt => {
                 _exportFormat = (ExportFormat)evt.newValue;
                 UpdateBottomBar();
@@ -454,7 +426,7 @@ namespace PSDSimpleEditor
                 }
             }) { text = "書き出し" };
             _exportButton.AddToClassList("button-primary");
-            _exportButton.style.width = 120;
+            _exportButton.AddToClassList("export-button");
             _bottomBarContainer.Add(_exportButton);
 
             // Add bottom bar before the status bar
@@ -596,7 +568,6 @@ namespace PSDSimpleEditor
             string labelText = BuildLayerLabel(layer, true);
             var label = new Label(labelText);
             label.AddToClassList("layer-name");
-            label.style.flexGrow = 1;
             header.Add(label);
 
             // Blend mode dropdown
@@ -655,12 +626,11 @@ namespace PSDSimpleEditor
             container.AddToClassList("layer-leaf-card");
 
             var header = new VisualElement();
-            header.style.flexDirection = FlexDirection.Row;
-            header.style.alignItems = Align.Center;
+            header.AddToClassList("layer-leaf-header");
 
             // Spacer for foldout alignment
             var spacer = new VisualElement();
-            spacer.style.width = 18;
+            spacer.AddToClassList("foldout-spacer");
             header.Add(spacer);
 
             // Visibility toggle
@@ -677,7 +647,6 @@ namespace PSDSimpleEditor
             string labelText = BuildLayerLabel(layer, false);
             var label = new Label(labelText);
             label.AddToClassList("layer-name");
-            label.style.flexGrow = 1;
             header.Add(label);
 
             // Blend mode dropdown
@@ -700,7 +669,7 @@ namespace PSDSimpleEditor
                         PSDEditorTheme.PopEditorTheme();
                     }
                 });
-                imguiContainer.style.marginTop = 4;
+                imguiContainer.AddToClassList("layer-controls");
                 container.Add(imguiContainer);
             }
 
@@ -721,8 +690,8 @@ namespace PSDSimpleEditor
             var dropdown = new DropdownField();
             dropdown.choices = choices;
             dropdown.index = curIndex;
-            dropdown.style.width = 74;
-            
+            dropdown.AddToClassList("blend-dropdown");
+
             dropdown.RegisterValueChangedCallback(evt => {
                 int index = dropdown.index;
                 if (index >= 0 && index < modes.Length)

@@ -340,8 +340,9 @@ namespace PSDSimpleEditor
             GUILayout.Space(indent * IndentWidth + 18f);
             GUILayout.Label(new GUIContent("画像", "合成に使用するテクスチャ画像（Asset）を指定します。"), PSDEditorTheme.ControlLabelStyle,
                             GUILayout.Width(48), GUILayout.Height(RowH));
-            var tex = (Texture2D)EditorGUILayout.ObjectField(new GUIContent("", "合成に使用するテクスチャ画像"), layer.UIImageClipTex, typeof(Texture2D), false,
-                                                             GUILayout.Height(RowH));
+            var tex = NarrowLabelField(() =>
+                (Texture2D)EditorGUILayout.ObjectField(new GUIContent("", "合成に使用するテクスチャ画像"), layer.UIImageClipTex, typeof(Texture2D), false,
+                                                       GUILayout.Height(RowH)));
             EditorGUILayout.EndHorizontal();
             RowSpace();
             if (tex != layer.UIImageClipTex)
@@ -355,8 +356,9 @@ namespace PSDSimpleEditor
             GUILayout.Space(indent * IndentWidth + 18f);
             GUILayout.Label(new GUIContent("タイル", "合成画像の縦横タイリング反復回数を設定します。1.0で等倍です。"), PSDEditorTheme.ControlLabelStyle,
                             GUILayout.Width(48), GUILayout.Height(RowH));
-            Vector2 nt = EditorGUILayout.Vector2Field(new GUIContent("", "合成画像の縦横タイリング反復回数"), layer.UIImageClipTile,
-                                                      GUILayout.Height(RowH));
+            Vector2 nt = NarrowLabelField(() =>
+                EditorGUILayout.Vector2Field(new GUIContent("", "合成画像の縦横タイリング反復回数"), layer.UIImageClipTile,
+                                             GUILayout.Height(RowH)));
             EditorGUILayout.EndHorizontal();
             RowSpace();
             if (nt != layer.UIImageClipTile)
@@ -374,7 +376,8 @@ namespace PSDSimpleEditor
             BlendMode[] modes  = _blendModesNormal;
             string[]    labels = _blendLabelsNormal ?? (_blendLabelsNormal = BuildBlendLabels(_blendModesNormal));
             int curIndex = Mathf.Max(0, Array.IndexOf(modes, layer.UIImageClipBlend));
-            int newIndex = EditorGUILayout.Popup(new GUIContent("", "ブレンドモード"), curIndex, labels, GUILayout.Height(RowH));
+            int newIndex = NarrowLabelField(() =>
+                EditorGUILayout.Popup(new GUIContent("", "ブレンドモード"), curIndex, labels, GUILayout.Height(RowH)));
             EditorGUILayout.EndHorizontal();
             RowSpace();
             if (newIndex != curIndex)
@@ -432,7 +435,8 @@ namespace PSDSimpleEditor
             GUILayout.Label(new GUIContent("階調", "グラデーションマップで使用するグラデーションを編集します。"), PSDEditorTheme.ControlLabelStyle,
                             GUILayout.Width(48), GUILayout.Height(RowH));
             EditorGUI.BeginChangeCheck();
-            Gradient ng = EditorGUILayout.GradientField(new GUIContent("", "グラデーションマップで使用するグラデーション"), layer.UIGradient, GUILayout.Height(RowH));
+            Gradient ng = NarrowLabelField(() =>
+                EditorGUILayout.GradientField(new GUIContent("", "グラデーションマップで使用するグラデーション"), layer.UIGradient, GUILayout.Height(RowH)));
             bool gradientChanged = EditorGUI.EndChangeCheck();
             EditorGUILayout.EndHorizontal();
             RowSpace();
@@ -544,6 +548,19 @@ namespace PSDSimpleEditor
             if (min > max) { min = 0f; max = 1f; } // 不透明画素なし → フォールバック (正規化を実質無効化)
             layer._gradientLumMin = min;
             layer._gradientLumMax = max;
+        }
+
+        /// <summary>
+        /// EditorGUILayout 系フィールドの最小レイアウト幅には labelWidth (既定 ~150px) が常に含まれるため、
+        /// ラベル列を自前描画している行では labelWidth を最小化して描く。
+        /// これを怠るとレイヤーパネルが狭いときにフィールドが右へはみ出す。
+        /// </summary>
+        static T NarrowLabelField<T>(Func<T> draw)
+        {
+            float originalWidth = EditorGUIUtility.labelWidth;
+            EditorGUIUtility.labelWidth = 1f;
+            try { return draw(); }
+            finally { EditorGUIUtility.labelWidth = originalWidth; }
         }
 
         /// <summary>インデント付きのラベル + スライダー 1 行 (行間の縦余白付き)。</summary>
