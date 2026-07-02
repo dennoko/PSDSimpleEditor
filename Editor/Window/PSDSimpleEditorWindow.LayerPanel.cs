@@ -63,6 +63,8 @@ namespace PSDSimpleEditor
 
             if (layer.Adjustment != null && layer.Adjustment.HasSolidColor)
                 prefix += "[SoCo] ";
+            else if (layer.Adjustment != null && layer.Adjustment.HasGradientFill)
+                prefix += "[グラデ塗り] ";
             else if (!isGroup && layer.IsAdjustmentLayer &&
                      layer.Adjustment != null &&
                      (layer.Adjustment.HasBrightnessContrast || layer.Adjustment.HasHueSaturation ||

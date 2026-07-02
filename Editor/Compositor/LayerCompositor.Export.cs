@@ -17,10 +17,18 @@ namespace PSDSimpleEditor
         {
             Texture tex;
             Vector4 rect;
+            bool    gradFill = false;
             if (layer.Adjustment.HasSolidColor)
             {
                 tex  = GetSolidTexture(layer.Adjustment.SolidColor);
                 rect = FullCanvasRect;
+            }
+            else if (layer.Adjustment.HasGradientFill && layer._gradientFillLut != null)
+            {
+                // GdFl: α はグラデーション LUT (透明ストップ) が決める
+                tex      = Texture2D.whiteTexture;
+                rect     = FullCanvasRect;
+                gradFill = true;
             }
             else if (layer.Texture != null)
             {
@@ -43,6 +51,7 @@ namespace PSDSimpleEditor
             p.BlendMode = 0; // Normal (α の算出にブレンド関数は影響しない)
             SetMaskFrom(ref p, layer);
             p.ClipMaskTex = clipMask;
+            if (gradFill) SetGradientFillFrom(ref p, layer);
             ApplyParams(p);
             Graphics.Blit(clearBg, result, _mat);
 

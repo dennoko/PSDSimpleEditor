@@ -460,7 +460,8 @@ namespace PSDSimpleEditor
             return g;
         }
 
-        /// <summary>PSD からインポートしたグラデーションマップ (grdm) レイヤーの LUT をロード直後に焼く (ツリー再帰)。</summary>
+        /// <summary>PSD からインポートしたグラデーションマップ (grdm) / グラデーション塗りつぶし (GdFl)
+        /// レイヤーの LUT をロード直後に焼く (ツリー再帰)。</summary>
         void BakeImportedGradientLuts(System.Collections.Generic.List<PSDLayer> layers)
         {
             if (layers == null) return;
@@ -468,8 +469,30 @@ namespace PSDSimpleEditor
             {
                 if (l.UIGradientMapEnabled && l.UIGradient != null)
                     EnsureGradientLut(l);
+                if (l.Adjustment != null && l.Adjustment.HasGradientFill && l.Adjustment.GradientFillGradient != null)
+                    BakeGradientFillLut(l);
                 BakeImportedGradientLuts(l.Children);
             }
+        }
+
+        /// <summary>GradientFillGradient を 256×1 の LUT テクスチャ (linear) に焼き込む (GdFl 用)。</summary>
+        static void BakeGradientFillLut(PSDLayer layer)
+        {
+            const int N = 256;
+            if (layer._gradientFillLut == null)
+            {
+                layer._gradientFillLut = new Texture2D(N, 1, TextureFormat.RGBA32, false, linear: true)
+                {
+                    hideFlags  = HideFlags.HideAndDontSave,
+                    wrapMode   = TextureWrapMode.Clamp,
+                    filterMode = FilterMode.Bilinear,
+                };
+            }
+            var px = new Color32[N];
+            for (int i = 0; i < N; i++)
+                px[i] = layer.Adjustment.GradientFillGradient.Evaluate(i / (float)(N - 1));
+            layer._gradientFillLut.SetPixels32(px);
+            layer._gradientFillLut.Apply(false);
         }
 
         /// <summary>グラデーション有効時に LUT が無ければ焼く。</summary>
