@@ -279,7 +279,8 @@ namespace PSDSimpleEditor
             if (layer._curveLut == null) BakeCurveLut(layer);
         }
 
-        /// <summary>UICurve を 256×1 の LUT テクスチャ (linear, R=G=B=出力値) に焼き込む。</summary>
+        /// <summary>UICurve (+ パース済みチャンネル別カーブ) を 256×1 の LUT テクスチャに焼き込む。
+        /// R/G/B 各チャンネル値 = 複合カーブ(チャンネルカーブ(入力))。チャンネルカーブが無い場合は R=G=B。</summary>
         static void BakeCurveLut(PSDLayer layer)
         {
             const int N = 256;
@@ -295,12 +296,25 @@ namespace PSDSimpleEditor
             var px = new Color32[N];
             for (int i = 0; i < N; i++)
             {
-                float v = Mathf.Clamp01(layer.UICurve.Evaluate(i / (float)(N - 1)));
-                byte  b = (byte)Mathf.RoundToInt(v * 255f);
-                px[i] = new Color32(b, b, b, 255);
+                float x = i / (float)(N - 1);
+                px[i] = new Color32(
+                    EvalCurveChannel(layer, 0, x),
+                    EvalCurveChannel(layer, 1, x),
+                    EvalCurveChannel(layer, 2, x),
+                    255);
             }
             layer._curveLut.SetPixels32(px);
             layer._curveLut.Apply(false);
+        }
+
+        /// <summary>チャンネルカーブ → 複合カーブの順で評価した出力値 (0..255)。</summary>
+        static byte EvalCurveChannel(PSDLayer layer, int channel, float x)
+        {
+            var chCurves = layer.UICurveChannels;
+            if (chCurves != null && chCurves[channel] != null)
+                x = Mathf.Clamp01(chCurves[channel].Evaluate(x));
+            float v = Mathf.Clamp01(layer.UICurve.Evaluate(x));
+            return (byte)Mathf.RoundToInt(v * 255f);
         }
 
         /// <summary>画像クリップ合成: 任意画像をレイヤーα形状へクリップ・タイリング・ブレンド。</summary>

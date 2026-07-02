@@ -134,6 +134,18 @@ namespace PSDSimpleEditor
                 if (l.Adjustment.HasCurves && l.Adjustment.CurvePoints != null && l.Adjustment.CurvePoints.Count >= 2)
                     l.UICurve = BuildAnimationCurveFromPoints(l.Adjustment.CurvePoints);
 
+                // R/G/B チャンネル別カーブ (合成へ反映のみ。LUT ベイク時に複合カーブと畳み込む)
+                if (l.Adjustment.HasChannelCurves && l.Adjustment.CurveChannelPoints != null)
+                {
+                    l.UICurveChannels = new AnimationCurve[3];
+                    for (int c = 0; c < 3; c++)
+                    {
+                        var pts = l.Adjustment.CurveChannelPoints[c];
+                        if (pts != null && pts.Count >= 2)
+                            l.UICurveChannels[c] = BuildAnimationCurveFromPoints(pts);
+                    }
+                }
+
                 // グラデーションマップ (LUT は Editor 側でロード後に焼く。ここでは有効化とグラデーションのみ)
                 if (l.Adjustment.HasGradientMap && l.Adjustment.GradientMapGradient != null)
                 {
