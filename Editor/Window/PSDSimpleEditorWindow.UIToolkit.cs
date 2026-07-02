@@ -283,7 +283,10 @@ namespace PSDSimpleEditor
                 emptyState.style.alignItems = Align.Center;
                 emptyState.style.justifyContent = Justify.Center;
                 emptyState.style.flexGrow = 1;
-                emptyState.style.margin = 20;
+                emptyState.style.marginTop = 20;
+                emptyState.style.marginBottom = 20;
+                emptyState.style.marginLeft = 20;
+                emptyState.style.marginRight = 20;
 
                 var emptyHeader = new Label("PSD が読み込まれていません");
                 emptyHeader.AddToClassList("title");
