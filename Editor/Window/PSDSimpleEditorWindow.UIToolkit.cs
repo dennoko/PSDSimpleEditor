@@ -194,7 +194,7 @@ namespace PSDSimpleEditor
 
             _previewMaterialField = new ObjectField { objectType = typeof(Material), value = _previewMaterial, allowSceneObjects = true };
             _previewMaterialField.AddToClassList("settings-object-input");
-            _previewMaterialField.tooltip = "プレビュー先のマテリアルを指定します。";
+            _previewMaterialField.tooltip = "プレビュー先のマテリアルを指定します。設定すると自動的にプレビューが有効になります。";
             _previewMaterialField.RegisterValueChangedCallback(evt => {
                 var prevMat = (Material)evt.newValue;
                 if (prevMat != _previewMaterial)
@@ -202,6 +202,10 @@ namespace PSDSimpleEditor
                     RevertRealtimePreview();
                     _previewMaterial = prevMat;
                     _needsRecomposite = true;
+
+                    // マテリアルをセットしたら自動的にプレビューを有効化する（未設定に戻したら無効化）
+                    _isRealtimePreviewEnabled = _previewMaterial != null;
+                    UpdateRealtimePreviewButtonState();
                 }
             });
             row3.Add(_previewMaterialField);
