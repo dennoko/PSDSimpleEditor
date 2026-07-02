@@ -23,7 +23,7 @@ namespace PSDSimpleEditor
         static void Open()
         {
             var window = GetWindow<PSDSimpleEditorWindow>("Dennoko PSD Editor");
-            window.minSize = new Vector2(640f, 360f);
+            window.minSize = new Vector2(800f, 360f);
         }
 
         // ── 定数 ───────────────────────────────────────────────────────────
