@@ -341,7 +341,8 @@ namespace PSDSimpleEditor
             float originalLabelWidth = EditorGUIUtility.labelWidth;
             EditorGUIUtility.labelWidth = 48f;
             var tex = (Texture2D)EditorGUILayout.ObjectField(new GUIContent("画像", "合成に使用するテクスチャ画像（Asset）を指定します。"),
-                                                             layer.UIImageClipTex, typeof(Texture2D), false, GUILayout.Height(RowH));
+                                                             layer.UIImageClipTex, typeof(Texture2D), false,
+                                                             GUILayout.Height(RowH));
             EditorGUIUtility.labelWidth = originalLabelWidth;
             EditorGUILayout.EndHorizontal();
             RowSpace();

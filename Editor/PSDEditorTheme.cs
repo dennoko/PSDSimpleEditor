@@ -474,7 +474,7 @@ namespace PSDSimpleEditor
             FixAllTextColors(EditorStyles.objectField, TextPrimary);
             FixAllTextColors(EditorStyles.numberField, TextPrimary);
             FixAllTextColors(EditorStyles.textField,   TextPrimary);
-            FixAllTextColors(EditorStyles.popup,       TextPrimary);
+            FixAllTextColors(EditorStyles.popup,       EditorGUIUtility.isProSkin ? TextPrimary : Hex(0x111111));
             FixAllTextColors(EditorStyles.toggle,      TextPrimary);
             FixAllTextColors(EditorStyles.foldout,     TextPrimary);
             FixAllTextColors(GUI.skin.textField,       TextPrimary);
