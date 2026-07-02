@@ -38,7 +38,7 @@ namespace PSDSimpleEditor
 
         // ── 状態 ───────────────────────────────────────────────────────────
         [SerializeField] float _layerPanelWidth = 300f; // 左パネル幅
-        [SerializeField] string _exportDir = "Assets/PSDSE_exported"; // PNG出力先フォルダ
+        [SerializeField] string _exportDir = "Assets/DennokoPSDEditor_exported"; // PNG出力先フォルダ
         [SerializeField] ExportFormat _exportFormat = ExportFormat.PNG; // エクスポートフォーマット
         string _psdPath = "";                 // 入力中の PSD パス (リロード後も保持)
         bool   _showMergedRef;                // マージ済み画像の参照表示
