@@ -370,10 +370,8 @@ namespace PSDSimpleEditor
         void BuildBottomBar()
         {
             if (_rootContainer == null) return;
-            if (_bottomBarContainer != null)
-            {
-                _rootContainer.Remove(_bottomBarContainer);
-            }
+            // RemoveFromHierarchy は現在の実際の親から外すため、既に外れている場合でも安全 (Remove は非子要素で例外を投げる)
+            _bottomBarContainer?.RemoveFromHierarchy();
 
             if (_psdFile == null) return;
 
