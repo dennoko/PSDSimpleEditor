@@ -480,18 +480,9 @@ namespace PSDSimpleEditor
             FixAllTextColors(GUI.skin.textField,       TextPrimary);
             FixAllTextColors(GUI.skin.label,           TextPrimary);
 
-            // ─ 背景テクスチャをすべての状態でダーク色＋ボーダーに固定
-            FixAllStateBackgrounds(EditorStyles.objectField, _texSearchField);
-            FixAllStateBackgrounds(EditorStyles.numberField, _texSearchField);
-            FixAllStateBackgrounds(EditorStyles.textField,   _texSearchField);
-            FixAllStateBackgrounds(GUI.skin.textField,       _texSearchField);
-
             // ── カーソルと選択範囲の色を固定 (ライトモードの黒カーソル等を防止)
             GUI.skin.settings.cursorColor = TextPrimary;
             GUI.skin.settings.selectionColor = new Color(1f, 1f, 1f, 0.25f);
-
-            // ポップアップは枠線付きカードテクスチャを使用
-            FixAllStateBackgrounds(EditorStyles.popup, _texCard);
         }
 
         /// <summary>OnGUI 末尾の finally ブロックで必ず呼ぶ。EditorStyles を元に戻す。</summary>

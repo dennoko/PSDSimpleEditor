@@ -1,0 +1,349 @@
+/* dennokoworks フローティングデザインスキーマに基づく USS テーマ定義 */
+
+:root {
+    --surface-0: #121212;
+    --surface-1: #1e1e1e;
+    --surface-2: #2c2c2c;
+    --outline: #3a3a3a;
+    --text-primary: #ffffff;
+    --text-secondary: #cccccc;
+    --text-tertiary: #aaaaaa;
+    --text-disabled: #555555;
+    --accent: #ffffff;
+    --semantic-success: #4caf50;
+    --semantic-error: #ff6565;
+    --input-outline: #5a5a5a;
+}
+
+/* ── Container ──────────────────────────────────────────────────── */
+
+.root {
+    background-color: var(--surface-0);
+    flex-grow: 1;
+    padding: 0;
+    margin: 0;
+}
+
+.card {
+    background-color: var(--surface-1);
+    border-color: var(--outline);
+    border-width: 1px;
+    border-radius: 4px;
+    padding: 10px 12px;
+    margin: 6px 8px;
+}
+
+.card-outer {
+    background-color: var(--surface-1);
+    border-color: var(--outline);
+    border-width: 1px;
+    border-radius: 4px;
+    padding: 0;
+    margin: 6px 8px;
+}
+
+.panel {
+    background-color: var(--surface-1);
+    border-color: var(--outline);
+    border-width: 1px;
+    border-radius: 4px;
+    padding: 0;
+    margin: 0;
+}
+
+.toolbar-style {
+    background-color: var(--surface-2);
+    padding: 5px 8px;
+    flex-direction: row;
+    align-items: center;
+}
+
+.separator {
+    background-color: var(--outline);
+    height: 1px;
+    margin: 4px 0;
+}
+
+/* ── Typography ─────────────────────────────────────────────────── */
+
+.title {
+    -unity-font-style: bold;
+    font-size: 14px;
+    color: var(--text-primary);
+    -unity-text-align: middle-left;
+}
+
+.section-header {
+    -unity-font-style: bold;
+    font-size: 10px;
+    color: var(--text-tertiary);
+    -unity-text-align: middle-left;
+}
+
+.secondary-text {
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: normal;
+}
+
+.caption {
+    font-size: 9px;
+    color: var(--text-primary);
+    -unity-text-align: middle-left;
+}
+
+.centered-caption {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    -unity-text-align: middle-center;
+    white-space: normal;
+}
+
+.control-label {
+    font-size: 10px;
+    color: var(--text-primary);
+    -unity-text-align: middle-left;
+}
+
+.layer-name {
+    font-size: 11px;
+    color: var(--text-primary);
+    -unity-text-align: middle-left;
+    overflow: hidden;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────── */
+
+.button-primary {
+    background-color: var(--surface-2);
+    border-color: var(--outline);
+    border-width: 1px;
+    color: var(--text-primary);
+    border-radius: 2px;
+    height: 28px;
+    -unity-font-style: bold;
+    padding: 4px 10px;
+    -unity-text-align: middle-center;
+}
+.button-primary:hover {
+    background-color: #3e3e3e;
+}
+.button-primary:active {
+    background-color: #4e4e4e;
+}
+
+.button-secondary {
+    background-color: var(--surface-1);
+    border-color: var(--outline);
+    border-width: 1px;
+    color: var(--text-secondary);
+    border-radius: 2px;
+    height: 26px;
+    padding: 4px 10px;
+    -unity-text-align: middle-center;
+}
+.button-secondary:hover {
+    background-color: var(--surface-2);
+    color: var(--text-primary);
+}
+.button-secondary:active {
+    background-color: #3e3e3e;
+    color: var(--text-primary);
+}
+
+.button-tool {
+    background-color: var(--surface-2);
+    border-color: var(--outline);
+    border-width: 1px;
+    color: var(--text-secondary);
+    border-radius: 2px;
+    height: 20px;
+    padding: 2px 8px;
+    -unity-text-align: middle-center;
+}
+.button-tool:hover {
+    background-color: #3e3e3e;
+    color: var(--text-primary);
+}
+.button-tool:active {
+    background-color: #4e4e4e;
+    color: var(--text-primary);
+}
+
+.button-mini {
+    background-color: var(--surface-2);
+    border-color: var(--outline);
+    border-width: 1px;
+    color: var(--text-tertiary);
+    border-radius: 2px;
+    height: 18px;
+    padding: 1px 6px;
+    font-size: 10px;
+    -unity-text-align: middle-center;
+}
+.button-mini:hover {
+    background-color: #3e3e3e;
+    color: var(--text-secondary);
+}
+.button-mini:active {
+    background-color: #4e4e4e;
+    color: var(--text-primary);
+}
+
+.foldout-button {
+    background-color: transparent;
+    border-width: 0;
+    color: var(--text-primary);
+    font-size: 14px;
+    margin: 0;
+    padding: 0;
+    width: 18px;
+    height: 20px;
+}
+
+.foldout-label {
+    background-color: transparent;
+    border-width: 0;
+    color: var(--text-primary);
+    font-size: 11px;
+    margin: 0;
+    padding: 0 2px;
+    -unity-text-align: middle-left;
+}
+
+/* ── Layer Tree ─────────────────────────────────────────────────── */
+
+.layer-leaf-card {
+    background-color: var(--surface-1);
+    border-color: var(--outline);
+    border-width: 1px;
+    padding: 6px 8px;
+    margin: 3px 0;
+    border-radius: 4px;
+}
+
+.layer-group-outer {
+    background-color: var(--surface-1);
+    border-color: var(--outline);
+    border-width: 1px;
+    padding: 0;
+    margin: 4px 0;
+    border-radius: 4px;
+}
+
+.layer-group-header {
+    background-color: var(--surface-2);
+    border-color: var(--outline);
+    border-bottom-width: 1px;
+    border-top-width: 0;
+    border-left-width: 0;
+    border-right-width: 0;
+    padding: 5px 8px;
+    margin: 0;
+    flex-direction: row;
+    align-items: center;
+}
+
+.layer-group-body {
+    padding: 8px 8px 8px 10px;
+    margin: 0;
+}
+
+/* ── Status Bar ─────────────────────────────────────────────────── */
+
+.status-bar {
+    border-width: 1px;
+    border-radius: 4px;
+    padding: 6px 10px;
+    margin: 4px 8px 6px 8px;
+    font-size: 11px;
+    white-space: normal;
+    -unity-text-align: middle-left;
+}
+
+.status-info {
+    background-color: var(--surface-1);
+    border-color: var(--outline);
+    color: var(--text-secondary);
+}
+
+.status-success {
+    background-color: rgba(76, 175, 80, 0.15);
+    border-color: var(--outline);
+    color: var(--semantic-success);
+}
+
+.status-error {
+    background-color: rgba(155, 27, 48, 0.25);
+    border-color: var(--outline);
+    color: var(--semantic-error);
+}
+
+/* ── Built-in UI Toolkit Controls Styling ────────────────────────── */
+
+/* Text Fields */
+.unity-text-field__input {
+    background-color: var(--surface-2);
+    border-color: var(--input-outline);
+    border-width: 1px;
+    border-radius: 3px;
+    color: var(--text-primary);
+    padding: 2px 4px;
+    selection-color: rgba(255, 255, 255, 0.25);
+    cursor: text;
+}
+.unity-text-field__input:hover {
+    border-color: var(--outline);
+}
+.unity-text-field__input:focus {
+    border-color: var(--accent);
+}
+
+/* Object Fields */
+.unity-object-field__input {
+    background-color: var(--surface-2);
+    border-color: var(--input-outline);
+    border-width: 1px;
+    border-radius: 3px;
+    color: var(--text-primary);
+    padding: 2px 4px;
+}
+.unity-object-field__selector {
+    background-color: var(--surface-1);
+    border-left-color: var(--input-outline);
+    border-left-width: 1px;
+}
+
+/* Dropdowns / Popups */
+.unity-base-popup-field__input {
+    background-color: var(--surface-2);
+    border-color: var(--input-outline);
+    border-width: 1px;
+    border-radius: 3px;
+    color: var(--text-primary);
+    padding: 2px 6px;
+}
+.unity-base-popup-field__arrow {
+    -unity-background-image-tint-color: var(--text-primary);
+}
+
+/* Toggles */
+.unity-toggle__checkmark {
+    background-color: var(--surface-2);
+    border-color: var(--input-outline);
+    border-width: 1px;
+    border-radius: 2px;
+    width: 16px;
+    height: 16px;
+}
+.unity-toggle__checkmark:hover {
+    border-color: var(--outline);
+}
+.unity-toggle__checkmark:checked {
+    background-color: var(--surface-1);
+    border-color: var(--accent);
+}
+
+.unity-disabled {
+    opacity: 0.5;
+}

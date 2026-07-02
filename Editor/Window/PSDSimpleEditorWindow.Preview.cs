@@ -21,6 +21,14 @@ namespace PSDSimpleEditor
                                               PSDEditorTheme.ToolbarButtonStyle, GUILayout.Width(80));
             EditorGUILayout.EndHorizontal();
 
+            DrawPreviewPanelContentOnly();
+
+            EditorGUILayout.EndVertical();
+        }
+
+        void DrawPreviewPanelContentOnly()
+        {
+
             // 本体 (手動パディング付きプレビュー領域)
             GUILayout.Space(6);
             EditorGUILayout.BeginHorizontal();
@@ -71,8 +79,6 @@ namespace PSDSimpleEditor
                     GUI.Label(area, "プレビューなし", PSDEditorTheme.CenteredCaptionStyle);
                 }
             }
-
-            EditorGUILayout.EndVertical();
         }
 
         /// <summary>マージ済み画像を右下に小窓で重ね描きする。</summary>
