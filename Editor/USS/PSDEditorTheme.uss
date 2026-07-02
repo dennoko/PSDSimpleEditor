@@ -293,6 +293,15 @@
     color: var(--text-primary);
 }
 
+.button-tool-active {
+    background-color: var(--surface-hover) !important;
+    color: var(--text-primary) !important;
+    -unity-font-style: bold;
+}
+.button-tool-active:hover {
+    background-color: var(--surface-active) !important;
+}
+
 .button-mini {
     background-color: var(--surface-2);
     border-color: var(--outline);
@@ -424,12 +433,13 @@
 /* ── Built-in UI Toolkit Controls Styling ────────────────────────── */
 
 /* Text Fields */
-.unity-text-field__input {
+.unity-text-field__input,
+.unity-text-field__input .unity-text-element {
     background-color: var(--surface-2);
     border-color: var(--input-outline);
     border-width: 1px;
     border-radius: 3px;
-    color: var(--text-primary);
+    color: var(--text-primary) !important;
     padding: 2px 4px;
     selection-color: rgba(255, 255, 255, 0.25);
     cursor: text;
@@ -442,12 +452,15 @@
 }
 
 /* Object Fields */
-.unity-object-field__input {
+.unity-object-field__input,
+.unity-object-field__input .unity-label,
+.unity-object-field__input .unity-object-field-display__label,
+.unity-object-field__input .unity-text-element {
     background-color: var(--surface-2);
     border-color: var(--input-outline);
     border-width: 1px;
     border-radius: 3px;
-    color: var(--text-primary);
+    color: var(--text-primary) !important;
     padding: 2px 4px;
 }
 .unity-object-field__selector {
@@ -457,12 +470,14 @@
 }
 
 /* Dropdowns / Popups */
-.unity-base-popup-field__input {
+.unity-base-popup-field__input,
+.unity-base-popup-field__input .unity-base-popup-field__text,
+.unity-base-popup-field__input .unity-text-element {
     background-color: var(--surface-2);
     border-color: var(--input-outline);
     border-width: 1px;
     border-radius: 3px;
-    color: var(--text-primary);
+    color: var(--text-primary) !important;
     padding: 2px 6px;
 }
 .unity-base-popup-field__arrow {

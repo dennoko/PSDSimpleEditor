@@ -340,9 +340,8 @@ namespace PSDSimpleEditor
             GUILayout.Space(indent * IndentWidth + 18f);
             GUILayout.Label(new GUIContent("画像", "合成に使用するテクスチャ画像（Asset）を指定します。"), PSDEditorTheme.ControlLabelStyle,
                             GUILayout.Width(48), GUILayout.Height(RowH));
-            var tex = NarrowLabelField(() =>
-                (Texture2D)EditorGUILayout.ObjectField(new GUIContent("", "合成に使用するテクスチャ画像"), layer.UIImageClipTex, typeof(Texture2D), false,
-                                                       GUILayout.Height(RowH)));
+            var rect = EditorGUILayout.GetControlRect(false, RowH, GUILayout.ExpandWidth(true));
+            var tex = (Texture2D)EditorGUI.ObjectField(rect, layer.UIImageClipTex, typeof(Texture2D), false);
             EditorGUILayout.EndHorizontal();
             RowSpace();
             if (tex != layer.UIImageClipTex)

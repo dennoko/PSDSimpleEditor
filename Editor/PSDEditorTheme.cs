@@ -480,6 +480,11 @@ namespace PSDSimpleEditor
             FixAllTextColors(GUI.skin.textField,       TextPrimary);
             FixAllTextColors(GUI.skin.label,           TextPrimary);
 
+            // ── 入力フィールドの背景を固定 (ライトモードの白い背景を防止)
+            FixAllStateBackgrounds(EditorStyles.numberField, _texSearchField);
+            FixAllStateBackgrounds(EditorStyles.textField, _texSearchField);
+            FixAllStateBackgrounds(GUI.skin.textField, _texSearchField);
+
             // ── カーソルと選択範囲の色を固定 (ライトモードの黒カーソル等を防止)
             GUI.skin.settings.cursorColor = TextPrimary;
             GUI.skin.settings.selectionColor = new Color(1f, 1f, 1f, 0.25f);

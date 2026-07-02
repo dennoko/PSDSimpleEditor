@@ -16,7 +16,7 @@ namespace PSDSimpleEditor
         private TextField _exportDirField;
         private ObjectField _previewMaterialField;
         private TextField _previewSlotField;
-        private Toggle _realtimePreviewToggle;
+        private Button _realtimePreviewButton;
         private EnumField _exportFormatField;
         private Label _bottomInfoLabel;
         private Button _exportButton;
@@ -222,26 +222,11 @@ namespace PSDSimpleEditor
             });
             row3.Add(_previewSlotField);
 
-            _realtimePreviewToggle = new Toggle("反映");
-            _realtimePreviewToggle.value = _isRealtimePreviewEnabled;
-            _realtimePreviewToggle.AddToClassList("settings-toggle");
-            _realtimePreviewToggle.RegisterValueChangedCallback(evt => {
-                var prevEnabled = evt.newValue;
-                if (prevEnabled != _isRealtimePreviewEnabled)
-                {
-                    _isRealtimePreviewEnabled = prevEnabled;
-                    if (_isRealtimePreviewEnabled)
-                    {
-                        ApplyRealtimePreview();
-                    }
-                    else
-                    {
-                        RevertRealtimePreview();
-                    }
-                    _needsRecomposite = true;
-                }
-            });
-            row3.Add(_realtimePreviewToggle);
+            _realtimePreviewButton = new Button(ToggleRealtimePreview);
+            _realtimePreviewButton.AddToClassList("button-tool");
+            _realtimePreviewButton.AddToClassList("settings-button-wide");
+            UpdateRealtimePreviewButtonState();
+            row3.Add(_realtimePreviewButton);
 
             card.Add(row3);
 
@@ -499,7 +484,37 @@ namespace PSDSimpleEditor
             if (_exportDirField != null) _exportDirField.SetValueWithoutNotify(_exportDir);
             if (_previewMaterialField != null) _previewMaterialField.SetValueWithoutNotify(_previewMaterial);
             if (_previewSlotField != null) _previewSlotField.SetValueWithoutNotify(_previewSlotName);
-            if (_realtimePreviewToggle != null) _realtimePreviewToggle.SetValueWithoutNotify(_isRealtimePreviewEnabled);
+            UpdateRealtimePreviewButtonState();
+        }
+
+        void ToggleRealtimePreview()
+        {
+            _isRealtimePreviewEnabled = !_isRealtimePreviewEnabled;
+            if (_isRealtimePreviewEnabled)
+            {
+                ApplyRealtimePreview();
+            }
+            else
+            {
+                RevertRealtimePreview();
+            }
+            _needsRecomposite = true;
+            UpdateRealtimePreviewButtonState();
+        }
+
+        void UpdateRealtimePreviewButtonState()
+        {
+            if (_realtimePreviewButton == null) return;
+            if (_isRealtimePreviewEnabled)
+            {
+                _realtimePreviewButton.text = "反映中";
+                _realtimePreviewButton.AddToClassList("button-tool-active");
+            }
+            else
+            {
+                _realtimePreviewButton.text = "反映";
+                _realtimePreviewButton.RemoveFromClassList("button-tool-active");
+            }
         }
 
         void RebuildLayerTree()
