@@ -316,7 +316,7 @@ namespace PSDSimpleEditor
                 var layerPanel = new VisualElement();
                 layerPanel.AddToClassList("panel");
                 layerPanel.style.flexGrow = 1;
-                layerPanel.style.minWidth = 180;
+                layerPanel.style.minWidth = 320;
 
                 var layerHeader = new VisualElement();
                 layerHeader.AddToClassList("toolbar-style");
@@ -339,7 +339,7 @@ namespace PSDSimpleEditor
                 var previewPanel = new VisualElement();
                 previewPanel.AddToClassList("panel");
                 previewPanel.style.flexGrow = 1;
-                previewPanel.style.minWidth = 200;
+                previewPanel.style.minWidth = 400;
 
                 var previewHeader = new VisualElement();
                 previewHeader.AddToClassList("toolbar-style");

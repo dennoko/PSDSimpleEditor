@@ -151,7 +151,8 @@ namespace PSDSimpleEditor
                 GUILayout.Label(new GUIContent("塗り色", "ベタ塗りレイヤーの塗りつぶし色を設定します。"), PSDEditorTheme.ControlLabelStyle,
                                 GUILayout.Width(48), GUILayout.Height(RowH));
                 Color nc = EditorGUILayout.ColorField(new GUIContent("", "ベタ塗りレイヤーの塗りつぶし色を設定します。"), layer.Adjustment.SolidColor,
-                                                      GUILayout.Height(RowH));
+                                                      GUILayout.Width(80), GUILayout.Height(RowH));
+                GUILayout.FlexibleSpace();
                 EditorGUILayout.EndHorizontal();
                 RowSpace();
                 if (nc != layer.Adjustment.SolidColor)

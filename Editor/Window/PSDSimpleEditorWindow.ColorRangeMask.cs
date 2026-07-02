@@ -31,7 +31,8 @@ namespace PSDSimpleEditor
             GUILayout.Label(new GUIContent("対象色", "抽出する対象の色を指定します。"), PSDEditorTheme.ControlLabelStyle,
                             GUILayout.Width(48), GUILayout.Height(RowH));
             Color nc = EditorGUILayout.ColorField(new GUIContent("", "抽出する対象の色を指定します。"), layer.UIColorRangeTarget, true, false, false,
-                                                  GUILayout.Height(RowH));
+                                                  GUILayout.Width(80), GUILayout.Height(RowH));
+            GUILayout.FlexibleSpace();
             bool armed = _eyedropperTarget == layer;
             bool newArmed = GUILayout.Toggle(armed, new GUIContent("スポイト", "スポイトツールを有効にします。プレビュー上でクリックした対象レイヤーの画素色を直接取得できます。"), PSDEditorTheme.MiniButtonStyle,
                                              GUILayout.Width(60), GUILayout.Height(RowH));
