@@ -9,6 +9,13 @@ namespace PSDSimpleEditor
         public byte[] Data;  // [uint16 compression][rowLens..][packbits rows..]
     }
 
+    // ── 書き出し用の追加情報ブロック (調整キー等。luni/lsct の後に書かれる) ──
+    internal class ExportExtraBlock
+    {
+        public string Key;   // 4 文字キー (brit / hue2 / SoCo / GdFl ...)
+        public byte[] Data;  // ブロック本体 (奇数長の偶数化パディングはライターが行う)
+    }
+
     // ── 書き出し用に準備した 1 レコード分 ──
     internal class ExportRecord
     {
@@ -22,6 +29,8 @@ namespace PSDSimpleEditor
 
         public int    LsctType;       // 0=通常 1=開フォルダ 2=閉フォルダ 3=終端マーカー
         public string GroupBlendKey;  // フォルダの lsct ブレンドキー (type1/2 のみ)
+
+        public List<ExportExtraBlock> ExtraBlocks; // 調整キー等の追加情報 (null = なし)
 
         public bool HasMask;
         public int  MaskTop, MaskLeft, MaskBottom, MaskRight;

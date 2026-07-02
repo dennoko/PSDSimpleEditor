@@ -76,18 +76,34 @@ namespace PSDSimpleEditor
         public bool  HasPosterize;           // post
         public float PosterizeLevels = 4f;   // 2 .. 255
 
-        public bool  HasLevels;              // levl (複合/コンポジットチャンネルのみ v1 対応)
+        public bool  HasLevels;              // levl (複合チャンネル。UI で編集可能)
         public float LevelsInputBlack  = 0f;    // 0 .. 255
         public float LevelsInputWhite  = 255f;  // 0 .. 255
         public float LevelsGamma       = 1f;    // 0.01 .. 9.99
         public float LevelsOutputBlack = 0f;    // 0 .. 255
         public float LevelsOutputWhite = 255f;  // 0 .. 255
 
-        public bool          HasCurves;      // curv (複合/コンポジットチャンネルのみ v1 対応)
+        // levl の R/G/B チャンネル別レコード (合成へ反映のみ。UI 編集対象外)
+        public bool      HasChannelLevels;
+        public Vector4[] LevelsChannelRanges; // [3] = R/G/B: (入力黒, 入力白, 出力黒, 出力白) 0..255
+        public float[]   LevelsChannelGamma;  // [3] = R/G/B のガンマ
+
+        public bool          HasCurves;      // curv (複合チャンネル。UI で編集可能)
         public List<Vector2> CurvePoints;    // (入力, 出力) 0..255 空間の制御点。null = 未設定
+
+        // curv の R/G/B チャンネル別カーブ (合成へ反映のみ。UI 編集対象外)
+        public bool            HasChannelCurves;
+        public List<Vector2>[] CurveChannelPoints; // [3] = R/G/B。null 要素 = そのチャンネルは恒等
 
         public bool     HasGradientMap;      // grdm (PSD のグラデーションマップ調整レイヤー)
         public Gradient GradientMapGradient; // パース済みグラデーション (null = 未設定)
+
+        // グラデーション塗りつぶしレイヤー (GdFl)。線形/円形のみ対応、他タイプは線形フォールバック
+        public bool     HasGradientFill;
+        public Gradient GradientFillGradient; // 反転 (Rvrs) は適用済み
+        public float    GradientFillAngle;    // 度 (0 = 左→右, 90 = 下→上)
+        public bool     GradientFillRadial;   // true = 円形
+        public float    GradientFillScale = 1f; // Scl / 100 (0.1 .. 1.5 程度)
 
         public bool    HasColorBalance;      // blnc
         public Vector3 CBShadows;            // シャドウ (CR, MG, YB) 各 -100..100
@@ -122,6 +138,7 @@ namespace PSDSimpleEditor
         public byte      Opacity    = 255;
         public bool      IsVisible  = true;     // flags bit1 == 0
         public bool      IsClipping;            // clipping byte != 0 (直下のベース層でクリップ)
+        public bool      BlendClippedAsGroup = true; // clbl (クリップ群をグループとして先に合成。既定 = true)
 
         // ── レイヤー識別 ──
         public string Name = "";                // luni (UTF-16BE) を優先、無ければ Pascal 名
@@ -173,6 +190,7 @@ namespace PSDSimpleEditor
         // ── トーンカーブ (非破壊。全ピクセルレイヤーに適用可) ──
         [System.NonSerialized] public bool           UICurveEnabled;
         [System.NonSerialized] public AnimationCurve  UICurve;    // 既定: 直線 (0,0)-(1,1)
+        [System.NonSerialized] public AnimationCurve[] UICurveChannels; // [3] = R/G/B 個別カーブ (PSD 由来・UI 編集対象外)
         [System.NonSerialized] public Texture2D       _curveLut;  // 256×1 焼き込み LUT (window が管理)
 
         // ── 着色 (Colorize): ON で絶対値の色相・彩度を強制し、白黒 (彩度0) にも着色する ──
@@ -193,6 +211,9 @@ namespace PSDSimpleEditor
         [System.NonSerialized] public bool      UIGradientMapNormalize;    // true: 輝度を対象レイヤーの最暗〜最明で 0..1 に正規化
         [System.NonSerialized] public float     _gradientLumMin = 0f;      // 正規化用レンジ (window が非透明画素から計算)
         [System.NonSerialized] public float     _gradientLumMax = 1f;
+
+        // ── グラデーション塗りつぶし (GdFl) の焼き込み LUT (window が管理) ──
+        [System.NonSerialized] public Texture2D _gradientFillLut;          // 256×1 (α 込み)
 
         // ── カラーバランス (非破壊。シャドウ/中間調/ハイライトごとの色味シフト) ──
         public bool    UIColorBalanceEnabled;
