@@ -12,8 +12,10 @@ namespace PSDSimpleEditor
     ///     1 レイヤー合成するごとに Graphics.Blit(cur, next, _mat) → Swap(cur, next)。
     ///   ・分離グループ (PassThrough 以外) は RT プールから 2 枚借りて透明クリア後に
     ///     子を再帰合成し、平坦化結果を「1 枚のレイヤー」として親バッファへ合成する。
-    ///   ・クリッピングは、ベース層を透明 RT へ単独描画 (Normal ブレンド) して実効 α を
-    ///     得た RT を _ClipMaskTex としてクリッピング層へ渡す。
+    ///   ・クリッピングは Photoshop 既定 (clbl=true) ではベース+クリップ群を透明バッファで
+    ///     先に合成し、結果 1 枚をベースのブレンドモード・不透明度で背景へ合成する
+    ///     (CompositeClipGroup)。clbl=false のレイヤーはベース α を _ClipMaskTex として
+    ///     メンバーを背景バッファへ直接ブレンドする旧方式。
     ///
     /// 色空間: RT は全て RenderTextureReadWrite.Linear、戻り Texture2D も linear:true。
     /// 合成中は GL.sRGBWrite = false にして sRGB 変換が混入しないようにする
@@ -174,9 +176,15 @@ namespace PSDSimpleEditor
                 {
                     CompositeGroup(layers, i, runEnd, ref cur, ref next);
                 }
+                else if (hasClipRun && baseLayer.BlendClippedAsGroup)
+                {
+                    // ── Photoshop 既定 (clbl=true): ベース+クリップ群を先にグループ合成 ──
+                    CompositeClipGroup(layers, i, runEnd, ref cur, ref next);
+                }
                 else
                 {
-                    // ── 通常レイヤー (+ クリッピング群) ──
+                    // ── 通常レイヤー (+ clbl=false のクリッピング群) ──
+                    // clbl=false: メンバーは背景合成後のバッファへ直接ブレンドされる
                     RenderTexture clipMask = null;
                     if (hasClipRun)
                         clipMask = RenderLayerAlpha(baseLayer, null); // ベース層の実効 α
@@ -227,21 +235,95 @@ namespace PSDSimpleEditor
             var gNext = AcquireRT(clearToTransparent: false);
             CompositeList(group.Children, ref gCur, ref gNext);
 
-            // クリッピング群がある場合、グループの実効 α (平坦化結果 × 不透明度 × マスク) を先に取得
-            RenderTexture clipMask = null;
-            if (runEnd > groupIdx + 1)
-                clipMask = RenderTextureAlpha(gCur, group, null);
+            bool hasClipRun = runEnd > groupIdx + 1;
 
-            // グループ全体を 1 枚のレイヤーとして合成
-            // (_LayerRect = 全面 / _BlendMode = GroupBlendMode / _Opacity = UIOpacity / グループ自身のマスク適用)
-            BlitAsFullCanvasLayer(gCur, group, ToShaderBlendMode(group.GroupBlendMode), null, ref cur, ref next);
+            if (hasClipRun && group.BlendClippedAsGroup)
+            {
+                // ── Photoshop 既定 (clbl=true): クリップ群をグループ内容と先に合成 ──
+                // グループ内容の α をコピーで保持 (メンバー描画で gCur が変化するため)
+                var clipMask = AcquireRT(clearToTransparent: false);
+                Graphics.Blit(gCur, clipMask);
 
-            for (int j = groupIdx + 1; j < runEnd; j++)
+                for (int j = groupIdx + 1; j < runEnd; j++)
+                {
+                    var c = layers[j];
+                    if (!c.UIVisible) continue;
+                    DrawClipRunMember(c, clipMask, ref gCur, ref gNext);
+                }
+                ReleaseToPool(clipMask);
+
+                // メンバー込みの平坦化結果を 1 枚のレイヤーとして合成
+                // (グループの不透明度・マスクは群全体へかかる = Photoshop と同じ)
+                BlitAsFullCanvasLayer(gCur, group, ToShaderBlendMode(group.GroupBlendMode), null, ref cur, ref next);
+            }
+            else
+            {
+                // ── clbl=false: グループを先に合成し、メンバーは背景バッファへ直接ブレンド ──
+                RenderTexture clipMask = null;
+                if (hasClipRun)
+                    clipMask = RenderTextureAlpha(gCur, group, null); // 実効 α (× 不透明度 × マスク)
+
+                BlitAsFullCanvasLayer(gCur, group, ToShaderBlendMode(group.GroupBlendMode), null, ref cur, ref next);
+
+                for (int j = groupIdx + 1; j < runEnd; j++)
+                {
+                    var c = layers[j];
+                    if (!c.UIVisible) continue;
+                    DrawClipRunMember(c, clipMask, ref cur, ref next);
+                }
+
+                ReleaseToPool(clipMask);
+            }
+
+            ReleaseToPool(gCur);
+            ReleaseToPool(gNext);
+        }
+
+        // ─── 通常レイヤーのクリッピング群 (clbl=true) の合成 ─────────────────
+        //
+        // Photoshop の既定動作「クリップされたレイヤーをグループとしてブレンド」:
+        //   1. ベース層を不透明度 1 で透明バッファへ単独描画 (マスク・色調補正込み)
+        //   2. その α をクリップマスクとして保持
+        //   3. クリッピング層を同バッファへ各自のブレンドモードで合成
+        //   4. 平坦化結果 1 枚をベース層のブレンドモード・不透明度で背景へ合成
+        // これによりベースが乗算等でもメンバーはベースの画素とだけ先に混ざり、
+        // 背景とはベースのモードで一度だけブレンドされる。
+
+        void CompositeClipGroup(List<PSDLayer> layers, int baseIdx, int runEnd,
+                                ref RenderTexture cur, ref RenderTexture next)
+        {
+            var baseLayer = layers[baseIdx];
+
+            var gCur  = AcquireRT(clearToTransparent: true);
+            var gNext = AcquireRT(clearToTransparent: false);
+
+            // ベース層を不透明度 1 で単独描画 (不透明度は最後に群全体へかける)
+            float savedOpacity = baseLayer.UIOpacity;
+            baseLayer.UIOpacity = 1f;
+            try     { DrawLayer(baseLayer, null, ref gCur, ref gNext); }
+            finally { baseLayer.UIOpacity = savedOpacity; }
+
+            // ベース層の実効 α をコピーで保持 (メンバー描画で gCur が変化するため)
+            var clipMask = AcquireRT(clearToTransparent: false);
+            Graphics.Blit(gCur, clipMask);
+
+            for (int j = baseIdx + 1; j < runEnd; j++)
             {
                 var c = layers[j];
                 if (!c.UIVisible) continue;
-                DrawClipRunMember(c, clipMask, ref cur, ref next);
+                DrawClipRunMember(c, clipMask, ref gCur, ref gNext);
             }
+
+            // 平坦化結果をベース層のブレンドモード・不透明度で背景へ合成
+            // (マスク・色調補正はベース層の描画時に適用済みのため、ここでは適用しない)
+            var p = NewParams();
+            p.LayerTex  = gCur;
+            p.LayerRect = FullCanvasRect;
+            p.Opacity   = savedOpacity;
+            p.BlendMode = ToShaderBlendMode(baseLayer.BlendMode);
+            ApplyParams(p);
+            Graphics.Blit(cur, next, _mat);
+            Swap(ref cur, ref next);
 
             ReleaseToPool(clipMask);
             ReleaseToPool(gCur);
@@ -276,8 +358,8 @@ namespace PSDSimpleEditor
         void DrawLayer(PSDLayer layer, RenderTexture clipMask,
                        ref RenderTexture cur, ref RenderTexture next)
         {
-            // ── 調整レイヤー (ピクセルなし・SoCo なし) ──
-            if (layer.IsAdjustmentLayer && !layer.Adjustment.HasSolidColor)
+            // ── 調整レイヤー (ピクセルなし・SoCo/GdFl なし) ──
+            if (layer.IsAdjustmentLayer && !layer.Adjustment.HasSolidColor && !layer.Adjustment.HasGradientFill)
             {
                 bool hasAdj = layer.Adjustment.HasBrightnessContrast
                            || layer.Adjustment.HasHueSaturation
@@ -316,6 +398,24 @@ namespace PSDSimpleEditor
                 sp.ClipMaskTex = clipMask;
                 SetAdjustmentsFrom(ref sp, layer);
                 ApplyParams(sp);
+                Graphics.Blit(cur, next, _mat);
+                Swap(ref cur, ref next);
+                return;
+            }
+
+            // ── GdFl グラデーション塗りつぶしレイヤー: LUT + 角度/タイプで全面レイヤーとして合成 ──
+            if (layer.Adjustment.HasGradientFill && layer._gradientFillLut != null)
+            {
+                var gp = NewParams();
+                gp.LayerTex  = Texture2D.whiteTexture; // 色はシェーダーが _GradFillTex で上書きする
+                gp.LayerRect = FullCanvasRect;
+                gp.Opacity   = layer.UIOpacity;
+                gp.BlendMode = ToShaderBlendMode(layer.BlendMode);
+                SetMaskFrom(ref gp, layer);
+                gp.ClipMaskTex = clipMask;
+                SetAdjustmentsFrom(ref gp, layer);
+                SetGradientFillFrom(ref gp, layer);
+                ApplyParams(gp);
                 Graphics.Blit(cur, next, _mat);
                 Swap(ref cur, ref next);
                 return;
