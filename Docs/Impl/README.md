@@ -4,16 +4,16 @@
 独立したタスクとして切り出した指示書集。各タスクは互いに依存しないため、
 別々のエージェント/作業者が並行して着手できる。
 
-| # | ファイル | 内容 | 優先度 | 規模 |
-|---|---|---|---|---|
-| 01 | [01_fix-thrs-post-parse.md](01_fix-thrs-post-parse.md) | しきい値(thrs)/ポスタリゼーション(post) のバイナリ解釈修正 | 高 | 極小 |
-| 02 | [02_fix-curv-parse.md](02_fix-curv-parse.md) | トーンカーブ(curv) の構造ズレ修正 | 高 | 小 |
-| 03 | [03_fix-grdm-version3.md](03_fix-grdm-version3.md) | グラデーションマップ(grdm) version 3 対応 | 高 | 極小 |
-| 04 | [04_fix-export-dir-assets-prefix.md](04_fix-export-dir-assets-prefix.md) | 出力先 "Assets" プレフィックス誤判定の修正 | 低 | 極小 |
-| 05 | [05_fix-writer-empty-channels.md](05_fix-writer-empty-channels.md) | PSD 書き出し: チャンネル0本レコードの回避 + 調整レイヤー消失の警告 | 中 | 小 |
-| 06 | [06_shader-path-fallback.md](06_shader-path-fallback.md) | シェーダーパスのハードコード解消 (フォールバック追加) | 中 | 小 |
-| 07 | [07_ui-adjustment-layer-gaps.md](07_ui-adjustment-layer-gaps.md) | grdm/blnc 調整レイヤーの UI 欠落の補完 | 低 | 小 |
-| 08 | [08_misc-polish.md](08_misc-polish.md) | 細かい磨き込み (ソリッドテクスチャキャッシュ / パススルー不透明度 UI) | 低 | 極小 |
+| # | ファイル | 内容 | 優先度 | 規模 | 状態 |
+|---|---|---|---|---|---|
+| 01 | [01_fix-thrs-post-parse.md](01_fix-thrs-post-parse.md) | しきい値(thrs)/ポスタリゼーション(post) のバイナリ解釈修正 | 高 | 極小 | **済** (本編作業で実装) |
+| 02 | [02_fix-curv-parse.md](02_fix-curv-parse.md) | トーンカーブ(curv) の構造ズレ修正 | 高 | 小 | **済** (チャンネル別対応込みで本編作業が上書き実装) |
+| 03 | [03_fix-grdm-version3.md](03_fix-grdm-version3.md) | グラデーションマップ(grdm) version 3 対応 | 高 | 極小 | **済** |
+| 04 | [04_fix-export-dir-assets-prefix.md](04_fix-export-dir-assets-prefix.md) | 出力先 "Assets" プレフィックス誤判定の修正 | 低 | 極小 | **済** |
+| 05 | [05_fix-writer-empty-channels.md](05_fix-writer-empty-channels.md) | PSD 書き出し: チャンネル0本レコードの回避 + 調整レイヤー消失の警告 | 中 | 小 | **済** (調整キー書き戻し対応に伴い警告対象は Color Overlay のみに縮小済み) |
+| 06 | [06_shader-path-fallback.md](06_shader-path-fallback.md) | シェーダーパスのハードコード解消 (フォールバック追加) | 中 | 小 | **済** |
+| 07 | [07_ui-adjustment-layer-gaps.md](07_ui-adjustment-layer-gaps.md) | grdm/blnc 調整レイヤーの UI 欠落の補完 | 低 | 小 | **済** |
+| 08 | [08_misc-polish.md](08_misc-polish.md) | 細かい磨き込み (ソリッドテクスチャキャッシュ / パススルー不透明度 UI) | 低 | 極小 | (a) 済 / **(b) 未着手** |
 
 ## 全タスク共通の注意事項
 

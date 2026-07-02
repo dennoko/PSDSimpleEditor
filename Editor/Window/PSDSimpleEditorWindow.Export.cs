@@ -161,9 +161,9 @@ namespace PSDSimpleEditor
             if (lossCount > 0)
             {
                 bool proceed = EditorUtility.DisplayDialog("PSD 書き出しの注意",
-                    $"調整レイヤー・べた塗り・レイヤー効果など、PSD 書き出しで保持できない" +
+                    $"レイヤー効果 (カラーオーバーレイ) など、PSD 書き出しで保持できない" +
                     $"設定を持つレイヤーが {lossCount} 件あります。\n" +
-                    "これらは空のレイヤーとして書き出され、Photoshop で開くと見た目が変わる可能性があります。\n\n" +
+                    "効果は書き出した PSD には含まれず、Photoshop で開くと見た目が変わる可能性があります。\n\n" +
                     "続行しますか?",
                     "書き出す", "キャンセル");
                 if (!proceed) return;
@@ -318,21 +318,16 @@ namespace PSDSimpleEditor
             return tga;
         }
 
-        /// <summary>PSD 書き出しで内容を保持できないレイヤー (調整/SoCo/効果) を数える。</summary>
+        /// <summary>PSD 書き出しで内容を保持できないレイヤーを数える。
+        /// 調整レイヤー / SoCo / GdFl は追加情報キーとして書き戻されるため対象外。
+        /// 残る消失対象はレイヤー効果 (lfx2 Color Overlay) のみ。</summary>
         static int CountUnsupportedForPsdExport(List<PSDLayer> layers)
         {
             if (layers == null) return 0;
             int count = 0;
             foreach (var l in layers)
             {
-                var a = l.Adjustment;
-                bool hasUnsupported =
-                    (l.IsAdjustmentLayer && a != null &&
-                     (a.HasBrightnessContrast || a.HasHueSaturation || a.HasSolidColor ||
-                      a.HasInvert || a.HasThreshold || a.HasPosterize || a.HasLevels ||
-                      a.HasCurves || a.HasGradientMap || a.HasColorBalance))
-                    || (l.Effects != null && l.Effects.HasColorOverlay);
-                if (hasUnsupported) count++;
+                if (l.Effects != null && l.Effects.HasColorOverlay) count++;
                 count += CountUnsupportedForPsdExport(l.Children);
             }
             return count;
