@@ -179,6 +179,12 @@ namespace PSDSimpleEditor
                     SafeDestroy(ref _compositeTexture);
                     _compositeTexture = _compositor.Composite(_psdFile.Layers);
                     _needsRecomposite = false;
+
+                    // 破棄済みテクスチャをマテリアルが参照したままにならないよう、新しい合成結果を再バインドする
+                    if (_isRealtimePreviewEnabled)
+                    {
+                        ApplyRealtimePreview();
+                    }
                 }
 
                 EditorUtility.DisplayProgressBar("PSD 書き出し中", "PSD を書き出しています...", 0.6f);
