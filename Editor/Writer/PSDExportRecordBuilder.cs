@@ -125,6 +125,11 @@ namespace PSDSimpleEditor
                 rec.MaskDisabled     = layer.MaskIsDisabled;
             }
 
+            // R/G/B/A が 1 つも無ければ空チャンネルを先頭へ補う (-2 マスクのみのレコード対策)
+            bool hasColorChannel = rec.Channels.Exists(c => c.Id >= -1);
+            if (!hasColorChannel)
+                rec.Channels.InsertRange(0, EmptyChannels());
+
             return rec;
         }
 

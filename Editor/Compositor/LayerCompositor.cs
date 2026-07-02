@@ -52,16 +52,42 @@ namespace PSDSimpleEditor
             _canvasW = Mathf.Max(1, canvasW);
             _canvasH = Mathf.Max(1, canvasH);
 
-            var shader = AssetDatabase.LoadAssetAtPath<Shader>(ShaderPath);
+            var shader = LoadLayerBlendShader();
             if (shader == null)
             {
-                Debug.LogError($"[LayerCompositor] シェーダーが見つかりません: {ShaderPath}");
+                Debug.LogError("[LayerCompositor] LayerBlend.shader が見つかりません。" +
+                               "PSDSimpleEditor フォルダ内の Shader/LayerBlend.shader を確認してください。");
                 return;
             }
 
             _mat = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
             _rtA = CreateRT();
             _rtB = CreateRT();
+        }
+
+        /// <summary>
+        /// LayerBlend.shader を取得する。
+        /// 1) 既定パス → 2) シェーダー名 (Shader.Find) → 3) AssetDatabase 全体検索 の順で解決する
+        /// (フォルダ移動・リネームされた配布環境でも動作させるため)。
+        /// </summary>
+        static Shader LoadLayerBlendShader()
+        {
+            // 1) 既定パス (最速)
+            var shader = AssetDatabase.LoadAssetAtPath<Shader>(ShaderPath);
+            if (shader != null) return shader;
+
+            // 2) シェーダー宣言名で解決 (コンパイル済みならフォルダ位置に依存しない)
+            shader = Shader.Find("PSDSimpleEditor/LayerBlend");
+            if (shader != null) return shader;
+
+            // 3) アセット検索 (リネーム・移動された場合の最終手段)
+            foreach (string guid in AssetDatabase.FindAssets("LayerBlend t:Shader"))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                var s = AssetDatabase.LoadAssetAtPath<Shader>(path);
+                if (s != null && s.name == "PSDSimpleEditor/LayerBlend") return s;
+            }
+            return null;
         }
 
         public void Dispose()

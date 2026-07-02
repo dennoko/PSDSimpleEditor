@@ -68,7 +68,7 @@ namespace PSDSimpleEditor
                     break;
 
                 case "curv": // トーンカーブ
-                    HandleCurves(r, layer);
+                    HandleCurves(r, layer, len);
                     break;
 
                 case "grdm": // グラデーションマップ
@@ -176,17 +176,15 @@ namespace PSDSimpleEditor
 
         static void HandleThreshold(BigEndianBinaryReader r, PSDLayer layer)
         {
-            r.ReadUInt16();                     // version (=1)
-            ushort level = r.ReadUInt16();       // 0 .. 255
-            layer.Adjustment.HasThreshold  = true;
-            layer.Adjustment.ThresholdLevel = level;
+            ushort level = r.ReadUInt16();       // 1 .. 255 (パディング 2B は境界 seek でスキップ)
+            layer.Adjustment.HasThreshold   = true;
+            layer.Adjustment.ThresholdLevel = Mathf.Clamp(level, 0, 255);
         }
 
         static void HandlePosterize(BigEndianBinaryReader r, PSDLayer layer)
         {
-            r.ReadUInt16();                     // version (=1)
-            ushort levels = r.ReadUInt16();      // 2 .. 255
-            layer.Adjustment.HasPosterize     = true;
+            ushort levels = r.ReadUInt16();      // 2 .. 255 (パディング 2B は境界 seek でスキップ)
+            layer.Adjustment.HasPosterize    = true;
             layer.Adjustment.PosterizeLevels = Mathf.Max(2, (int)levels);
         }
 
@@ -209,43 +207,71 @@ namespace PSDSimpleEditor
             layer.Adjustment.LevelsOutputWhite = highlightOutput;
         }
 
-        static void HandleCurves(BigEndianBinaryReader r, PSDLayer layer)
+        static void HandleCurves(BigEndianBinaryReader r, PSDLayer layer, uint len)
         {
-            // 形式: version(2B, =1) + channelCount(2B) + 各チャンネル (channelId(2B) + pointCount(2B)
-            //       + pointCount × (outputValue(2B) inputValue(2B)))。
-            //       複合/コンポジットチャンネル (先頭) のみ v1 で対応する。
-            r.ReadUInt16();                       // version
-            ushort channelCount = r.ReadUInt16();
-            if (channelCount == 0) return;
+            // curv バイナリ構造 (psd-tools 準拠):
+            //   is_map(1B) + version(2B, =1) + チャンネルビットマップ(4B)
+            //   + ビットが立っているチャンネルごと (昇順): pointCount(2B) + 点 (output(2B), input(2B))×N
+            // v1 対応: 複合チャンネル (bit 0) のカーブのみ採用。is_map=1 (マップ形式) は未対応。
+            long end = r.Position + len;
 
-            r.ReadUInt16();                       // channelId (先頭チャンネル)
-            ushort pointCount = r.ReadUInt16();
-            var points = new List<Vector2>(pointCount);
-            for (int i = 0; i < pointCount; i++)
+            byte isMap = r.ReadByte();
+            if (isMap != 0) return;             // 256B ルックアップマップ形式は未対応
+
+            r.ReadUInt16();                     // version (=1)
+            uint channelBits = r.ReadUInt32();  // ビットマップ (bit 0 = 複合チャンネル)
+            if (channelBits == 0) return;
+
+            for (int bit = 0; bit < 32; bit++)
             {
-                ushort output = r.ReadUInt16();
-                ushort input  = r.ReadUInt16();
-                points.Add(new Vector2(input, output));
-            }
-            if (points.Count < 2) return;
+                if ((channelBits & (1u << bit)) == 0) continue;
+                if (r.Position + 2 > end) return;           // 想定レイアウトと不一致
 
-            layer.Adjustment.HasCurves    = true;
-            layer.Adjustment.CurvePoints = points;
+                ushort pointCount = r.ReadUInt16();
+                if (pointCount > 19) return;                 // 仕様上 2..19。超過はレイアウト不一致とみなす
+
+                if (bit == 0)
+                {
+                    // 複合チャンネル: 採用
+                    if (r.Position + pointCount * 4 > end) return;
+                    var points = new List<Vector2>(pointCount);
+                    for (int i = 0; i < pointCount; i++)
+                    {
+                        ushort output = r.ReadUInt16();
+                        ushort input  = r.ReadUInt16();
+                        points.Add(new Vector2(input, output));
+                    }
+                    if (points.Count < 2) return;
+
+                    layer.Adjustment.HasCurves   = true;
+                    layer.Adjustment.CurvePoints = points;
+                    return; // 複合チャンネルを読めたら終了 (per-channel は捨てる)
+                }
+
+                // 複合以外のチャンネル: 点列を読み飛ばす
+                long skip = pointCount * 4L;
+                if (r.Position + skip > end) return;
+                r.Skip(skip);
+            }
         }
 
         static void HandleGradientMap(BigEndianBinaryReader r, PSDLayer layer, uint len)
         {
             // grdm バイナリ構造 (libpsd / ag-psd 準拠):
-            //   version(2) reverse(1) dithered(1) name(Unicode) colorStopCount(2)
+            //   version(2) reverse(1) dithered(1)
+            //   [version >= 3 の場合のみ method(4s)]
+            //   name(Unicode) colorStopCount(2)
             //   各カラーストップ: location(4, 0..4096) midpoint(4) colorSpace(2) 色成分(2×4) colorType(2)
             //   transparencyStopCount(2) 各: location(4) midpoint(4) opacity(2, 0..100)
             // 実バイト配置が想定と異なる場合は境界チェックで検出し途中で return する
             // (呼び出し側が必ず境界 seek するため、部分読みでも全体のパースは壊れない)。
             long end = r.Position + len;
 
-            r.ReadUInt16();                 // version (=1)
+            ushort version = r.ReadUInt16(); // 1 または 3 (3 は method 4B が追加される)
             bool reverse = r.ReadByte() != 0;
             r.ReadByte();                   // dithered (プレビューには未使用)
+            if (version >= 3)
+                r.ReadAscii(4);             // method (Perc/Lnr /Gcls 等の補間方式キー。プレビューには未使用)
             r.ReadUnicodeString();          // グラデーション名 (未使用)
 
             if (r.Position + 2 > end) return;

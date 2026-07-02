@@ -51,11 +51,21 @@ namespace PSDSimpleEditor
             rt = null;
         }
 
+        const int SolidCacheMax = 64; // ドラッグ編集で無制限に増えるのを防ぐ上限
+
         // SoCo / Color Overlay 用の 1×1 ソリッドテクスチャ (色ごとにキャッシュ)
         Texture2D GetSolidTexture(Color color)
         {
             if (_solidCache.TryGetValue(color, out var cached) && cached != null)
                 return cached;
+
+            // 上限超過時は全破棄してから登録し直す (1×1 なので再生成コストは無視できる)
+            if (_solidCache.Count >= SolidCacheMax)
+            {
+                foreach (var t in _solidCache.Values)
+                    if (t != null) Object.DestroyImmediate(t);
+                _solidCache.Clear();
+            }
 
             var tex = new Texture2D(1, 1, TextureFormat.RGBA32, false, linear: true)
             { hideFlags = HideFlags.HideAndDontSave };

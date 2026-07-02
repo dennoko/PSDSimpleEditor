@@ -196,7 +196,20 @@ namespace PSDSimpleEditor
             {
                 EditorGUILayout.BeginVertical(PSDEditorTheme.LayerGroupBodyStyle);
 
-                DrawOpacitySlider(layer, 0);
+                // パススルーグループの不透明度は合成で無視される (仕様上の簡略化) ため無効化して明示する
+                bool isPassThrough = layer.GroupBlendMode == BlendMode.PassThrough;
+                using (new EditorGUI.DisabledScope(isPassThrough))
+                {
+                    DrawOpacitySlider(layer, 0);
+                }
+                if (isPassThrough)
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    GUILayout.Space(18f);
+                    GUILayout.Label("※ パススルー時は不透明度は適用されません",
+                                    PSDEditorTheme.CaptionStyle);
+                    EditorGUILayout.EndHorizontal();
+                }
 
                 if (layer.IsExpanded)
                     DrawLayerListTopDown(layer.Children, depth + 1);
@@ -245,7 +258,8 @@ namespace PSDSimpleEditor
                      layer.Adjustment != null &&
                      (layer.Adjustment.HasBrightnessContrast || layer.Adjustment.HasHueSaturation ||
                       layer.Adjustment.HasInvert || layer.Adjustment.HasThreshold || layer.Adjustment.HasPosterize ||
-                      layer.Adjustment.HasLevels || layer.Adjustment.HasCurves))
+                      layer.Adjustment.HasLevels || layer.Adjustment.HasCurves ||
+                      layer.Adjustment.HasGradientMap || layer.Adjustment.HasColorBalance))
                 prefix += "[調整] ";
 
             if (layer.Effects != null && layer.Effects.HasColorOverlay)
@@ -311,6 +325,14 @@ namespace PSDSimpleEditor
             // トーンカーブ (curv)
             if (layer.Adjustment != null && layer.Adjustment.HasCurves)
                 DrawCurveControls(layer, indent);
+
+            // カラーバランス (blnc)
+            if (layer.Adjustment != null && layer.Adjustment.HasColorBalance)
+                DrawColorBalanceControls(layer, indent);
+
+            // グラデーションマップ (grdm)
+            if (layer.Adjustment != null && layer.Adjustment.HasGradientMap)
+                DrawGradientMapControls(layer, indent);
 
             // ベタ塗りカラー (SoCo)
             if (layer.Adjustment != null && layer.Adjustment.HasSolidColor)
