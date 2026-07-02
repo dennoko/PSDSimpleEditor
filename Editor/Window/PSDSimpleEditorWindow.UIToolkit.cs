@@ -17,6 +17,7 @@ namespace PSDSimpleEditor
         private ObjectField _previewMaterialField;
         private TextField _previewSlotField;
         private Button _realtimePreviewButton;
+        private Button _mergedRefButton;
         private EnumField _exportFormatField;
         private Label _bottomInfoLabel;
         private Button _exportButton;
@@ -307,13 +308,11 @@ namespace PSDSimpleEditor
                 previewTitle.AddToClassList("grow");
                 previewHeader.Add(previewTitle);
 
-                var mergedToggle = new Toggle("マージ参照");
-                mergedToggle.value = _showMergedRef;
-                mergedToggle.RegisterValueChangedCallback(evt => {
-                    _showMergedRef = evt.newValue;
-                    Repaint();
-                });
-                previewHeader.Add(mergedToggle);
+                _mergedRefButton = new Button(ToggleMergedRef);
+                _mergedRefButton.AddToClassList("button-tool");
+                _mergedRefButton.AddToClassList("settings-button-wide");
+                UpdateMergedRefButtonState();
+                previewHeader.Add(_mergedRefButton);
                 previewPanel.Add(previewHeader);
 
                 var imguiPreview = new IMGUIContainer(() => {
@@ -485,6 +484,29 @@ namespace PSDSimpleEditor
             if (_previewMaterialField != null) _previewMaterialField.SetValueWithoutNotify(_previewMaterial);
             if (_previewSlotField != null) _previewSlotField.SetValueWithoutNotify(_previewSlotName);
             UpdateRealtimePreviewButtonState();
+            UpdateMergedRefButtonState();
+        }
+
+        void ToggleMergedRef()
+        {
+            _showMergedRef = !_showMergedRef;
+            UpdateMergedRefButtonState();
+            Repaint();
+        }
+
+        void UpdateMergedRefButtonState()
+        {
+            if (_mergedRefButton == null) return;
+            if (_showMergedRef)
+            {
+                _mergedRefButton.text = "マージ参照中";
+                _mergedRefButton.AddToClassList("button-tool-active");
+            }
+            else
+            {
+                _mergedRefButton.text = "マージ参照";
+                _mergedRefButton.RemoveFromClassList("button-tool-active");
+            }
         }
 
         void ToggleRealtimePreview()
