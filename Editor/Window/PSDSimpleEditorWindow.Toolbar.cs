@@ -5,7 +5,7 @@ using UnityEditor;
 
 namespace PSDSimpleEditor
 {
-    // ── 設定カード (PSD パス / 出力先 / 3D プレビュー反映 / 履歴) ────────────
+    // ── 設定カード (PSD パス / 出力先 / マテリアルプレビュー / 履歴) ────────────
     public partial class PSDSimpleEditorWindow
     {
         // ── 履歴ドロップダウン ───────────────────────────────────────────────

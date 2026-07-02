@@ -139,6 +139,10 @@
     width: 68px;
 }
 
+.settings-label-wide {
+    width: 108px;
+}
+
 /* テキスト入力: width 0 + flex-grow で行内の残り幅いっぱいに広げる */
 .settings-input {
     flex-grow: 1;
@@ -153,7 +157,7 @@
 }
 
 .settings-slot-label {
-    width: 48px;
+    width: 56px;
     margin-left: 8px;
 }
 
@@ -161,6 +165,12 @@
     flex-grow: 1;
     flex-shrink: 1;
     min-width: 60px;
+}
+
+.settings-button-icon {
+    width: 22px;
+    padding: 2px 4px;
+    margin-left: 2px;
 }
 
 .settings-toggle {

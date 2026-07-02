@@ -182,17 +182,19 @@ namespace PSDSimpleEditor
             sep2.AddToClassList("separator");
             card.Add(sep2);
 
-            // Row 3: 3D Preview
+            // Row 3: Material Preview (3D プレビュー反映)
             var row3 = new VisualElement();
             row3.AddToClassList("settings-row");
 
-            var previewLabel = new Label("3D反映");
+            var previewLabel = new Label("マテリアルプレビュー");
             previewLabel.AddToClassList("control-label");
-            previewLabel.AddToClassList("settings-label");
+            previewLabel.AddToClassList("settings-label-wide");
+            previewLabel.tooltip = "指定したマテリアルのテクスチャを合成結果に一時的に差し替えて、3Dビュー上で見た目を確認できます。";
             row3.Add(previewLabel);
 
             _previewMaterialField = new ObjectField { objectType = typeof(Material), value = _previewMaterial, allowSceneObjects = true };
             _previewMaterialField.AddToClassList("settings-object-input");
+            _previewMaterialField.tooltip = "プレビュー先のマテリアルを指定します。";
             _previewMaterialField.RegisterValueChangedCallback(evt => {
                 var prevMat = (Material)evt.newValue;
                 if (prevMat != _previewMaterial)
@@ -204,7 +206,7 @@ namespace PSDSimpleEditor
             });
             row3.Add(_previewMaterialField);
 
-            var slotLabel = new Label("スロット");
+            var slotLabel = new Label("テクスチャ");
             slotLabel.AddToClassList("control-label");
             slotLabel.AddToClassList("settings-slot-label");
             row3.Add(slotLabel);
@@ -212,6 +214,7 @@ namespace PSDSimpleEditor
             _previewSlotField = new TextField();
             _previewSlotField.value = _previewSlotName;
             _previewSlotField.AddToClassList("settings-slot-input");
+            _previewSlotField.tooltip = "合成結果を差し替えるマテリアルのテクスチャプロパティ名です。右の「▾」からシェーダーのテクスチャ項目を選択できます。";
             _previewSlotField.RegisterValueChangedCallback(evt => {
                 var prevSlot = evt.newValue;
                 if (prevSlot != _previewSlotName)
@@ -222,6 +225,12 @@ namespace PSDSimpleEditor
                 }
             });
             row3.Add(_previewSlotField);
+
+            var slotPickerBtn = new Button(ShowTexturePropertyMenu) { text = "▾" };
+            slotPickerBtn.AddToClassList("button-tool");
+            slotPickerBtn.AddToClassList("settings-button-icon");
+            slotPickerBtn.tooltip = "マテリアルのシェーダーからテクスチャ項目を選んで指定します。";
+            row3.Add(slotPickerBtn);
 
             _realtimePreviewButton = new Button(ToggleRealtimePreview);
             _realtimePreviewButton.AddToClassList("button-tool");
@@ -487,6 +496,50 @@ namespace PSDSimpleEditor
             UpdateMergedRefButtonState();
         }
 
+        /// <summary>プレビューマテリアルのシェーダーからテクスチャプロパティ一覧を取得し、選択メニューを表示する。</summary>
+        void ShowTexturePropertyMenu()
+        {
+            var menu = new GenericMenu();
+
+            if (_previewMaterial == null || _previewMaterial.shader == null)
+            {
+                menu.AddDisabledItem(new GUIContent("マテリアルが未設定です"));
+                menu.ShowAsContext();
+                return;
+            }
+
+            var props = MaterialEditor.GetMaterialProperties(new Material[] { _previewMaterial });
+            bool any = false;
+            foreach (var prop in props)
+            {
+                if (prop.type != MaterialProperty.PropType.Texture) continue;
+                any = true;
+
+                string propName = prop.name;
+                string display = string.IsNullOrEmpty(prop.displayName) || prop.displayName == propName
+                    ? propName
+                    : $"{prop.displayName} ({propName})";
+                display = display.Replace('/', '∕'); // GenericMenu はスラッシュをサブメニュー区切りとして解釈するため置換
+
+                menu.AddItem(new GUIContent(display), propName == _previewSlotName, () => {
+                    if (_previewSlotName != propName)
+                    {
+                        RevertRealtimePreview();
+                        _previewSlotName = propName;
+                        if (_previewSlotField != null) _previewSlotField.SetValueWithoutNotify(_previewSlotName);
+                        _needsRecomposite = true;
+                    }
+                });
+            }
+
+            if (!any)
+            {
+                menu.AddDisabledItem(new GUIContent("テクスチャ項目が見つかりません"));
+            }
+
+            menu.ShowAsContext();
+        }
+
         void ToggleMergedRef()
         {
             _showMergedRef = !_showMergedRef;
@@ -529,12 +582,12 @@ namespace PSDSimpleEditor
             if (_realtimePreviewButton == null) return;
             if (_isRealtimePreviewEnabled)
             {
-                _realtimePreviewButton.text = "反映中";
+                _realtimePreviewButton.text = "プレビュー中";
                 _realtimePreviewButton.AddToClassList("button-tool-active");
             }
             else
             {
-                _realtimePreviewButton.text = "反映";
+                _realtimePreviewButton.text = "プレビュー";
                 _realtimePreviewButton.RemoveFromClassList("button-tool-active");
             }
         }

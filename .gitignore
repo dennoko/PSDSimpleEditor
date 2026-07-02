@@ -1,2 +1,4 @@
 *.meta
-.claude/
+.claude/*
+!.claude/skills/
+.claude/skills/dennokoworks_color_schema/
