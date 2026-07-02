@@ -14,7 +14,7 @@ namespace PSDSimpleEditor
         /// </summary>
         void DrawColorRangeMaskControls(PSDLayer layer, int indent)
         {
-            layer.UIColorRangeExpanded = DrawSectionFoldout(new GUIContent("色域選択マスク", "特定の色とその周辺色を抽出した選択範囲マスクを生成します。スポイトで色を選択し、閾値で範囲を広げられます。"), layer.UIColorRangeExpanded, indent);
+            layer.UIColorRangeExpanded = DrawSectionFoldout(new GUIContent("色域選択マスク", "特定の色とその周辺色を抽出した選択範囲マスクを生成します。スポイトで色を選択し、閾値で範囲を広げられます。"), layer.UIColorRangeExpanded, indent, layer, ClipboardKind.ColorRangeMask);
             if (!layer.UIColorRangeExpanded)
             {
                 // フォールドアウトを閉じたら、このレイヤーのスポイト待機・ハイライトを解除する

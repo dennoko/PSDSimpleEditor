@@ -136,7 +136,7 @@ namespace PSDSimpleEditor
         /// テーマ管理の折りたたみ見出し (EditorGUILayout.Foldout の置き換え)。
         /// ライト/ダーク両モードで文字色が破綻しないよう ▸/▾ ボタン + クリック可能ラベルで構成する。
         /// </summary>
-        bool DrawSectionFoldout(GUIContent label, bool expanded, int indent)
+        bool DrawSectionFoldout(GUIContent label, bool expanded, int indent, PSDLayer layer, ClipboardKind kind)
         {
             bool result = expanded;
             EditorGUILayout.BeginHorizontal();
@@ -147,13 +147,14 @@ namespace PSDSimpleEditor
             if (GUILayout.Button(label, PSDEditorTheme.FoldoutLabelStyle, GUILayout.ExpandWidth(true),
                                  GUILayout.Height(RowH)))
                 result = !expanded;
+            DrawAdjustmentGearMenu(kind, layer);
             EditorGUILayout.EndHorizontal();
             return result;
         }
 
-        bool DrawSectionFoldout(string label, bool expanded, int indent)
+        bool DrawSectionFoldout(string label, bool expanded, int indent, PSDLayer layer, ClipboardKind kind)
         {
-            return DrawSectionFoldout(new GUIContent(label), expanded, indent);
+            return DrawSectionFoldout(new GUIContent(label), expanded, indent, layer, kind);
         }
 
         /// <summary>表示トグル (目のチェックボックス相当)。変更時に再合成。</summary>
