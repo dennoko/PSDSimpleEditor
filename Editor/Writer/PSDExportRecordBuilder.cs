@@ -25,8 +25,18 @@ namespace PSDSimpleEditor
                 {
                     outRecs.Add(BuildPixelRecord(layer, comp));
 
-                    // 画像クリップ合成は独立したクリッピングレイヤーとして真上に挿入する。
-                    // (ファイル格納順 = 下→上なので、直後 append = ベースの真上 = クリップ先が直下)
+                    // 非破壊調整を dPSE マーカー付きクリップ調整レイヤーとして真上に積む
+                    // (焼き込み対象レイヤーは何も積まれない)
+                    AppendAdjustmentClipRecords(layer, outRecs);
+
+                    // Color Overlay 効果はベタ塗り (SoCo) のクリッピングレイヤーへ変換する。
+                    // クリップメンバー自身の効果は適用対象が変わってしまうため変換しない (消失)。
+                    if (layer.Effects != null && layer.Effects.HasColorOverlay &&
+                        !layer.IsClipping && layer.Texture != null)
+                        outRecs.Add(BuildColorOverlayClipRecord(layer));
+
+                    // 画像クリップ合成は独立したクリッピングレイヤーとして最上段に挿入する。
+                    // (ファイル格納順 = 下→上なので、直後 append = クリップ群の最上段)
                     // 既知の制限: ベースが既に他のクリッピングメンバーを真上に持つ場合、その間に入る。
                     if (layer.UIImageClipEnabled && layer.UIImageClipTex != null)
                         outRecs.Add(BuildImageClipRecord(layer, comp));
@@ -89,8 +99,9 @@ namespace PSDSimpleEditor
             int lw = layer.Width, lh = layer.Height;
             if (layer.Texture != null && lw > 0 && lh > 0)
             {
-                // 補正/グラデーションがあれば焼き込み、無ければ素のテクスチャを読み戻す
-                Color32[] px = NeedsBake(layer) && comp != null
+                // 調整レイヤーで表現できない補正だけ画素へ焼き込み、それ以外は素のテクスチャを読み戻す
+                // (表現できる補正は AppendAdjustmentClipRecords がクリップ調整レイヤーとして書き出す)
+                Color32[] px = WillBakeAdjustments(layer) && comp != null
                     ? comp.RenderLayerForExport(layer)
                     : null;
                 if (px == null) px = PSDPixelEncoder.ReadTextureTopDown(layer.Texture);
@@ -190,27 +201,153 @@ namespace PSDSimpleEditor
             return rec;
         }
 
-        static bool NeedsBake(PSDLayer layer)
+        // ════════════════════════════════════════════════════════════════
+        //  非破壊調整のクリップ調整レイヤー化
+        // ════════════════════════════════════════════════════════════════
+
+        /// <summary>塗りつぶし系 (SoCo/GdFl) でもグループでもない、画素を持つ通常レイヤー。</summary>
+        static bool IsPlainPixelLayer(PSDLayer layer)
+        {
+            if (layer.Children != null || layer.Texture == null || layer.IsAdjustmentLayer) return false;
+            var a = layer.Adjustment;
+            return a == null || (!a.HasSolidColor && !a.HasGradientFill);
+        }
+
+        static bool HasAnyActiveAdjustment(PSDLayer layer)
         {
             return !Mathf.Approximately(layer.UIBrightness, 0f)
                 || !Mathf.Approximately(layer.UIContrast,   0f)
-                || !Mathf.Approximately(layer.UIHue,        0f)
-                || !Mathf.Approximately(layer.UISaturation, 0f)
-                || !Mathf.Approximately(layer.UILightness,  0f)
-                || layer.UIColorize
+                || HasActiveHsl(layer)
                 || layer.UIInvert
                 || layer.UIThresholdEnabled
                 || layer.UIPosterizeEnabled
-                || (layer.UILevelsEnabled && (
-                       !Mathf.Approximately(layer.UILevelsInputBlack,  0f)
-                    || !Mathf.Approximately(layer.UILevelsInputWhite,  255f)
-                    || !Mathf.Approximately(layer.UILevelsGamma,       1f)
-                    || !Mathf.Approximately(layer.UILevelsOutputBlack, 0f)
-                    || !Mathf.Approximately(layer.UILevelsOutputWhite, 255f)
-                   ))
-                || (layer.UICurveEnabled && layer._curveLut != null)
-                || (layer.UIGradientMapEnabled && layer._gradientLut != null)
+                || layer.UILevelsEnabled
+                || (layer.UICurveEnabled && layer.UICurve != null)
+                || (layer.UIGradientMapEnabled && layer.UIGradient != null)
                 || layer.UIColorBalanceEnabled;
+        }
+
+        static bool HasActiveHsl(PSDLayer layer)
+        {
+            return !Mathf.Approximately(layer.UIHue,        0f)
+                || !Mathf.Approximately(layer.UISaturation, 0f)
+                || !Mathf.Approximately(layer.UILightness,  0f)
+                || layer.UIColorize;
+        }
+
+        /// <summary>
+        /// このレイヤーの非破壊調整を従来どおり画素へ焼き込むか (= クリップ調整レイヤーで
+        /// 表現できないか)。書き出しダイアログの警告表示にも使う。
+        /// </summary>
+        internal static bool WillBakeAdjustments(PSDLayer layer)
+        {
+            if (!IsPlainPixelLayer(layer) || !HasAnyActiveAdjustment(layer)) return false;
+            // クリップメンバー自身の補正: クリップ調整レイヤーにすると適用対象が
+            // 「そのメンバー単体」から「クリップ群の合成結果」へ変わってしまう
+            if (layer.IsClipping) return true;
+            // clbl=false のベース: メンバーが背景バッファへ直接ブレンドされるため
+            // 「ブレンド前のベース画素への補正」を調整レイヤーで再現できない
+            if (!layer.BlendClippedAsGroup) return true;
+            // 輝度正規化グラデーションマップは PSD に対応する表現が無い
+            if (layer.UIGradientMapEnabled && layer.UIGradientMapNormalize) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// レイヤーの有効な非破壊調整を、dPSE マーカー付きのクリップ調整レイヤー
+        /// (ゼロ面積 + Clipping=1 + 調整キー) としてベースの直上へ積む。
+        /// 積み順はシェーダー (LayerBlend.shader ApplyAdjustments) の適用順に合わせる:
+        /// 反転 → レベル → カーブ → ポスタリ → しきい値 → 明るさ/コントラスト
+        /// → カラーバランス → 色相・彩度 → グラデーションマップ。
+        /// </summary>
+        static void AppendAdjustmentClipRecords(PSDLayer layer, List<ExportRecord> outRecs)
+        {
+            if (!IsPlainPixelLayer(layer) || WillBakeAdjustments(layer)) return;
+
+            if (layer.UIInvert)
+                outRecs.Add(BuildAdjustmentClipRecord("階調の反転",
+                    new ExportExtraBlock { Key = "nvrt", Data = new byte[0] }));
+
+            if (layer.UILevelsEnabled)
+                outRecs.Add(BuildAdjustmentClipRecord("レベル補正",
+                    PSDAdjustmentInfoWriter.EncodeLevl(layer)));
+
+            if (layer.UICurveEnabled && layer.UICurve != null)
+            {
+                var curv = PSDAdjustmentInfoWriter.EncodeCurv(layer);
+                if (curv != null)
+                    outRecs.Add(BuildAdjustmentClipRecord("トーンカーブ", curv));
+            }
+
+            if (layer.UIPosterizeEnabled)
+                outRecs.Add(BuildAdjustmentClipRecord("ポスタリゼーション",
+                    PSDAdjustmentInfoWriter.EncodePost(layer.UIPosterizeLevels)));
+
+            if (layer.UIThresholdEnabled)
+                outRecs.Add(BuildAdjustmentClipRecord("2階調化",
+                    PSDAdjustmentInfoWriter.EncodeThrs(layer.UIThresholdLevel)));
+
+            if (!Mathf.Approximately(layer.UIBrightness, 0f) || !Mathf.Approximately(layer.UIContrast, 0f))
+                outRecs.Add(BuildAdjustmentClipRecord("明るさ・コントラスト",
+                    PSDAdjustmentInfoWriter.EncodeBrit(layer.UIBrightness, layer.UIContrast),
+                    PSDAdjustmentInfoWriter.EncodeCgEd(layer.UIBrightness, layer.UIContrast)));
+
+            if (layer.UIColorBalanceEnabled)
+                outRecs.Add(BuildAdjustmentClipRecord("カラーバランス",
+                    PSDAdjustmentInfoWriter.EncodeBlnc(layer)));
+
+            if (HasActiveHsl(layer))
+                outRecs.Add(BuildAdjustmentClipRecord("色相・彩度",
+                    PSDAdjustmentInfoWriter.EncodeHue2(
+                        layer.UIHue, layer.UISaturation, layer.UILightness, layer.UIColorize)));
+
+            if (layer.UIGradientMapEnabled && layer.UIGradient != null)
+            {
+                var rec = BuildAdjustmentClipRecord("グラデーションマップ",
+                    PSDAdjustmentInfoWriter.EncodeGrdm(layer.UIGradient));
+                rec.Opacity = ToByteOpacity(layer.UIGradientMapOpacity); // 適用率 → レイヤー不透明度
+                outRecs.Add(rec);
+            }
+        }
+
+        /// <summary>ゼロ面積 + Clipping=1 + マーカー付きのクリップ調整レイヤーレコード。</summary>
+        static ExportRecord BuildAdjustmentClipRecord(string name, params ExportExtraBlock[] blocks)
+        {
+            var extra = new List<ExportExtraBlock>(blocks);
+            extra.Add(PSDAdjustmentInfoWriter.BuildClipMarkerBlock());
+            return new ExportRecord
+            {
+                Name        = name,
+                BlendKey    = "norm",
+                Opacity     = 255,
+                Clipping    = 1,
+                Flags       = 0x00, // 表示
+                Channels    = EmptyChannels(),
+                ExtraBlocks = extra,
+            };
+        }
+
+        /// <summary>
+        /// Color Overlay 効果をベタ塗り (SoCo) のクリッピングレイヤーへ変換する。
+        /// マーカーは付けない (再読み込み後はベタ塗りクリップレイヤーとして扱われ、
+        /// クリップ群合成によって効果とほぼ同じ見た目で再現される)。
+        /// </summary>
+        static ExportRecord BuildColorOverlayClipRecord(PSDLayer layer)
+        {
+            var fx = layer.Effects;
+            return new ExportRecord
+            {
+                Name        = "カラーオーバーレイ",
+                BlendKey    = PSDWriter.KeyOf(fx.OverlayBlendMode),
+                Opacity     = ToByteOpacity(fx.OverlayOpacity),
+                Clipping    = 1,
+                Flags       = 0x00,
+                Channels    = EmptyChannels(),
+                ExtraBlocks = new List<ExportExtraBlock>
+                {
+                    PSDAdjustmentInfoWriter.EncodeSoCo(fx.OverlayColor),
+                },
+            };
         }
 
         static byte ToByteOpacity(float opacity01)

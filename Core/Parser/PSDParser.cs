@@ -90,6 +90,10 @@ namespace PSDSimpleEditor
             // UI 初期値の設定 (パーサーの責務)
             PSDLayerAssembler.InitUIState(psd.Layers);
 
+            // 本ツールが書き出したクリップ調整レイヤー (dPSE マーカー付き) を
+            // ベースレイヤーの非破壊調整 (UI*) へ畳み戻す (書き出し時の逆変換)
+            PSDLayerAssembler.FoldBackToolAdjustmentClips(psd.Layers);
+
             if (vlog != null) Debug.Log(vlog.ToString());
             return psd;
         }

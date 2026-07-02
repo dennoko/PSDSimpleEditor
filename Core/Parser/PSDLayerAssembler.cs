@@ -119,6 +119,7 @@ namespace PSDSimpleEditor
                 l.UIHue        = l.Adjustment.HasHueSaturation ? l.Adjustment.Hue        : 0f;
                 l.UISaturation = l.Adjustment.HasHueSaturation ? l.Adjustment.Saturation : 0f;
                 l.UILightness  = l.Adjustment.HasHueSaturation ? l.Adjustment.Lightness  : 0f;
+                l.UIColorize   = l.Adjustment.HasHueSaturation && l.Adjustment.HueColorize;
                 l.UIInvert            = l.Adjustment.HasInvert;
                 l.UIThresholdEnabled  = l.Adjustment.HasThreshold;
                 l.UIThresholdLevel    = l.Adjustment.HasThreshold ? l.Adjustment.ThresholdLevel : 128f;
@@ -164,6 +165,126 @@ namespace PSDSimpleEditor
                 }
 
                 InitUIState(l.Children);
+            }
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        //  本ツール製クリップ調整レイヤーの畳み戻し
+        //  (PSDExportRecordBuilder.AppendAdjustmentClipRecords の逆変換)
+        // ════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// dPSE マーカー付きのクリップ調整レイヤーを直下のピクセルレイヤーの UI* へ吸収し、
+        /// ツリーから除去する (InitUIState 実行後に呼ぶこと)。
+        /// Photoshop 側でマスク付与・非表示化・不透明度変更・ブレンド変更されたものは
+        /// 情報を壊さないよう畳み戻さず通常の調整レイヤーとして残す。
+        /// </summary>
+        internal static void FoldBackToolAdjustmentClips(List<PSDLayer> layers)
+        {
+            if (layers == null) return;
+            for (int i = 0; i < layers.Count; i++)
+            {
+                var baseLayer = layers[i];
+                FoldBackToolAdjustmentClips(baseLayer.Children);
+
+                // 畳み戻し先はピクセルレイヤーのみ (マーカー自身・グループ・調整レイヤーは対象外)
+                if (baseLayer.Children != null || baseLayer.Texture == null ||
+                    baseLayer.IsAdjustmentLayer || baseLayer.IsToolAdjustmentClip) continue;
+
+                // 直上に連続するマーカー付きレイヤーを順に吸収する
+                // (非対象レイヤーが現れた時点で停止 = 適用順を壊さない)
+                while (i + 1 < layers.Count && CanFoldBack(layers[i + 1]))
+                {
+                    AbsorbAdjustmentClip(baseLayer, layers[i + 1]);
+                    layers.RemoveAt(i + 1);
+                }
+            }
+        }
+
+        static bool CanFoldBack(PSDLayer m)
+        {
+            if (!m.IsToolAdjustmentClip || !m.IsClipping) return false;
+            if (m.Children != null || !m.IsAdjustmentLayer) return false;   // ピクセルを持つ = 対象外
+            if (m.HasMask && m.MaskTexture != null) return false;           // マスクが付与された
+            if (!m.IsVisible) return false;                                 // 非表示化された
+            if (m.BlendMode != BlendMode.Normal) return false;              // ブレンドが変更された
+            // グラデーションマップは不透明度に適用率を載せて書き出すため不透明度変更を許容する
+            bool isGradientMap = m.Adjustment != null && m.Adjustment.HasGradientMap;
+            if (!isGradientMap && m.Opacity != 255) return false;           // 不透明度で効果が弱められた
+            return true;
+        }
+
+        static void AbsorbAdjustmentClip(PSDLayer b, PSDLayer m)
+        {
+            var a = m.Adjustment;
+            if (a == null) return;
+
+            if (a.HasInvert) b.UIInvert = true;
+
+            if (a.HasThreshold)
+            {
+                b.UIThresholdEnabled = true;
+                b.UIThresholdLevel   = m.UIThresholdLevel;
+            }
+
+            if (a.HasPosterize)
+            {
+                b.UIPosterizeEnabled = true;
+                b.UIPosterizeLevels  = m.UIPosterizeLevels;
+            }
+
+            if (a.HasBrightnessContrast)
+            {
+                b.UIBrightness = m.UIBrightness;
+                b.UIContrast   = m.UIContrast;
+            }
+
+            if (a.HasHueSaturation)
+            {
+                b.UIHue        = m.UIHue;
+                b.UISaturation = m.UISaturation;
+                b.UILightness  = m.UILightness;
+                b.UIColorize   = m.UIColorize;
+            }
+
+            if (a.HasLevels)
+            {
+                b.UILevelsEnabled     = true;
+                b.UILevelsInputBlack  = m.UILevelsInputBlack;
+                b.UILevelsInputWhite  = m.UILevelsInputWhite;
+                b.UILevelsGamma       = m.UILevelsGamma;
+                b.UILevelsOutputBlack = m.UILevelsOutputBlack;
+                b.UILevelsOutputWhite = m.UILevelsOutputWhite;
+                // R/G/B チャンネル別レコードは合成・書き出しとも Adjustment 側を参照する
+                b.Adjustment.HasChannelLevels    = a.HasChannelLevels;
+                b.Adjustment.LevelsChannelRanges = a.LevelsChannelRanges;
+                b.Adjustment.LevelsChannelGamma  = a.LevelsChannelGamma;
+            }
+
+            if (a.HasCurves && m.UICurve != null)
+            {
+                b.UICurveEnabled  = true;
+                b.UICurve         = m.UICurve;
+                b.UICurveChannels = m.UICurveChannels;
+                // チャンネル別カーブの書き戻し (EncodeCurv) は Adjustment 側を参照する
+                b.Adjustment.HasChannelCurves   = a.HasChannelCurves;
+                b.Adjustment.CurveChannelPoints = a.CurveChannelPoints;
+            }
+
+            if (a.HasColorBalance)
+            {
+                b.UIColorBalanceEnabled  = true;
+                b.UICBShadows            = m.UICBShadows;
+                b.UICBMidtones           = m.UICBMidtones;
+                b.UICBHighlights         = m.UICBHighlights;
+                b.UICBPreserveLuminosity = m.UICBPreserveLuminosity;
+            }
+
+            if (a.HasGradientMap && m.UIGradient != null)
+            {
+                b.UIGradientMapEnabled = true;
+                b.UIGradient           = m.UIGradient;
+                b.UIGradientMapOpacity = m.UIOpacity; // 書き出し時に適用率をレイヤー不透明度へ載せている
             }
         }
 

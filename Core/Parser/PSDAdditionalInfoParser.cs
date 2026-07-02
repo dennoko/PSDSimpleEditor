@@ -88,6 +88,10 @@ namespace PSDSimpleEditor
                     layer.BlendClippedAsGroup = r.ReadByte() != 0;
                     break;
 
+                case "dPSE": // 本ツール製クリップ調整レイヤーのマーカー (読み込み時に UI* へ畳み戻す)
+                    layer.IsToolAdjustmentClip = true;
+                    break;
+
                 default:
                     // その他のキーは読まずにスキップ (境界 seek は呼び出し側)
                     break;
@@ -152,6 +156,15 @@ namespace PSDSimpleEditor
             else
             {
                 return;
+            }
+
+            if (colorization != 0)
+            {
+                // 着色モードの値はレンジが異なる (hue 0..360 / saturation 0..100) ため
+                // ツール空間 (hue -180..180 / saturation -100..100) へ変換して保持する
+                layer.Adjustment.HueColorize = true;
+                h = (short)(h > 180 ? h - 360 : h);
+                s = (short)Mathf.Clamp(s * 2 - 100, -100, 100);
             }
 
             layer.Adjustment.HasHueSaturation = true;

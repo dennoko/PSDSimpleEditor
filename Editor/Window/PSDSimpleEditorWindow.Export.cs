@@ -157,15 +157,26 @@ namespace PSDSimpleEditor
             string savePath = EditorUtility.SaveFilePanel("PSD として保存", dir, defaultName, "psd");
             if (string.IsNullOrEmpty(savePath)) return;
 
-            int lossCount = CountUnsupportedForPsdExport(_psdFile.Layers);
-            if (lossCount > 0)
+            int bakeCount = 0, overlayConvert = 0, overlayLost = 0;
+            CountPsdExportConversions(_psdFile.Layers, ref bakeCount, ref overlayConvert, ref overlayLost);
+            if (bakeCount > 0 || overlayConvert > 0 || overlayLost > 0)
             {
+                var sb = new System.Text.StringBuilder();
+                if (bakeCount > 0)
+                    sb.AppendLine($"・{bakeCount} 件のレイヤーは補正を画素へ焼き込んで書き出します\n" +
+                                  "  (クリッピング中のレイヤーの補正や輝度正規化グラデーションマップは\n" +
+                                  "   調整レイヤーで表現できないため)。");
+                if (overlayConvert > 0)
+                    sb.AppendLine($"・{overlayConvert} 件のカラーオーバーレイ効果はベタ塗りのクリッピング" +
+                                  "レイヤーへ変換されます。");
+                if (overlayLost > 0)
+                    sb.AppendLine($"・クリッピング中のレイヤーが持つカラーオーバーレイ効果 {overlayLost} 件は" +
+                                  "書き出しに含まれません。");
+                sb.AppendLine();
+                sb.Append("続行しますか?");
+
                 bool proceed = EditorUtility.DisplayDialog("PSD 書き出しの注意",
-                    $"レイヤー効果 (カラーオーバーレイ) など、PSD 書き出しで保持できない" +
-                    $"設定を持つレイヤーが {lossCount} 件あります。\n" +
-                    "効果は書き出した PSD には含まれず、Photoshop で開くと見た目が変わる可能性があります。\n\n" +
-                    "続行しますか?",
-                    "書き出す", "キャンセル");
+                    sb.ToString(), "書き出す", "キャンセル");
                 if (!proceed) return;
             }
 
@@ -324,19 +335,26 @@ namespace PSDSimpleEditor
             return tga;
         }
 
-        /// <summary>PSD 書き出しで内容を保持できないレイヤーを数える。
-        /// 調整レイヤー / SoCo / GdFl は追加情報キーとして書き戻されるため対象外。
-        /// 残る消失対象はレイヤー効果 (lfx2 Color Overlay) のみ。</summary>
-        static int CountUnsupportedForPsdExport(List<PSDLayer> layers)
+        /// <summary>PSD 書き出しで元のまま保持できないレイヤーを数える。
+        /// 調整レイヤー / SoCo / GdFl は追加情報キー、ピクセルレイヤーの非破壊調整は
+        /// クリップ調整レイヤーとして書き出されるため対象外。
+        /// bake = 補正を画素へ焼き込むレイヤー (クリッピング中の補正・輝度正規化グラデマップ)、
+        /// overlayConvert = ベタ塗りクリッピングレイヤーへ変換されるカラーオーバーレイ、
+        /// overlayLost = 変換できず消失するカラーオーバーレイ (クリップメンバー上)。</summary>
+        static void CountPsdExportConversions(List<PSDLayer> layers,
+            ref int bake, ref int overlayConvert, ref int overlayLost)
         {
-            if (layers == null) return 0;
-            int count = 0;
+            if (layers == null) return;
             foreach (var l in layers)
             {
-                if (l.Effects != null && l.Effects.HasColorOverlay) count++;
-                count += CountUnsupportedForPsdExport(l.Children);
+                if (PSDExportRecordBuilder.WillBakeAdjustments(l)) bake++;
+                if (l.Effects != null && l.Effects.HasColorOverlay)
+                {
+                    if (!l.IsClipping && l.Texture != null && l.Children == null) overlayConvert++;
+                    else overlayLost++;
+                }
+                CountPsdExportConversions(l.Children, ref bake, ref overlayConvert, ref overlayLost);
             }
-            return count;
         }
     }
 }

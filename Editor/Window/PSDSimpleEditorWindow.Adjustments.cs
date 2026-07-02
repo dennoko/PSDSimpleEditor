@@ -464,9 +464,9 @@ namespace PSDSimpleEditor
             return g;
         }
 
-        /// <summary>PSD からインポートしたグラデーションマップ (grdm) / グラデーション塗りつぶし (GdFl)
-        /// レイヤーの LUT をロード直後に焼く (ツリー再帰)。</summary>
-        void BakeImportedGradientLuts(System.Collections.Generic.List<PSDLayer> layers)
+        /// <summary>PSD からインポートしたグラデーションマップ (grdm) / グラデーション塗りつぶし (GdFl) /
+        /// トーンカーブ (curv、畳み戻されたものを含む) の LUT をロード直後に焼く (ツリー再帰)。</summary>
+        void BakeImportedLuts(System.Collections.Generic.List<PSDLayer> layers)
         {
             if (layers == null) return;
             foreach (var l in layers)
@@ -475,7 +475,9 @@ namespace PSDSimpleEditor
                     EnsureGradientLut(l);
                 if (l.Adjustment != null && l.Adjustment.HasGradientFill && l.Adjustment.GradientFillGradient != null)
                     BakeGradientFillLut(l);
-                BakeImportedGradientLuts(l.Children);
+                if (l.UICurveEnabled)
+                    EnsureCurveLut(l);
+                BakeImportedLuts(l.Children);
             }
         }
 

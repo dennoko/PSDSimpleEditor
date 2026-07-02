@@ -14,6 +14,7 @@
 | 06 | [06_shader-path-fallback.md](06_shader-path-fallback.md) | シェーダーパスのハードコード解消 (フォールバック追加) | 中 | 小 | **済** |
 | 07 | [07_ui-adjustment-layer-gaps.md](07_ui-adjustment-layer-gaps.md) | grdm/blnc 調整レイヤーの UI 欠落の補完 | 低 | 小 | **済** |
 | 08 | [08_misc-polish.md](08_misc-polish.md) | 細かい磨き込み (ソリッドテクスチャキャッシュ / パススルー不透明度 UI) | 低 | 極小 | (a) 済 / **(b) 未着手** |
+| 09 | [09_nondestructive-adjustments-as-clip-layers.md](09_nondestructive-adjustments-as-clip-layers.md) | ピクセルレイヤーの非破壊調整をクリップ調整レイヤーとして書き出し / 読み込みで畳み戻し | 高 | 中 | **済** |
 
 ## 全タスク共通の注意事項
 

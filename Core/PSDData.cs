@@ -64,6 +64,7 @@ namespace PSDSimpleEditor
         public float Hue;           // -180 .. 180
         public float Saturation;    // -100 .. 100
         public float Lightness;     // -100 .. 100
+        public bool  HueColorize;   // hue2 の colorization フラグ (着色モード。値はツール空間へ変換済み)
 
         public bool  HasSolidColor;          // SoCo
         public Color SolidColor;
@@ -229,6 +230,11 @@ namespace PSDSimpleEditor
         [System.NonSerialized] public bool  UIColorRangeExpanded;
         [System.NonSerialized] public Color UIColorRangeTarget    = Color.white; // 対象色
         [System.NonSerialized] public float UIColorRangeThreshold = 0.1f;        // 閾値 0..1 (RGB 正規化距離)
+
+        // ── 本ツール製クリップ調整レイヤーの識別 (追加情報キー dPSE) ──
+        // 書き出し時にピクセルレイヤーの非破壊調整をクリップ調整レイヤーへ変換した印。
+        // 読み込み時にベースレイヤーの UI* へ畳み戻す対象かどうかの判定に使う。
+        public bool IsToolAdjustmentClip;
 
         // ── ヘルパー ──
         public bool IsAdjustmentLayer => Width <= 0 || Height <= 0;

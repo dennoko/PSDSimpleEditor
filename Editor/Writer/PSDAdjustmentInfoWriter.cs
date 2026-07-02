@@ -15,10 +15,20 @@ namespace PSDSimpleEditor
     // ════════════════════════════════════════════════════════════════
     internal static class PSDAdjustmentInfoWriter
     {
+        /// <summary>本ツール製クリップ調整レイヤーを識別する追加情報キー。
+        /// 読み込み時にベースレイヤーの UI* へ畳み戻す対象の印になる。
+        /// (Photoshop 等は未知キーを保存時に破棄するため、外部で編集された
+        ///  ファイルは自動的に通常の調整レイヤーとして扱われる)</summary>
+        internal const string ClipMarkerKey = "dPSE";
+
+        /// <summary>クリップ調整レイヤーのマーカーブロック (version 1)。</summary>
+        internal static ExportExtraBlock BuildClipMarkerBlock()
+            => new ExportExtraBlock { Key = ClipMarkerKey, Data = new byte[] { 0, 0, 0, 1 } };
+
         /// <summary>
         /// レイヤーが書き戻すべき追加情報ブロック群を組み立てる。対象外・内容なしは null。
         /// 対象: ゼロ面積の調整レイヤー / SoCo / GdFl。ピクセルレイヤーの非破壊補正は
-        /// RenderLayerForExport で画素へ焼き込まれるため対象外。
+        /// PSDExportRecordBuilder がクリップ調整レイヤーとして書き出すため対象外。
         /// </summary>
         internal static List<ExportExtraBlock> BuildBlocks(PSDLayer layer)
         {
@@ -41,7 +51,7 @@ namespace PSDSimpleEditor
             }
 
             if (a.HasHueSaturation)
-                blocks.Add(EncodeHue2(layer.UIHue, layer.UISaturation, layer.UILightness));
+                blocks.Add(EncodeHue2(layer.UIHue, layer.UISaturation, layer.UILightness, layer.UIColorize));
 
             if (a.HasInvert && layer.UIInvert)
                 blocks.Add(new ExportExtraBlock { Key = "nvrt", Data = new byte[0] });
@@ -94,7 +104,7 @@ namespace PSDSimpleEditor
 
         // brit (旧形式): brightness(2) contrast(2) mean(2) labOnly(1) + パディング(1)。
         // 旧形式のレンジは ±100 のためクランプする (正確な値は CgEd 側が持つ)
-        static ExportExtraBlock EncodeBrit(float brightness, float contrast) => new ExportExtraBlock
+        internal static ExportExtraBlock EncodeBrit(float brightness, float contrast) => new ExportExtraBlock
         {
             Key = "brit",
             Data = Build(w =>
@@ -108,7 +118,7 @@ namespace PSDSimpleEditor
         };
 
         // thrs: level(2) + パディング(2)。version フィールドは存在しない
-        static ExportExtraBlock EncodeThrs(float level) => new ExportExtraBlock
+        internal static ExportExtraBlock EncodeThrs(float level) => new ExportExtraBlock
         {
             Key = "thrs",
             Data = Build(w =>
@@ -119,7 +129,7 @@ namespace PSDSimpleEditor
         };
 
         // post: levels(2) + パディング(2)。version フィールドは存在しない
-        static ExportExtraBlock EncodePost(float levels) => new ExportExtraBlock
+        internal static ExportExtraBlock EncodePost(float levels) => new ExportExtraBlock
         {
             Key = "post",
             Data = Build(w =>
@@ -130,7 +140,7 @@ namespace PSDSimpleEditor
         };
 
         // blnc: (CR,MG,YB)×シャドウ/中間調/ハイライト の int16×9 + preserveLum(1) + パディング(1)
-        static ExportExtraBlock EncodeBlnc(PSDLayer layer) => new ExportExtraBlock
+        internal static ExportExtraBlock EncodeBlnc(PSDLayer layer) => new ExportExtraBlock
         {
             Key = "blnc",
             Data = Build(w =>
@@ -163,20 +173,36 @@ namespace PSDSimpleEditor
 
         // hue2: version(2) colorization(1) pad(1) + colorization 値 3×int16 + master 値 3×int16
         //       + 6 色域レコード (レンジ 4×int16 + 補正 3×int16)
-        static ExportExtraBlock EncodeHue2(float hue, float saturation, float lightness) => new ExportExtraBlock
+        // colorize=true では着色モードとして書く。ツール空間 (hue -180..180 / sat -100..100) から
+        // Photoshop の着色レンジ (hue 0..360 / sat 0..100) へ変換する (パーサー側の逆変換)
+        internal static ExportExtraBlock EncodeHue2(float hue, float saturation, float lightness, bool colorize) => new ExportExtraBlock
         {
             Key = "hue2",
             Data = Build(w =>
             {
-                w.WriteUInt16(2);  // version
-                w.Write((byte)0);  // colorization フラグ (常に master 値として書く)
-                w.Write((byte)0);  // パディング
-                // colorization 用スロット (未使用。Photoshop 既定値)
-                w.WriteInt16(0); w.WriteInt16(25); w.WriteInt16(0);
-                // master 値
-                w.WriteInt16(RoundClamp(hue,       -180, 180));
-                w.WriteInt16(RoundClamp(saturation, -100, 100));
-                w.WriteInt16(RoundClamp(lightness,  -100, 100));
+                w.WriteUInt16(2);                    // version
+                w.Write((byte)(colorize ? 1 : 0));   // colorization フラグ
+                w.Write((byte)0);                    // パディング
+                if (colorize)
+                {
+                    // colorization 用スロット (着色値)
+                    int ph = Mathf.RoundToInt(hue);
+                    ph = ((ph % 360) + 360) % 360;   // -180..180 → 0..360 の絶対色相
+                    w.WriteInt16((short)ph);
+                    w.WriteInt16(RoundClamp(saturation * 0.5f + 50f, 0, 100));
+                    w.WriteInt16(RoundClamp(lightness, -100, 100));
+                    // master 値 (未使用)
+                    w.WriteInt16(0); w.WriteInt16(0); w.WriteInt16(0);
+                }
+                else
+                {
+                    // colorization 用スロット (未使用。Photoshop 既定値)
+                    w.WriteInt16(0); w.WriteInt16(25); w.WriteInt16(0);
+                    // master 値
+                    w.WriteInt16(RoundClamp(hue,       -180, 180));
+                    w.WriteInt16(RoundClamp(saturation, -100, 100));
+                    w.WriteInt16(RoundClamp(lightness,  -100, 100));
+                }
                 // 6 色域レコード (レンジは既定値、補正値は 0)
                 for (int i = 0; i < 6; i++)
                 {
@@ -187,7 +213,7 @@ namespace PSDSimpleEditor
         };
 
         // levl: version(2, =2) + 10 バイトレコード × 29 ([0]=複合, [1..3]=R/G/B, 残りは恒等)
-        static ExportExtraBlock EncodeLevl(PSDLayer layer) => new ExportExtraBlock
+        internal static ExportExtraBlock EncodeLevl(PSDLayer layer) => new ExportExtraBlock
         {
             Key = "levl",
             Data = Build(w =>
@@ -229,7 +255,7 @@ namespace PSDSimpleEditor
         // curv: is_map(1, =0) + version(2, =1) + チャンネルビットマップ(4)
         //       + チャンネルごと (ビット昇順): pointCount(2) + 点 (output(2), input(2))×N
         //       複合カーブは UICurve (編集値)、R/G/B はパース済み点列をそのまま書き戻す
-        static ExportExtraBlock EncodeCurv(PSDLayer layer)
+        internal static ExportExtraBlock EncodeCurv(PSDLayer layer)
         {
             var composite = CurvePointsFrom(layer.UICurve);
             if (composite == null) composite = layer.Adjustment.CurvePoints;
@@ -310,7 +336,7 @@ namespace PSDSimpleEditor
         //       + カラーストップ (location(4, 0..4096) midpoint(4, %) colorSpace(2) 成分 4×2 pad(2))
         //       + 透明ストップ (location(4) midpoint(4) opacity(2, %))
         //       + 末尾フィールド (ソリッドグラデーションの標準値)
-        static ExportExtraBlock EncodeGrdm(Gradient gradient)
+        internal static ExportExtraBlock EncodeGrdm(Gradient gradient)
         {
             var colorKeys = gradient.colorKeys;
             var alphaKeys = gradient.alphaKeys;
@@ -371,7 +397,7 @@ namespace PSDSimpleEditor
         // ────────────────────────────────────────────────────────────────
 
         // SoCo: version(4, =16) + ディスクリプタ { 'Clr ' (Objc RGBC) { Rd/Grn/Bl (doub 0..255) } }
-        static ExportExtraBlock EncodeSoCo(Color color) => new ExportExtraBlock
+        internal static ExportExtraBlock EncodeSoCo(Color color) => new ExportExtraBlock
         {
             Key = "SoCo",
             Data = Build(w =>
@@ -386,7 +412,7 @@ namespace PSDSimpleEditor
         };
 
         // CgEd: 新形式の明るさ・コントラスト (レンジ ±150 / -50..100 の正確な値を持つ)
-        static ExportExtraBlock EncodeCgEd(float brightness, float contrast) => new ExportExtraBlock
+        internal static ExportExtraBlock EncodeCgEd(float brightness, float contrast) => new ExportExtraBlock
         {
             Key = "CgEd",
             Data = Build(w =>
