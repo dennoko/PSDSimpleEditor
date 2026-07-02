@@ -111,8 +111,9 @@ namespace PSDSimpleEditor
             if (layer.Adjustment.HasInvert)             adj += " Invert";
             if (layer.Adjustment.HasThreshold)          adj += $" Threshold({layer.Adjustment.ThresholdLevel})";
             if (layer.Adjustment.HasPosterize)          adj += $" Posterize({layer.Adjustment.PosterizeLevels})";
-            if (layer.Adjustment.HasLevels)             adj += $" Levels({layer.Adjustment.LevelsInputBlack},{layer.Adjustment.LevelsInputWhite},{layer.Adjustment.LevelsGamma},{layer.Adjustment.LevelsOutputBlack},{layer.Adjustment.LevelsOutputWhite})";
-            if (layer.Adjustment.HasCurves)             adj += $" Curves({layer.Adjustment.CurvePoints?.Count ?? 0}pts)";
+            if (layer.Adjustment.HasLevels)             adj += $" Levels({layer.Adjustment.LevelsInputBlack},{layer.Adjustment.LevelsInputWhite},{layer.Adjustment.LevelsGamma},{layer.Adjustment.LevelsOutputBlack},{layer.Adjustment.LevelsOutputWhite}){(layer.Adjustment.HasChannelLevels ? "+ch" : "")}";
+            if (layer.Adjustment.HasCurves)             adj += $" Curves({layer.Adjustment.CurvePoints?.Count ?? 0}pts){(layer.Adjustment.HasChannelCurves ? "+ch" : "")}";
+            if (layer.Adjustment.HasGradientFill)       adj += $" GdFl({(layer.Adjustment.GradientFillRadial ? "円形" : "線形")},{layer.Adjustment.GradientFillAngle}°)";
             if (layer.Effects != null && layer.Effects.HasColorOverlay) adj += " ColorOverlay";
 
             vlog.AppendLine(

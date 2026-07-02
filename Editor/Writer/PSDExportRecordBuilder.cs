@@ -125,6 +125,22 @@ namespace PSDSimpleEditor
                 rec.MaskDisabled     = layer.MaskIsDisabled;
             }
 
+            // R/G/B/A チャンネルが 1 つも無いレコード (調整レイヤー等) は他アプリで
+            // 読み込みエラーの原因になるため、空のカラーチャンネルを先頭へ補う
+            bool hasColorChannel = rec.Channels.Exists(c => c.Id >= -1);
+            if (!hasColorChannel)
+                rec.Channels.InsertRange(0, EmptyChannels());
+
+            // 調整レイヤー / SoCo / GdFl の内容を追加情報ブロックとして書き戻す
+            rec.ExtraBlocks = PSDAdjustmentInfoWriter.BuildBlocks(layer);
+
+            // clbl (クリップ群をグループとしてブレンド) が既定値 (true) 以外なら保持する
+            if (!layer.BlendClippedAsGroup)
+            {
+                if (rec.ExtraBlocks == null) rec.ExtraBlocks = new List<ExportExtraBlock>();
+                rec.ExtraBlocks.Add(new ExportExtraBlock { Key = "clbl", Data = new byte[] { 0, 0, 0, 0 } });
+            }
+
             return rec;
         }
 

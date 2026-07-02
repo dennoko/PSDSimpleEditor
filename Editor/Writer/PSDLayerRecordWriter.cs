@@ -60,7 +60,21 @@ namespace PSDSimpleEditor
             if (rec.LsctType != 0)
                 WriteAdditionalLsct(w, rec);
 
+            // 追加情報: 調整レイヤーキー / SoCo / GdFl / clbl 等
+            if (rec.ExtraBlocks != null)
+                foreach (var block in rec.ExtraBlocks)
+                    WriteAdditionalBlock(w, block);
+
             PSDWriter.Backpatch(w, extraLenPos, (uint)(w.Position - extraStart));
+        }
+
+        static void WriteAdditionalBlock(BigEndianBinaryWriter w, ExportExtraBlock block)
+        {
+            w.WriteAscii("8BIM");
+            w.WriteAscii(block.Key);
+            w.WriteUInt32((uint)block.Data.Length); // 宣言長はパディング前の実長
+            w.WriteBytesExact(block.Data);
+            if ((block.Data.Length & 1) != 0) w.Write((byte)0); // 偶数境界へパディング
         }
 
         static void WriteAdditionalLuni(BigEndianBinaryWriter w, string name)

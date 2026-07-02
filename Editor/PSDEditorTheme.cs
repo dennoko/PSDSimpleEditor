@@ -112,10 +112,10 @@ namespace PSDSimpleEditor
             if (!_texSurface0)    _texSurface0    = MakeTex(Surface0);
             if (!_texSurface1)    _texSurface1    = MakeTex(Surface1);
             if (!_texSurface2)    _texSurface2    = MakeTex(Surface2);
-            if (!_texCard)        _texCard        = MakeBorderedTex(Surface1, Outline);
-            if (!_texAccentCard)  _texAccentCard  = MakeBorderedTex(Surface2, Outline);
-            if (!_texGroupHeader) _texGroupHeader = MakeBorderedTex(Surface2, Outline);
-            if (!_texSearchField) _texSearchField = MakeBorderedTex(Surface2, Hex(0x5a5a5a));
+            if (!_texCard)        _texCard        = MakeBorderedTex(Surface1, Outline, 64);
+            if (!_texAccentCard)  _texAccentCard  = MakeBorderedTex(Surface2, Outline, 64);
+            if (!_texGroupHeader) _texGroupHeader = MakeBorderedTex(Surface2, Outline, 64);
+            if (!_texSearchField) _texSearchField = MakeBorderedTex(Surface2, Hex(0x5a5a5a), 64);
         }
 
         private static void BuildStyles()
@@ -480,29 +480,9 @@ namespace PSDSimpleEditor
             FixAllTextColors(GUI.skin.textField,       TextPrimary);
             FixAllTextColors(GUI.skin.label,           TextPrimary);
 
-            // ─ 背景テクスチャをすべての状態でダーク色＋ボーダーに固定
-            FixAllStateBackgrounds(EditorStyles.objectField, _texSearchField);
-            EditorStyles.objectField.border = new RectOffset(1, 1, 1, 1);
-
-            FixAllStateBackgrounds(EditorStyles.numberField, _texSearchField);
-            EditorStyles.numberField.border = new RectOffset(1, 1, 1, 1);
-
-            FixAllStateBackgrounds(EditorStyles.textField,   _texSearchField);
-            EditorStyles.textField.border = new RectOffset(1, 1, 1, 1);
-            EditorStyles.textField.padding = new RectOffset(6, 6, 3, 3);
-
-            FixAllStateBackgrounds(GUI.skin.textField,       _texSearchField);
-            GUI.skin.textField.border = new RectOffset(1, 1, 1, 1);
-            GUI.skin.textField.padding = new RectOffset(6, 6, 3, 3);
-
             // ── カーソルと選択範囲の色を固定 (ライトモードの黒カーソル等を防止)
             GUI.skin.settings.cursorColor = TextPrimary;
             GUI.skin.settings.selectionColor = new Color(1f, 1f, 1f, 0.25f);
-
-            // ポップアップは枠線付きカードテクスチャを使用し、9スライス境界を1pxに設定して引き伸ばし縞ノイズを解消
-            FixAllStateBackgrounds(EditorStyles.popup, _texCard);
-            EditorStyles.popup.border = new RectOffset(1, 1, 1, 1);
-            EditorStyles.popup.padding = new RectOffset(6, 18, 4, 4);
         }
 
         /// <summary>OnGUI 末尾の finally ブロックで必ず呼ぶ。EditorStyles を元に戻す。</summary>
@@ -588,9 +568,8 @@ namespace PSDSimpleEditor
             return tex;
         }
 
-        private static Texture2D MakeBorderedTex(Color fillColor, Color borderColor)
+        private static Texture2D MakeBorderedTex(Color fillColor, Color borderColor, int size = 64)
         {
-            const int size = 3;
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
             for (int y = 0; y < size; y++)
                 for (int x = 0; x < size; x++)

@@ -50,6 +50,19 @@ namespace PSDSimpleEditor
 
         public void WriteInt32(int value) => WriteUInt32((uint)value);
 
+        /// <summary>ビッグエンディアン 64bit 整数を書き込む。</summary>
+        public void WriteInt64BE(long value)
+        {
+            WriteUInt32((uint)(value >> 32));
+            WriteUInt32((uint)(value & 0xFFFFFFFF));
+        }
+
+        /// <summary>ビッグエンディアン IEEE754 double を書き込む (ディスクリプタの 'doub'/'UntF' 用)。</summary>
+        public void WriteDoubleBE(double value)
+        {
+            WriteInt64BE(BitConverter.DoubleToInt64Bits(value));
+        }
+
         // ─── バイト列・文字列 ────────────────────────────────────────────
 
         /// <summary>バイト列をそのまま書き込む。</summary>

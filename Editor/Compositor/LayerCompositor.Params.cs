@@ -29,7 +29,10 @@ namespace PSDSimpleEditor
             public bool    Posterize;    // true → ポスタリゼーション有効
             public float   PosterizeLevels;  // 2..255
             public float   LevelsInBlack, LevelsInWhite, LevelsGamma, LevelsOutBlack, LevelsOutWhite; // 0..1 (Gamma は実値)
+            public Vector3 LevelsChInBlack, LevelsChInWhite, LevelsChGamma, LevelsChOutBlack, LevelsChOutWhite; // R/G/B 別 (既定は恒等)
             public Texture CurveLutTex;  // null → トーンカーブ無効
+            public Texture GradFillTex;    // null → グラデーション塗りつぶし無効
+            public Vector4 GradFillParams; // (cosθ, sinθ, 円形フラグ, スケール)
             public Texture GradientMapTex;     // null → グラデーションマップ無効
             public float   GradientMapOpacity; // 0..1
             public bool    GradientMapNormalize; // true → 輝度を [LumMin,LumMax] → [0,1] に正規化してから LUT を引く
@@ -61,7 +64,11 @@ namespace PSDSimpleEditor
                 Posterize = false, PosterizeLevels = 4f,
                 LevelsInBlack = 0f, LevelsInWhite = 1f, LevelsGamma = 1f,
                 LevelsOutBlack = 0f, LevelsOutWhite = 1f,
+                LevelsChInBlack = Vector3.zero, LevelsChInWhite = Vector3.one,
+                LevelsChGamma = Vector3.one,
+                LevelsChOutBlack = Vector3.zero, LevelsChOutWhite = Vector3.one,
                 CurveLutTex = null,
+                GradFillTex = null, GradFillParams = new Vector4(1, 0, 0, 1),
                 GradientMapTex = null, GradientMapOpacity = 1f,
                 GradientMapNormalize = false, GradientMapLumMin = 0f, GradientMapLumMax = 1f,
                 ColorBalance = false,
@@ -119,6 +126,11 @@ namespace PSDSimpleEditor
             _mat.SetFloat("_LevelsGamma",    Mathf.Max(0.01f, p.LevelsGamma));
             _mat.SetFloat("_LevelsOutBlack", Mathf.Clamp01(p.LevelsOutBlack));
             _mat.SetFloat("_LevelsOutWhite", Mathf.Clamp01(p.LevelsOutWhite));
+            _mat.SetVector("_LevelsChInBlack",  p.LevelsChInBlack);
+            _mat.SetVector("_LevelsChInWhite",  p.LevelsChInWhite);
+            _mat.SetVector("_LevelsChGamma",    p.LevelsChGamma);
+            _mat.SetVector("_LevelsChOutBlack", p.LevelsChOutBlack);
+            _mat.SetVector("_LevelsChOutWhite", p.LevelsChOutWhite);
 
             // トーンカーブ (LUT 未設定時は無効)
             bool hasCurve = p.CurveLutTex != null;
@@ -140,6 +152,12 @@ namespace PSDSimpleEditor
             _mat.SetVector ("_CBMidtones",   p.CBMidtones);
             _mat.SetVector ("_CBHighlights", p.CBHighlights);
             _mat.SetInt    ("_CBPreserveLum", p.CBPreserveLum ? 1 : 0);
+
+            // グラデーション塗りつぶし (GdFl。LUT 未設定時は無効)
+            bool hasGradFill = p.GradFillTex != null;
+            _mat.SetInt    ("_HasGradFill",    hasGradFill ? 1 : 0);
+            _mat.SetTexture("_GradFillTex",    hasGradFill ? p.GradFillTex : (Texture)Texture2D.whiteTexture);
+            _mat.SetVector ("_GradFillParams", p.GradFillParams);
         }
 
         // レイヤーのマスク情報を DrawParams へ反映 (無効・テクスチャなしは「マスクなし」扱い)
@@ -176,6 +194,24 @@ namespace PSDSimpleEditor
                 p.LevelsGamma    = Mathf.Max(0.01f, layer.UILevelsGamma);
                 p.LevelsOutBlack = layer.UILevelsOutputBlack / 255f;
                 p.LevelsOutWhite = layer.UILevelsOutputWhite / 255f;
+
+                // R/G/B チャンネル別レコード (PSD 由来。UI 編集対象外、有効トグルには連動)
+                var a = layer.Adjustment;
+                if (a != null && a.HasChannelLevels && a.LevelsChannelRanges != null)
+                {
+                    p.LevelsChInBlack = new Vector3(
+                        a.LevelsChannelRanges[0].x, a.LevelsChannelRanges[1].x, a.LevelsChannelRanges[2].x) / 255f;
+                    p.LevelsChInWhite = new Vector3(
+                        a.LevelsChannelRanges[0].y, a.LevelsChannelRanges[1].y, a.LevelsChannelRanges[2].y) / 255f;
+                    p.LevelsChOutBlack = new Vector3(
+                        a.LevelsChannelRanges[0].z, a.LevelsChannelRanges[1].z, a.LevelsChannelRanges[2].z) / 255f;
+                    p.LevelsChOutWhite = new Vector3(
+                        a.LevelsChannelRanges[0].w, a.LevelsChannelRanges[1].w, a.LevelsChannelRanges[2].w) / 255f;
+                    p.LevelsChGamma = new Vector3(
+                        Mathf.Max(0.01f, a.LevelsChannelGamma[0]),
+                        Mathf.Max(0.01f, a.LevelsChannelGamma[1]),
+                        Mathf.Max(0.01f, a.LevelsChannelGamma[2]));
+                }
             }
             else
             {
@@ -206,6 +242,19 @@ namespace PSDSimpleEditor
                 p.CBHighlights   = layer.UICBHighlights / 100f;
                 p.CBPreserveLum  = layer.UICBPreserveLuminosity;
             }
+        }
+
+        // グラデーション塗りつぶし (GdFl) のパラメータを DrawParams へ反映 (LUT 未ベイクは無効扱い)
+        static void SetGradientFillFrom(ref DrawParams p, PSDLayer layer)
+        {
+            var a = layer.Adjustment;
+            if (a == null || !a.HasGradientFill || layer._gradientFillLut == null) return;
+            float rad = a.GradientFillAngle * Mathf.Deg2Rad;
+            p.GradFillTex    = layer._gradientFillLut;
+            p.GradFillParams = new Vector4(
+                Mathf.Cos(rad), Mathf.Sin(rad),
+                a.GradientFillRadial ? 1f : 0f,
+                Mathf.Max(0.01f, a.GradientFillScale));
         }
 
         // PassThrough / Unknown はシェーダー上 Normal として扱う

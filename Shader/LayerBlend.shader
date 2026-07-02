@@ -48,6 +48,11 @@ Shader "PSDSimpleEditor/LayerBlend"
         _LevelsGamma    ("レベル 中間調ガンマ",         Float)  = 1
         _LevelsOutBlack ("レベル 出力シャドウ 0..1",    Float)  = 0
         _LevelsOutWhite ("レベル 出力ハイライト 0..1",  Float)  = 1
+        _LevelsChInBlack  ("レベル(RGB個別) 入力シャドウ",   Vector) = (0,0,0,0)
+        _LevelsChInWhite  ("レベル(RGB個別) 入力ハイライト", Vector) = (1,1,1,1)
+        _LevelsChGamma    ("レベル(RGB個別) ガンマ",         Vector) = (1,1,1,1)
+        _LevelsChOutBlack ("レベル(RGB個別) 出力シャドウ",   Vector) = (0,0,0,0)
+        _LevelsChOutWhite ("レベル(RGB個別) 出力ハイライト", Vector) = (1,1,1,1)
         _HasCurveLut  ("トーンカーブ LUT 有効 0/1",     Int)    = 0
         _CurveLutTex  ("トーンカーブ LUT (256x1)",      2D)     = "white" {}
         _HasGradientMap     ("グラデーションマップ有効 0/1", Int)   = 0
@@ -61,6 +66,9 @@ Shader "PSDSimpleEditor/LayerBlend"
         _CBMidtones   ("CB 中間調 (CR,MG,YB) -1..1",     Vector) = (0,0,0,0)
         _CBHighlights ("CB ハイライト (CR,MG,YB) -1..1", Vector) = (0,0,0,0)
         _CBPreserveLum ("CB 輝度保持 0/1",               Int)    = 1
+        _HasGradFill  ("グラデーション塗りつぶし有効 0/1", Int)  = 0
+        _GradFillTex  ("グラデーション塗りつぶし LUT (256x1)", 2D) = "white" {}
+        _GradFillParams ("(cosθ, sinθ, 円形フラグ, スケール)", Vector) = (1,0,0,1)
     }
 
     SubShader
@@ -112,8 +120,13 @@ Shader "PSDSimpleEditor/LayerBlend"
             float     _LevelsGamma;      // 実値 (既定 1 = 恒等)
             float     _LevelsOutBlack;   // 0..1
             float     _LevelsOutWhite;   // 0..1
+            float3    _LevelsChInBlack;  // R/G/B チャンネル別レベル (既定は恒等)
+            float3    _LevelsChInWhite;
+            float3    _LevelsChGamma;
+            float3    _LevelsChOutBlack;
+            float3    _LevelsChOutWhite;
             int       _HasCurveLut;      // 0/1
-            sampler2D _CurveLutTex;      // 256x1 LUT (入力輝度 → 出力値、R=G=B)
+            sampler2D _CurveLutTex;      // 256x1 LUT (入力値 → 出力値。チャンネル別カーブがあれば R/G/B 個別)
             int       _HasGradientMap;     // 0/1
             sampler2D _GradientMapTex;     // 256x1 LUT (輝度 → 色)
             float     _GradientMapOpacity; // 0..1
@@ -125,6 +138,9 @@ Shader "PSDSimpleEditor/LayerBlend"
             float3    _CBMidtones;
             float3    _CBHighlights;
             int       _CBPreserveLum;        // 0/1: 変換前後で輝度を保持
+            int       _HasGradFill;          // 0/1: グラデーション塗りつぶし (レイヤー色を LUT で上書き)
+            sampler2D _GradFillTex;          // 256x1 LUT (α 込み)
+            float4    _GradFillParams;       // (cosθ, sinθ, 円形フラグ 0/1, スケール)
 
             // ゼロ除算ガード用の微小値
             #define EPS 1e-5
@@ -454,14 +470,22 @@ Shader "PSDSimpleEditor/LayerBlend"
                 if (_HasInvert == 1)
                     col = saturate(1.0 - col);
 
-                // ── レベル補正: 入力レンジ → ガンマ → 出力レンジ (既定値は恒等変換) ──
+                // ── レベル補正 (R/G/B チャンネル別): PSD の per-channel レコード由来 (既定値は恒等) ──
+                // Photoshop はチャンネル別 → 複合の順で適用するためこの順序を守る
+                {
+                    float3 t = saturate((col - _LevelsChInBlack) / max(_LevelsChInWhite - _LevelsChInBlack, EPS));
+                    t = pow(t, 1.0 / max(_LevelsChGamma, 0.01));
+                    col = saturate(_LevelsChOutBlack + t * (_LevelsChOutWhite - _LevelsChOutBlack));
+                }
+
+                // ── レベル補正 (複合): 入力レンジ → ガンマ → 出力レンジ (既定値は恒等変換) ──
                 {
                     float3 t = saturate((col - _LevelsInBlack) / max(_LevelsInWhite - _LevelsInBlack, EPS));
                     t = pow(t, 1.0 / max(_LevelsGamma, 0.01));
                     col = saturate(_LevelsOutBlack + t * (_LevelsOutWhite - _LevelsOutBlack));
                 }
 
-                // ── トーンカーブ: 256×1 LUT を各チャンネルへ同一適用 (複合/コンポジットカーブ) ──
+                // ── トーンカーブ: 256×1 LUT をチャンネル別に適用 (LUT にはチャンネル→複合の合成値が焼き込まれる) ──
                 if (_HasCurveLut == 1)
                 {
                     col.r = tex2D(_CurveLutTex, float2(saturate(col.r), 0.5)).r;
@@ -599,6 +623,29 @@ Shader "PSDSimpleEditor/LayerBlend"
                 else if (lu >= 0.0 && lu <= 1.0 && lv >= 0.0 && lv <= 1.0)
                 {
                     layer = tex2D(_LayerTex, float2(lu, lv));
+                }
+
+                // ── グラデーション塗りつぶし (GdFl): レイヤー色を角度/タイプに応じた LUT 色で上書き ──
+                if (_HasGradFill == 1)
+                {
+                    // キャンバス中心原点・y 上向きのピクセル座標
+                    float2 cpos = float2(psdX - _CanvasSize.x * 0.5, _CanvasSize.y * 0.5 - psdY);
+                    float t;
+                    if (_GradFillParams.z > 0.5)
+                    {
+                        // 円形: 中心→キャンバス角までの距離を全長とする
+                        float rmax = 0.5 * length(_CanvasSize.xy);
+                        t = length(cpos) / max(rmax * _GradFillParams.w, EPS);
+                    }
+                    else
+                    {
+                        // 線形: 角度方向へのキャンバス投影幅を全長とする (Photoshop の自動スパン相当)
+                        float2 dir = _GradFillParams.xy;
+                        float ext = 0.5 * (abs(dir.x) * _CanvasSize.x + abs(dir.y) * _CanvasSize.y);
+                        t = 0.5 + dot(cpos, dir) / max(2.0 * ext, EPS);
+                        t = 0.5 + (t - 0.5) / max(_GradFillParams.w, EPS); // スケール (中心基準)
+                    }
+                    layer = tex2D(_GradFillTex, float2(saturate(t), 0.5));
                 }
 
                 // 通常パスでも色調補正はレイヤー色に適用 (グループの 1 枚畳み込み用)
