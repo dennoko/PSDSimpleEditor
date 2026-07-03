@@ -88,9 +88,18 @@ namespace PSDSimpleEditor
                     layer.BlendClippedAsGroup = r.ReadByte() != 0;
                     break;
 
-                case "dPSE": // 本ツール製クリップ調整レイヤーのマーカー (読み込み時に 編集状態 (UI) へ畳み戻す)
-                    layer.IsToolAdjustmentClip = true;
+                case "dPSE": // 本ツール製クリップ調整レイヤーのマーカー (読み込み時に編集状態 (UI) へ畳み戻す)
+                {
+                    // version (uint32 BE)。既知バージョン (1) のみ畳み戻し対象にする。
+                    // 未知バージョンや長さ不足は通常の調整レイヤーとして残す (安全側)。
+                    uint dpseVersion = len >= 4 ? r.ReadUInt32() : 0;
+                    if (dpseVersion == 1)
+                        layer.IsToolAdjustmentClip = true;
+                    else
+                        Debug.LogWarning($"[PSDParser] 未知の dPSE バージョン ({dpseVersion})。" +
+                                         "このレイヤーは通常の調整レイヤーとして扱います。");
                     break;
+                }
 
                 default:
                     // その他のキーは読まずにスキップ (境界 seek は呼び出し側)

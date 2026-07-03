@@ -211,6 +211,8 @@ namespace PSDSimpleEditor
             // グラデーションマップは不透明度に適用率を載せて書き出すため不透明度変更を許容する
             bool isGradientMap = m.Adjustment != null && m.Adjustment.HasGradientMap;
             if (!isGradientMap && m.Opacity != 255) return false;           // 不透明度で効果が弱められた
+            // 他ソフトの編集で調整キーが剥がされたマーカーは吸収しない (情報が無いのに除去だけされるのを防ぐ)
+            if (m.Adjustment == null || !m.Adjustment.HasAny) return false;
             return true;
         }
 
