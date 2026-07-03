@@ -190,19 +190,9 @@ namespace PSDSimpleEditor
             {
                 EditorUtility.DisplayProgressBar("PSD 書き出し中", "合成結果を更新しています...", 0.2f);
 
-                // マージ画像を最新の編集状態に同期 (Repaint 待ちに依存しない)
-                if (_compositor != null && _compositor.IsValid)
-                {
-                    SafeDestroy(ref _compositeTexture);
-                    _compositeTexture = _compositor.Composite(_psdFile.Layers);
-                    _needsRecomposite = false;
-
-                    // 破棄済みテクスチャをマテリアルが参照したままにならないよう、新しい合成結果を再バインドする
-                    if (_isRealtimePreviewEnabled)
-                    {
-                        ApplyRealtimePreview();
-                    }
-                }
+                // マージ画像を最新の編集状態に同期 (Repaint 待ちに依存しない)。
+                // 合成失敗時は例外が伝播し、下の catch で書き出しが中断される。
+                RecompositeNow();
 
                 EditorUtility.DisplayProgressBar("PSD 書き出し中", "PSD を書き出しています...", 0.6f);
                 PSDWriter.Save(_psdFile, _psdFile.Layers, _compositor, _compositeTexture, savePath);

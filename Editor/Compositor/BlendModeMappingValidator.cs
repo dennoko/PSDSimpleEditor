@@ -27,11 +27,24 @@ namespace PSDSimpleEditor
             s_done = true;
 
             string path = AssetDatabase.GetAssetPath(shader);
-            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return; // ビルトイン化等で読めない場合は黙ってスキップ
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
+            {
+                // ビルトイン化・パッケージ埋め込み等でソースが読めない場合。
+                // 「黙って無検証」だと契約破りに気付けないため、検証を省いた事実を残す。
+                Debug.LogWarning("[LayerCompositor] BlendMode 凍結契約チェックをスキップ: " +
+                                 $"LayerBlend.shader のソースを読めませんでした (path=\"{path}\")。" +
+                                 "PSDData.cs の BlendMode 値と LayerBlend.shader の分岐番号が一致しているか手動で確認してください。");
+                return;
+            }
 
             string src;
             try { src = File.ReadAllText(path); }
-            catch (Exception) { return; }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[LayerCompositor] BlendMode 凍結契約チェックをスキップ: " +
+                                 $"LayerBlend.shader の読み込みに失敗しました ({e.Message})。");
+                return;
+            }
 
             int checkedCount = 0;
             foreach (Match m in BranchPattern.Matches(src))

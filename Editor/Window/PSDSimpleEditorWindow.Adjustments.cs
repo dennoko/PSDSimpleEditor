@@ -40,7 +40,7 @@ namespace PSDSimpleEditor
                 layer.UI.Hue        = nh;
                 layer.UI.Saturation = ns;
                 layer.UI.Lightness  = nl;
-                _needsRecomposite  = true;
+                MarkDirty();
             }
             DrawColorizeToggle(layer, ci);
             DrawInvertToggle(layer, ci);
@@ -68,7 +68,7 @@ namespace PSDSimpleEditor
             if (en != layer.UI.Colorize)
             {
                 layer.UI.Colorize  = en;
-                _needsRecomposite = true;
+                MarkDirty();
             }
         }
 
@@ -85,7 +85,7 @@ namespace PSDSimpleEditor
             if (en != layer.UI.Invert)
             {
                 layer.UI.Invert    = en;
-                _needsRecomposite = true;
+                MarkDirty();
             }
         }
 
@@ -102,7 +102,7 @@ namespace PSDSimpleEditor
             if (en != layer.UI.ThresholdEnabled)
             {
                 layer.UI.ThresholdEnabled = en;
-                _needsRecomposite = true;
+                MarkDirty();
             }
             if (!en) return;
 
@@ -110,7 +110,7 @@ namespace PSDSimpleEditor
             if (!Mathf.Approximately(nl, layer.UI.ThresholdLevel))
             {
                 layer.UI.ThresholdLevel = nl;
-                _needsRecomposite = true;
+                MarkDirty();
             }
         }
 
@@ -128,7 +128,7 @@ namespace PSDSimpleEditor
             if (en != layer.UI.PosterizeEnabled)
             {
                 layer.UI.PosterizeEnabled = en;
-                _needsRecomposite = true;
+                MarkDirty();
             }
             if (!en) return;
 
@@ -136,7 +136,7 @@ namespace PSDSimpleEditor
             if (!Mathf.Approximately(nl, layer.UI.PosterizeLevels))
             {
                 layer.UI.PosterizeLevels = nl;
-                _needsRecomposite = true;
+                MarkDirty();
             }
         }
 
@@ -153,7 +153,7 @@ namespace PSDSimpleEditor
             if (en != layer.UI.LevelsEnabled)
             {
                 layer.UI.LevelsEnabled = en;
-                _needsRecomposite = true;
+                MarkDirty();
             }
             if (!en) return;
 
@@ -174,7 +174,7 @@ namespace PSDSimpleEditor
                 layer.UI.LevelsGamma       = ng;
                 layer.UI.LevelsOutputBlack = nob;
                 layer.UI.LevelsOutputWhite = now;
-                _needsRecomposite = true;
+                MarkDirty();
             }
         }
 
@@ -193,7 +193,7 @@ namespace PSDSimpleEditor
             if (en != layer.UI.ColorBalanceEnabled)
             {
                 layer.UI.ColorBalanceEnabled = en;
-                _needsRecomposite = true;
+                MarkDirty();
             }
             if (!en) return;
 
@@ -231,7 +231,7 @@ namespace PSDSimpleEditor
                 layer.UI.CBMidtones           = m;
                 layer.UI.CBHighlights         = h;
                 layer.UI.CBPreserveLuminosity = pl;
-                _needsRecomposite            = true;
+                MarkDirty();
             }
         }
 
@@ -248,7 +248,7 @@ namespace PSDSimpleEditor
             if (en != layer.UI.CurveEnabled)
             {
                 layer.UI.CurveEnabled = en;
-                _needsRecomposite = true;
+                MarkDirty();
             }
             if (!en) return;
 
@@ -268,7 +268,7 @@ namespace PSDSimpleEditor
             {
                 layer.UI.Curve = nc;
                 BakeCurveLut(layer);
-                _needsRecomposite = true;
+                MarkDirty();
             }
         }
 
@@ -338,7 +338,7 @@ namespace PSDSimpleEditor
             if (en != layer.UI.ImageClipEnabled)
             {
                 layer.UI.ImageClipEnabled = en;
-                _needsRecomposite = true;
+                MarkDirty();
             }
             if (!en) return;
 
@@ -355,7 +355,7 @@ namespace PSDSimpleEditor
             if (tex != layer.UI.ImageClipTex)
             {
                 layer.UI.ImageClipTex = tex;
-                _needsRecomposite = true;
+                MarkDirty();
             }
 
             // タイル反復数 (X,Y)
@@ -372,7 +372,7 @@ namespace PSDSimpleEditor
             {
                 // 0 / 負値はタイリングが破綻するため下限でクランプ
                 layer.UI.ImageClipTile = new Vector2(Mathf.Max(0.01f, nt.x), Mathf.Max(0.01f, nt.y));
-                _needsRecomposite = true;
+                MarkDirty();
             }
 
             // 合成モード
@@ -390,7 +390,7 @@ namespace PSDSimpleEditor
             if (newIndex != curIndex)
             {
                 layer.UI.ImageClipBlend = modes[newIndex];
-                _needsRecomposite = true;
+                MarkDirty();
             }
 
             // 不透明度
@@ -398,7 +398,7 @@ namespace PSDSimpleEditor
             if (!Mathf.Approximately(no, layer.UI.ImageClipOpacity))
             {
                 layer.UI.ImageClipOpacity = no;
-                _needsRecomposite = true;
+                MarkDirty();
             }
         }
 
@@ -417,7 +417,7 @@ namespace PSDSimpleEditor
             {
                 layer.UI.GradientMapEnabled = en;
                 if (en) EnsureGradientLut(layer);   // 初回有効化時に LUT を焼く
-                _needsRecomposite = true;
+                MarkDirty();
             }
             if (!en) return;
 
@@ -434,7 +434,7 @@ namespace PSDSimpleEditor
             {
                 layer.UI.GradientMapNormalize = normalize;
                 if (normalize) ComputeGradientLumRange(layer);
-                _needsRecomposite = true;
+                MarkDirty();
             }
 
             EditorGUILayout.BeginHorizontal();
@@ -451,14 +451,14 @@ namespace PSDSimpleEditor
             {
                 layer.UI.Gradient = ng;
                 BakeGradientLut(layer);
-                _needsRecomposite = true;
+                MarkDirty();
             }
 
             float no = IndentedSlider(new GUIContent(PSDTranslation.Get("GradientMapOpacity", "適用率"), PSDTranslation.Get("GradientMapOpacityTooltip", "グラデーションマップを適用する強度（0.0 〜 1.0）を設定します。")), layer.UI.GradientMapOpacity, 0f, 1f, indent);
             if (!Mathf.Approximately(no, layer.UI.GradientMapOpacity))
             {
                 layer.UI.GradientMapOpacity = no;
-                _needsRecomposite = true;
+                MarkDirty();
             }
         }
 

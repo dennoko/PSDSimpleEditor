@@ -239,7 +239,7 @@ namespace PSDSimpleEditor
                 {
                     RevertRealtimePreview();
                     _previewMaterial = prevMat;
-                    _needsRecomposite = true;
+                    MarkDirty();
 
                     // マテリアルをセットしたら自動的にプレビューを有効化する（未設定に戻したら無効化）
                     _isRealtimePreviewEnabled = _previewMaterial != null;
@@ -263,7 +263,7 @@ namespace PSDSimpleEditor
                 {
                     RevertRealtimePreview();
                     _previewSlotName = prevSlot;
-                    _needsRecomposite = true;
+                    MarkDirty();
                 }
             });
             row3.Add(_previewSlotField);
@@ -567,7 +567,7 @@ namespace PSDSimpleEditor
                         RevertRealtimePreview();
                         _previewSlotName = propName;
                         if (_previewSlotField != null) _previewSlotField.SetValueWithoutNotify(_previewSlotName);
-                        _needsRecomposite = true;
+                        MarkDirty();
                     }
                 });
             }
@@ -613,7 +613,7 @@ namespace PSDSimpleEditor
             {
                 RevertRealtimePreview();
             }
-            _needsRecomposite = true;
+            MarkDirty();
             UpdateRealtimePreviewButtonState();
         }
 
@@ -689,7 +689,7 @@ namespace PSDSimpleEditor
             visibilityToggle.value = layer.UI.Visible;
             visibilityToggle.RegisterValueChangedCallback(evt => {
                 layer.UI.Visible = evt.newValue;
-                _needsRecomposite = true;
+                MarkDirty();
                 RebuildLayerTree();
             });
             header.Add(visibilityToggle);
@@ -768,7 +768,7 @@ namespace PSDSimpleEditor
             visibilityToggle.value = layer.UI.Visible;
             visibilityToggle.RegisterValueChangedCallback(evt => {
                 layer.UI.Visible = evt.newValue;
-                _needsRecomposite = true;
+                MarkDirty();
                 RebuildLayerTree();
             });
             header.Add(visibilityToggle);
@@ -828,7 +828,7 @@ namespace PSDSimpleEditor
                 {
                     if (isGroup) layer.GroupBlendMode = modes[index];
                     else layer.BlendMode = modes[index];
-                    _needsRecomposite = true;
+                    MarkDirty();
                 }
             });
 

@@ -194,20 +194,17 @@ namespace PSDSimpleEditor
                     // ── 通常レイヤー (+ clbl=false のクリッピング群) ──
                     // clbl=false: メンバーは背景合成後のバッファへ直接ブレンドされる
                     RenderTexture clipMask = null;
-                    if (hasClipRun)
-                        clipMask = RenderLayerAlpha(baseLayer, null); // ベース層の実効 α
-
-                    // ベース層自身は通常どおり (自身の BlendMode で) 合成
-                    DrawLayer(baseLayer, null, ref cur, ref next);
-
-                    for (int j = i + 1; j < runEnd; j++)
+                    try
                     {
-                        var c = layers[j];
-                        if (!c.UI.Visible) continue;
-                        DrawClipRunMember(c, clipMask, ref cur, ref next);
-                    }
+                        if (hasClipRun)
+                            clipMask = RenderLayerAlpha(baseLayer, null); // ベース層の実効 α
 
-                    ReleaseToPool(clipMask);
+                        // ベース層自身は通常どおり (自身の BlendMode で) 合成
+                        DrawLayer(baseLayer, null, ref cur, ref next);
+
+                        DrawClipRunMembers(layers, i + 1, runEnd, clipMask, ref cur, ref next);
+                    }
+                    finally { ReleaseToPool(clipMask); }
                 }
 
                 i = runEnd;
@@ -229,62 +226,58 @@ namespace PSDSimpleEditor
 
                 // 簡略化: パススルーグループをベースとするクリッピング層は
                 // ベース α を確定できないためクリップなしで通常合成する
-                for (int j = groupIdx + 1; j < runEnd; j++)
-                {
-                    var c = layers[j];
-                    if (!c.UI.Visible) continue;
-                    DrawClipRunMember(c, null, ref cur, ref next);
-                }
+                DrawClipRunMembers(layers, groupIdx + 1, runEnd, null, ref cur, ref next);
                 return;
             }
 
             // ── 分離グループ: 透明 RT に子を合成 → 1 枚のレイヤーとして合成 ──
+            // gCur/gNext はプールからの借用。ref で渡され Swap されるため using ではなく
+            // try/finally で確実に返却する (再帰合成中に例外が出ても RT をリークさせない)。
             var gCur  = AcquireRT(clearToTransparent: true);
             var gNext = AcquireRT(clearToTransparent: false);
-            CompositeList(group.Children, ref gCur, ref gNext);
-
-            bool hasClipRun = runEnd > groupIdx + 1;
-
-            if (hasClipRun && group.BlendClippedAsGroup)
+            try
             {
-                // ── Photoshop 既定 (clbl=true): クリップ群をグループ内容と先に合成 ──
-                // グループ内容の α をコピーで保持 (メンバー描画で gCur が変化するため)
-                var clipMask = AcquireRT(clearToTransparent: false);
-                Graphics.Blit(gCur, clipMask);
+                CompositeList(group.Children, ref gCur, ref gNext);
 
-                for (int j = groupIdx + 1; j < runEnd; j++)
+                bool hasClipRun = runEnd > groupIdx + 1;
+
+                if (hasClipRun && group.BlendClippedAsGroup)
                 {
-                    var c = layers[j];
-                    if (!c.UI.Visible) continue;
-                    DrawClipRunMember(c, clipMask, ref gCur, ref gNext);
-                }
-                ReleaseToPool(clipMask);
+                    // ── Photoshop 既定 (clbl=true): クリップ群をグループ内容と先に合成 ──
+                    // グループ内容の α をコピーで保持 (メンバー描画で gCur が変化するため)
+                    var clipMask = AcquireRT(clearToTransparent: false);
+                    try
+                    {
+                        Graphics.Blit(gCur, clipMask);
+                        DrawClipRunMembers(layers, groupIdx + 1, runEnd, clipMask, ref gCur, ref gNext);
+                    }
+                    finally { ReleaseToPool(clipMask); }
 
-                // メンバー込みの平坦化結果を 1 枚のレイヤーとして合成
-                // (グループの不透明度・マスクは群全体へかかる = Photoshop と同じ)
-                BlitAsFullCanvasLayer(gCur, group, ToShaderBlendMode(group.GroupBlendMode), null, ref cur, ref next);
+                    // メンバー込みの平坦化結果を 1 枚のレイヤーとして合成
+                    // (グループの不透明度・マスクは群全体へかかる = Photoshop と同じ)
+                    BlitAsFullCanvasLayer(gCur, group, ToShaderBlendMode(group.GroupBlendMode), null, ref cur, ref next);
+                }
+                else
+                {
+                    // ── clbl=false: グループを先に合成し、メンバーは背景バッファへ直接ブレンド ──
+                    RenderTexture clipMask = null;
+                    try
+                    {
+                        if (hasClipRun)
+                            clipMask = RenderTextureAlpha(gCur, group, null); // 実効 α (× 不透明度 × マスク)
+
+                        BlitAsFullCanvasLayer(gCur, group, ToShaderBlendMode(group.GroupBlendMode), null, ref cur, ref next);
+
+                        DrawClipRunMembers(layers, groupIdx + 1, runEnd, clipMask, ref cur, ref next);
+                    }
+                    finally { ReleaseToPool(clipMask); }
+                }
             }
-            else
+            finally
             {
-                // ── clbl=false: グループを先に合成し、メンバーは背景バッファへ直接ブレンド ──
-                RenderTexture clipMask = null;
-                if (hasClipRun)
-                    clipMask = RenderTextureAlpha(gCur, group, null); // 実効 α (× 不透明度 × マスク)
-
-                BlitAsFullCanvasLayer(gCur, group, ToShaderBlendMode(group.GroupBlendMode), null, ref cur, ref next);
-
-                for (int j = groupIdx + 1; j < runEnd; j++)
-                {
-                    var c = layers[j];
-                    if (!c.UI.Visible) continue;
-                    DrawClipRunMember(c, clipMask, ref cur, ref next);
-                }
-
-                ReleaseToPool(clipMask);
+                ReleaseToPool(gCur);
+                ReleaseToPool(gNext);
             }
-
-            ReleaseToPool(gCur);
-            ReleaseToPool(gNext);
         }
 
         // ─── 通常レイヤーのクリッピング群 (clbl=true) の合成 ─────────────────
@@ -302,40 +295,42 @@ namespace PSDSimpleEditor
         {
             var baseLayer = layers[baseIdx];
 
+            // gCur/gNext はプールからの借用。ref/Swap されるため try/finally で確実に返却する。
             var gCur  = AcquireRT(clearToTransparent: true);
             var gNext = AcquireRT(clearToTransparent: false);
-
-            // ベース層を不透明度 1 で単独描画 (不透明度は最後に群全体へかける)
-            float savedOpacity = baseLayer.UI.Opacity;
-            baseLayer.UI.Opacity = 1f;
-            try     { DrawLayer(baseLayer, null, ref gCur, ref gNext); }
-            finally { baseLayer.UI.Opacity = savedOpacity; }
-
-            // ベース層の実効 α をコピーで保持 (メンバー描画で gCur が変化するため)
-            var clipMask = AcquireRT(clearToTransparent: false);
-            Graphics.Blit(gCur, clipMask);
-
-            for (int j = baseIdx + 1; j < runEnd; j++)
+            try
             {
-                var c = layers[j];
-                if (!c.UI.Visible) continue;
-                DrawClipRunMember(c, clipMask, ref gCur, ref gNext);
+                // ベース層を不透明度 1 で単独描画 (不透明度は最後に群全体へかける)
+                float savedOpacity = baseLayer.UI.Opacity;
+                baseLayer.UI.Opacity = 1f;
+                try     { DrawLayer(baseLayer, null, ref gCur, ref gNext); }
+                finally { baseLayer.UI.Opacity = savedOpacity; }
+
+                // ベース層の実効 α をコピーで保持 (メンバー描画で gCur が変化するため)
+                var clipMask = AcquireRT(clearToTransparent: false);
+                try
+                {
+                    Graphics.Blit(gCur, clipMask);
+                    DrawClipRunMembers(layers, baseIdx + 1, runEnd, clipMask, ref gCur, ref gNext);
+                }
+                finally { ReleaseToPool(clipMask); }
+
+                // 平坦化結果をベース層のブレンドモード・不透明度で背景へ合成
+                // (マスク・色調補正はベース層の描画時に適用済みのため、ここでは適用しない)
+                var p = NewParams();
+                p.LayerTex  = gCur;
+                p.LayerRect = FullCanvasRect;
+                p.Opacity   = savedOpacity;
+                p.BlendMode = ToShaderBlendMode(baseLayer.BlendMode);
+                ApplyParams(p);
+                Graphics.Blit(cur, next, _mat);
+                Swap(ref cur, ref next);
             }
-
-            // 平坦化結果をベース層のブレンドモード・不透明度で背景へ合成
-            // (マスク・色調補正はベース層の描画時に適用済みのため、ここでは適用しない)
-            var p = NewParams();
-            p.LayerTex  = gCur;
-            p.LayerRect = FullCanvasRect;
-            p.Opacity   = savedOpacity;
-            p.BlendMode = ToShaderBlendMode(baseLayer.BlendMode);
-            ApplyParams(p);
-            Graphics.Blit(cur, next, _mat);
-            Swap(ref cur, ref next);
-
-            ReleaseToPool(clipMask);
-            ReleaseToPool(gCur);
-            ReleaseToPool(gNext);
+            finally
+            {
+                ReleaseToPool(gCur);
+                ReleaseToPool(gNext);
+            }
         }
 
         // ─── クリッピング群メンバー 1 枚の合成 ───────────────────────────────
@@ -349,14 +344,35 @@ namespace PSDSimpleEditor
                 // 平坦化結果 1 枚にクリップマスクを適用して合成する (PassThrough は Normal 扱い)
                 var gCur  = AcquireRT(clearToTransparent: true);
                 var gNext = AcquireRT(clearToTransparent: false);
-                CompositeList(layer.Children, ref gCur, ref gNext);
-                BlitAsFullCanvasLayer(gCur, layer, ToShaderBlendMode(layer.GroupBlendMode), clipMask, ref cur, ref next);
-                ReleaseToPool(gCur);
-                ReleaseToPool(gNext);
+                try
+                {
+                    CompositeList(layer.Children, ref gCur, ref gNext);
+                    BlitAsFullCanvasLayer(gCur, layer, ToShaderBlendMode(layer.GroupBlendMode), clipMask, ref cur, ref next);
+                }
+                finally
+                {
+                    ReleaseToPool(gCur);
+                    ReleaseToPool(gNext);
+                }
                 return;
             }
 
             DrawLayer(layer, clipMask, ref cur, ref next);
+        }
+
+        // ─── クリッピング群メンバー列の合成 (共通ループ) ─────────────────────
+        // ベース (グループ) 直後の [firstMemberIdx, runEnd) にある可視メンバーを、
+        // clipMask (null 可) でクリップしつつ順に合成する。CompositeList /
+        // CompositeGroup / CompositeClipGroup が共有する。
+        void DrawClipRunMembers(List<PSDLayer> layers, int firstMemberIdx, int runEnd,
+                                RenderTexture clipMask, ref RenderTexture cur, ref RenderTexture next)
+        {
+            for (int j = firstMemberIdx; j < runEnd; j++)
+            {
+                var c = layers[j];
+                if (!c.UI.Visible) continue;
+                DrawClipRunMember(c, clipMask, ref cur, ref next);
+            }
         }
 
         // ════════════════════════════════════════════════════════════════
@@ -446,25 +462,31 @@ namespace PSDSimpleEditor
             {
                 // 1) レイヤー本体を temp へ合成
                 var temp = AcquireRT(clearToTransparent: false);
-                ApplyParams(p);
-                Graphics.Blit(cur, temp, _mat);
+                RenderTexture shape = null;
+                try
+                {
+                    ApplyParams(p);
+                    Graphics.Blit(cur, temp, _mat);
 
-                // 2) レイヤーの実効 α 形状 (マスク・不透明度・クリップ込み) を取得
-                var shape = RenderLayerAlpha(layer, clipMask);
+                    // 2) レイヤーの実効 α 形状 (マスク・不透明度・クリップ込み) を取得
+                    shape = RenderLayerAlpha(layer, clipMask);
 
-                // 3) オーバーレイ色を実効 α でクリップして temp → next へ合成
-                var op = NewParams();
-                op.LayerTex    = GetSolidTexture(layer.Effects.OverlayColor);
-                op.LayerRect   = FullCanvasRect;
-                op.Opacity     = layer.Effects.OverlayOpacity;
-                op.BlendMode   = ToShaderBlendMode(layer.Effects.OverlayBlendMode);
-                op.ClipMaskTex = shape;
-                ApplyParams(op);
-                Graphics.Blit(temp, next, _mat);
-                Swap(ref cur, ref next);
-
-                ReleaseToPool(temp);
-                ReleaseToPool(shape);
+                    // 3) オーバーレイ色を実効 α でクリップして temp → next へ合成
+                    var op = NewParams();
+                    op.LayerTex    = GetSolidTexture(layer.Effects.OverlayColor);
+                    op.LayerRect   = FullCanvasRect;
+                    op.Opacity     = layer.Effects.OverlayOpacity;
+                    op.BlendMode   = ToShaderBlendMode(layer.Effects.OverlayBlendMode);
+                    op.ClipMaskTex = shape;
+                    ApplyParams(op);
+                    Graphics.Blit(temp, next, _mat);
+                    Swap(ref cur, ref next);
+                }
+                finally
+                {
+                    ReleaseToPool(temp);
+                    ReleaseToPool(shape);
+                }
                 return;
             }
 
@@ -473,27 +495,33 @@ namespace PSDSimpleEditor
             {
                 // 1) レイヤー本体 (補正込み) を temp へ合成
                 var temp = AcquireRT(clearToTransparent: false);
-                ApplyParams(p);
-                Graphics.Blit(cur, temp, _mat);
+                RenderTexture shape = null;
+                try
+                {
+                    ApplyParams(p);
+                    Graphics.Blit(cur, temp, _mat);
 
-                // 2) レイヤーの実効 α 形状 (マスク・不透明度・クリップ込み) を取得
-                var shape = RenderLayerAlpha(layer, clipMask);
+                    // 2) レイヤーの実効 α 形状 (マスク・不透明度・クリップ込み) を取得
+                    shape = RenderLayerAlpha(layer, clipMask);
 
-                // 3) クリップ画像をレイヤー矩形基準でタイリングし、実効 α でクリップして合成
-                var op = NewParams();
-                op.LayerTex    = layer.UI.ImageClipTex;
-                op.LayerRect   = LayerRectOf(layer); // 保存レイヤー (同矩形) とプレビューを一致させる
-                op.LayerWrap   = true;
-                op.LayerTile   = layer.UI.ImageClipTile;
-                op.Opacity     = layer.UI.ImageClipOpacity;
-                op.BlendMode   = ToShaderBlendMode(layer.UI.ImageClipBlend);
-                op.ClipMaskTex = shape;
-                ApplyParams(op);
-                Graphics.Blit(temp, next, _mat);
-                Swap(ref cur, ref next);
-
-                ReleaseToPool(temp);
-                ReleaseToPool(shape);
+                    // 3) クリップ画像をレイヤー矩形基準でタイリングし、実効 α でクリップして合成
+                    var op = NewParams();
+                    op.LayerTex    = layer.UI.ImageClipTex;
+                    op.LayerRect   = LayerRectOf(layer); // 保存レイヤー (同矩形) とプレビューを一致させる
+                    op.LayerWrap   = true;
+                    op.LayerTile   = layer.UI.ImageClipTile;
+                    op.Opacity     = layer.UI.ImageClipOpacity;
+                    op.BlendMode   = ToShaderBlendMode(layer.UI.ImageClipBlend);
+                    op.ClipMaskTex = shape;
+                    ApplyParams(op);
+                    Graphics.Blit(temp, next, _mat);
+                    Swap(ref cur, ref next);
+                }
+                finally
+                {
+                    ReleaseToPool(temp);
+                    ReleaseToPool(shape);
+                }
                 return;
             }
 

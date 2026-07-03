@@ -24,27 +24,9 @@ namespace PSDSimpleEditor
     /// </summary>
     public static class PSDWriter
     {
-        // ── BlendMode → 4 文字キー (PSDParser.KeyToBlendMode の逆) ──
-        static readonly Dictionary<BlendMode, string> BlendModeToKey = new Dictionary<BlendMode, string>
-        {
-            { BlendMode.Normal,       "norm" }, { BlendMode.Multiply,     "mul " },
-            { BlendMode.Screen,       "scrn" }, { BlendMode.Overlay,      "over" },
-            { BlendMode.Dissolve,     "diss" }, { BlendMode.Darken,       "dark" },
-            { BlendMode.ColorBurn,    "idiv" }, { BlendMode.LinearBurn,   "lbrn" },
-            { BlendMode.DarkerColor,  "dkCl" }, { BlendMode.Lighten,      "lite" },
-            { BlendMode.ColorDodge,   "div " }, { BlendMode.LinearDodge,  "lddg" },
-            { BlendMode.LighterColor, "lgCl" }, { BlendMode.SoftLight,    "sLit" },
-            { BlendMode.HardLight,    "hLit" }, { BlendMode.VividLight,   "vLit" },
-            { BlendMode.LinearLight,  "lLit" }, { BlendMode.PinLight,     "pLit" },
-            { BlendMode.HardMix,      "hMix" }, { BlendMode.Difference,   "diff" },
-            { BlendMode.Exclusion,    "smud" }, { BlendMode.Subtract,     "fsub" },
-            { BlendMode.Divide,       "fdiv" }, { BlendMode.Hue,          "hue " },
-            { BlendMode.Saturation,   "sat " }, { BlendMode.Color,        "colr" },
-            { BlendMode.Luminosity,   "lum " }, { BlendMode.PassThrough,  "pass" },
-        };
-
-        internal static string KeyOf(BlendMode mode)
-            => BlendModeToKey.TryGetValue(mode, out var k) ? k : "norm";
+        // BlendMode → 4 文字キー。表の実体は Core の PSDBlendModeConverter が
+        // 読み込み用 KeyToBlendMode から自動生成する (read/write で表を二重管理しない)。
+        internal static string KeyOf(BlendMode mode) => PSDBlendModeConverter.KeyOf(mode);
 
         // ════════════════════════════════════════════════════════════════
         //  Public

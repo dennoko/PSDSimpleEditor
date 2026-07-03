@@ -103,7 +103,7 @@ namespace PSDSimpleEditor
                 {
                     layer.UI.Brightness = nb;
                     layer.UI.Contrast   = nc;
-                    _needsRecomposite  = true;
+                    MarkDirty();
                 }
             }
 
@@ -120,7 +120,7 @@ namespace PSDSimpleEditor
                     layer.UI.Hue        = nh;
                     layer.UI.Saturation = ns;
                     layer.UI.Lightness  = nl;
-                    _needsRecomposite  = true;
+                    MarkDirty();
                 }
                 DrawColorizeToggle(layer, indent);
             }
@@ -168,7 +168,7 @@ namespace PSDSimpleEditor
                 if (nc != layer.Adjustment.SolidColor)
                 {
                     layer.Adjustment.SolidColor = nc;
-                    _needsRecomposite = true;
+                    MarkDirty();
                 }
             }
 
@@ -199,7 +199,7 @@ namespace PSDSimpleEditor
             if (!Mathf.Approximately(newOpacity, layer.UI.Opacity))
             {
                 layer.UI.Opacity   = newOpacity;
-                _needsRecomposite = true;
+                MarkDirty();
             }
         }
 

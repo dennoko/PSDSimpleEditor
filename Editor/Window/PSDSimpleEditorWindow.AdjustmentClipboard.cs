@@ -339,7 +339,7 @@ namespace PSDSimpleEditor
                     return false;
             }
 
-            _needsRecomposite = true;
+            MarkDirty();
             return true;
         }
 

@@ -12,26 +12,8 @@ namespace PSDSimpleEditor
     // ────────────────────────────────────────────────────────────────
     public partial class PSDSimpleEditorWindow
     {
-        void DrawPreviewPanel()
-        {
-            // パネル外枠 (border 付き)
-            EditorGUILayout.BeginVertical(PSDEditorTheme.PanelStyle,
-                                          GUILayout.ExpandWidth(true),
-                                          GUILayout.ExpandHeight(true));
-
-            // ヘッダ帯 (Surface2): タイトル + マージ参照トグル
-            EditorGUILayout.BeginHorizontal(PSDEditorTheme.ToolbarStyle);
-            GUILayout.Label(PSDTranslation.Get("Preview", "プレビュー"), PSDEditorTheme.SectionHeaderStyle);
-            GUILayout.FlexibleSpace();
-            _showMergedRef = GUILayout.Toggle(_showMergedRef, new GUIContent(PSDTranslation.Get("MergedRef", "マージ参照"), PSDTranslation.Get("MergedRefTooltip", "PSDファイル作成・保存時に内包されたPhotoshop側の合成画像（元の見た目）を、プレビューの右下に小窓表示して比較できるようにします。")),
-                                              PSDEditorTheme.ToolbarButtonStyle, GUILayout.Width(80));
-            EditorGUILayout.EndHorizontal();
-
-            DrawPreviewPanelContentOnly();
-
-            EditorGUILayout.EndVertical();
-        }
-
+        // プレビューパネルの外枠・ヘッダ帯・マージ参照トグルは UI Toolkit 側
+        // (PSDSimpleEditorWindow.UIToolkit.cs) が構築する。ここは内部コンテンツ描画のみを担う。
         void DrawPreviewPanelContentOnly()
         {
 

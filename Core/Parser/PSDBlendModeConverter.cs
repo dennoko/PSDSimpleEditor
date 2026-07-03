@@ -5,7 +5,9 @@ namespace PSDSimpleEditor
     // ════════════════════════════════════════════════════════════════
     //  ブレンドモード変換
     // ════════════════════════════════════════════════════════════════
-    internal static class PSDBlendModeConverter
+    // Editor アセンブリ (PSDWriter) からも KeyOf を参照するため public。
+    // 内部専用のメソッドは internal のまま (Core アセンブリ内でのみ使用)。
+    public static class PSDBlendModeConverter
     {
         static readonly Dictionary<string, BlendMode> KeyToBlendMode = new Dictionary<string, BlendMode>
         {
@@ -29,6 +31,22 @@ namespace PSDSimpleEditor
         {
             return KeyToBlendMode.TryGetValue(key, out var mode) ? mode : BlendMode.Unknown;
         }
+
+        // 書き出し用の逆引き (BlendMode → 4 文字キー)。KeyToBlendMode 1 つを真実とし、
+        // ここから自動生成する (read/write で別々の表を手で同期しないため)。
+        static readonly Dictionary<BlendMode, string> BlendModeToKey = BuildReverse(KeyToBlendMode);
+
+        static Dictionary<BlendMode, string> BuildReverse(Dictionary<string, BlendMode> forward)
+        {
+            var reverse = new Dictionary<BlendMode, string>();
+            foreach (var kv in forward)
+                if (!reverse.ContainsKey(kv.Value)) reverse[kv.Value] = kv.Key;
+            return reverse;
+        }
+
+        /// <summary>BlendMode に対応する 4 文字キーを返す (未登録は "norm")。</summary>
+        public static string KeyOf(BlendMode mode)
+            => BlendModeToKey.TryGetValue(mode, out var key) ? key : "norm";
 
         // ディスクリプタの enum 値 (BlnM) → BlendMode (lfx2 用)
         static readonly Dictionary<string, BlendMode> EnumToBlendMode = new Dictionary<string, BlendMode>

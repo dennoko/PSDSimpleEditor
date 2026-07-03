@@ -15,7 +15,8 @@ namespace PSDSimpleEditor
     ///   Adjustments (色調補正・グラデーションマップ・画像クリップ) /
     ///   Preview (プレビュー描画) / ColorRangeMask (色域選択マスク) /
     ///   Export (下部バー・PNG/PSD 書き出し)。
-    /// このファイルはフィールド定義・ライフサイクル・OnGUI・PSD 読み込み・合成実行を担う。
+    /// このファイルはフィールド定義・ライフサイクル・PSD 読み込み・合成実行を担う。
+    /// (UI は UIToolkit.cs の CreateGUI が構築し、内部コンテンツは IMGUIContainer で描画する。)
     /// </summary>
     // ─── partial 見取り図 ───────────────────────────────────────────
     // 責務   : メインウィンドウの定義、ライフサイクル管理、PSD 読み込みと GPU 合成の実行
@@ -234,7 +235,7 @@ namespace PSDSimpleEditor
                     Debug.LogWarning("[PSDSimpleEditor] コンポジターの初期化に失敗しました。" +
                                      "LayerBlend.shader を確認してください。");
 
-                _needsRecomposite = true;
+                MarkDirty();
                 SetStatus($"読み込み完了: {Path.GetFileName(resolved)}", StatusType.Success);
             }
             catch (Exception e)
@@ -258,20 +259,36 @@ namespace PSDSimpleEditor
 
         // ── 合成 ───────────────────────────────────────────────────────────
 
-        /// <summary>Repaint イベント中に呼び出す。古い結果を破棄して再合成する。</summary>
-        void DoComposite()
+        /// <summary>
+        /// UI 変更により再合成が必要になったことを記録する。次の Repaint 時に DoComposite が走る。
+        /// 再合成トリガの単一の書き込み口 (各 UI ハンドラは直接フラグを立てずこれを呼ぶ)。
+        /// </summary>
+        void MarkDirty() => _needsRecomposite = true;
+
+        /// <summary>
+        /// 現在の編集状態でマージ画像を再合成し _compositeTexture を更新する。
+        /// Repaint 待ちに依存せず即座に走る。プレビュー中なら破棄済みテクスチャを
+        /// 参照したままにならないようマテリアルへ再バインドする。
+        /// 例外は握りつぶさず呼び出し側の文脈で処理する (プレビューは握って続行、
+        /// 書き出しは中断してダイアログ表示、という差を保つため)。
+        /// </summary>
+        void RecompositeNow()
         {
             _needsRecomposite = false;
             if (_psdFile == null || _compositor == null || !_compositor.IsValid) return;
 
             SafeDestroy(ref _compositeTexture);
+            _compositeTexture = _compositor.Composite(_psdFile.Layers);
+            if (_isRealtimePreviewEnabled)
+                ApplyRealtimePreview();
+        }
+
+        /// <summary>Repaint イベント中に呼び出す。古い結果を破棄して再合成する。</summary>
+        void DoComposite()
+        {
             try
             {
-                _compositeTexture = _compositor.Composite(_psdFile.Layers);
-                if (_isRealtimePreviewEnabled)
-                {
-                    ApplyRealtimePreview();
-                }
+                RecompositeNow();
             }
             catch (Exception e)
             {
