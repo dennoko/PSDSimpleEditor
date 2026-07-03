@@ -10,29 +10,29 @@ namespace PSDSimpleEditor
         /// <summary>「色調補正」フォールドアウト。明るさ/コントラスト/色相/彩度/明度 + グラデーションマップ。</summary>
         void DrawAdjustmentFoldout(PSDLayer layer, int indent)
         {
-            layer.UIAdjustExpanded = DrawSectionFoldout("色調補正", layer.UIAdjustExpanded, indent, layer, ClipboardKind.FullAdjustmentSection);
-            if (!layer.UIAdjustExpanded) { RowSpace(); return; }
+            layer.UI.AdjustExpanded = DrawSectionFoldout("色調補正", layer.UI.AdjustExpanded, indent, layer, ClipboardKind.FullAdjustmentSection);
+            if (!layer.UI.AdjustExpanded) { RowSpace(); return; }
             RowSpace();
 
             int ci = indent + 1;
 
             // 明るさ・コントラスト・色相・彩度・明度 (シェーダーの正規化除数に合わせた範囲)
-            float nb = IndentedSlider(new GUIContent("明るさ", "レイヤーの明るさを調整します（-150 〜 150）。"),  layer.UIBrightness, -150f, 150f, ci);
-            float nc = IndentedSlider(new GUIContent("ｺﾝﾄﾗｽﾄ", "レイヤーのコントラスト（明暗差）を調整します（-50 〜 100）。"),  layer.UIContrast,   -50f, 100f, ci);
-            float nh = IndentedSlider(new GUIContent("色相", "レイヤーの色相（カラー）を調整します（-180度 〜 180度）。"),    layer.UIHue,        -180f, 180f, ci);
-            float ns = IndentedSlider(new GUIContent("彩度", "レイヤーの彩度（鮮やかさ）を調整します（-100 〜 100）。"),    layer.UISaturation, -100f, 100f, ci);
-            float nl = IndentedSlider(new GUIContent("明度", "レイヤーの明度を調整します（-100 〜 100）。"),    layer.UILightness,  -100f, 100f, ci);
-            if (!Mathf.Approximately(nb, layer.UIBrightness) ||
-                !Mathf.Approximately(nc, layer.UIContrast)   ||
-                !Mathf.Approximately(nh, layer.UIHue)        ||
-                !Mathf.Approximately(ns, layer.UISaturation) ||
-                !Mathf.Approximately(nl, layer.UILightness))
+            float nb = IndentedSlider(new GUIContent("明るさ", "レイヤーの明るさを調整します（-150 〜 150）。"),  layer.UI.Brightness, -150f, 150f, ci);
+            float nc = IndentedSlider(new GUIContent("ｺﾝﾄﾗｽﾄ", "レイヤーのコントラスト（明暗差）を調整します（-50 〜 100）。"),  layer.UI.Contrast,   -50f, 100f, ci);
+            float nh = IndentedSlider(new GUIContent("色相", "レイヤーの色相（カラー）を調整します（-180度 〜 180度）。"),    layer.UI.Hue,        -180f, 180f, ci);
+            float ns = IndentedSlider(new GUIContent("彩度", "レイヤーの彩度（鮮やかさ）を調整します（-100 〜 100）。"),    layer.UI.Saturation, -100f, 100f, ci);
+            float nl = IndentedSlider(new GUIContent("明度", "レイヤーの明度を調整します（-100 〜 100）。"),    layer.UI.Lightness,  -100f, 100f, ci);
+            if (!Mathf.Approximately(nb, layer.UI.Brightness) ||
+                !Mathf.Approximately(nc, layer.UI.Contrast)   ||
+                !Mathf.Approximately(nh, layer.UI.Hue)        ||
+                !Mathf.Approximately(ns, layer.UI.Saturation) ||
+                !Mathf.Approximately(nl, layer.UI.Lightness))
             {
-                layer.UIBrightness = nb;
-                layer.UIContrast   = nc;
-                layer.UIHue        = nh;
-                layer.UISaturation = ns;
-                layer.UILightness  = nl;
+                layer.UI.Brightness = nb;
+                layer.UI.Contrast   = nc;
+                layer.UI.Hue        = nh;
+                layer.UI.Saturation = ns;
+                layer.UI.Lightness  = nl;
                 _needsRecomposite  = true;
             }
             DrawColorizeToggle(layer, ci);
@@ -52,15 +52,15 @@ namespace PSDSimpleEditor
         {
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            bool en = EditorGUILayout.ToggleLeft(new GUIContent("着色 (白黒にも色を入れる)", "白黒（無彩色）の領域にも色相・彩度を適用して着色できるようにします。"), layer.UIColorize,
+            bool en = EditorGUILayout.ToggleLeft(new GUIContent("着色 (白黒にも色を入れる)", "白黒（無彩色）の領域にも色相・彩度を適用して着色できるようにします。"), layer.UI.Colorize,
                                                  GUILayout.Height(RowH));
             GUILayout.FlexibleSpace();
             DrawAdjustmentGearMenu(ClipboardKind.Colorize, layer);
             EditorGUILayout.EndHorizontal();
             RowSpace();
-            if (en != layer.UIColorize)
+            if (en != layer.UI.Colorize)
             {
-                layer.UIColorize  = en;
+                layer.UI.Colorize  = en;
                 _needsRecomposite = true;
             }
         }
@@ -70,14 +70,14 @@ namespace PSDSimpleEditor
         {
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            bool en = EditorGUILayout.ToggleLeft(new GUIContent("階調反転", "レイヤーの色のRGB値を反転します。"), layer.UIInvert, GUILayout.Height(RowH));
+            bool en = EditorGUILayout.ToggleLeft(new GUIContent("階調反転", "レイヤーの色のRGB値を反転します。"), layer.UI.Invert, GUILayout.Height(RowH));
             GUILayout.FlexibleSpace();
             DrawAdjustmentGearMenu(ClipboardKind.Invert, layer);
             EditorGUILayout.EndHorizontal();
             RowSpace();
-            if (en != layer.UIInvert)
+            if (en != layer.UI.Invert)
             {
-                layer.UIInvert    = en;
+                layer.UI.Invert    = en;
                 _needsRecomposite = true;
             }
         }
@@ -87,22 +87,22 @@ namespace PSDSimpleEditor
         {
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            bool en = EditorGUILayout.ToggleLeft(new GUIContent("しきい値", "画像を白と黒の2階調に変換する機能を有効にします。"), layer.UIThresholdEnabled, GUILayout.Height(RowH));
+            bool en = EditorGUILayout.ToggleLeft(new GUIContent("しきい値", "画像を白と黒の2階調に変換する機能を有効にします。"), layer.UI.ThresholdEnabled, GUILayout.Height(RowH));
             GUILayout.FlexibleSpace();
             DrawAdjustmentGearMenu(ClipboardKind.Threshold, layer);
             EditorGUILayout.EndHorizontal();
             RowSpace();
-            if (en != layer.UIThresholdEnabled)
+            if (en != layer.UI.ThresholdEnabled)
             {
-                layer.UIThresholdEnabled = en;
+                layer.UI.ThresholdEnabled = en;
                 _needsRecomposite = true;
             }
             if (!en) return;
 
-            float nl = IndentedSlider(new GUIContent("レベル", "2階調に分ける基準値（0 〜 255）を設定します。"), layer.UIThresholdLevel, 0f, 255f, indent);
-            if (!Mathf.Approximately(nl, layer.UIThresholdLevel))
+            float nl = IndentedSlider(new GUIContent("レベル", "2階調に分ける基準値（0 〜 255）を設定します。"), layer.UI.ThresholdLevel, 0f, 255f, indent);
+            if (!Mathf.Approximately(nl, layer.UI.ThresholdLevel))
             {
-                layer.UIThresholdLevel = nl;
+                layer.UI.ThresholdLevel = nl;
                 _needsRecomposite = true;
             }
         }
@@ -112,23 +112,23 @@ namespace PSDSimpleEditor
         {
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            bool en = EditorGUILayout.ToggleLeft(new GUIContent("ポスタリゼーション", "画像の階調数を減らしてイラスト調（トーン減少）にする効果を有効にします。"), layer.UIPosterizeEnabled,
+            bool en = EditorGUILayout.ToggleLeft(new GUIContent("ポスタリゼーション", "画像の階調数を減らしてイラスト調（トーン減少）にする効果を有効にします。"), layer.UI.PosterizeEnabled,
                                                  GUILayout.Height(RowH));
             GUILayout.FlexibleSpace();
             DrawAdjustmentGearMenu(ClipboardKind.Posterize, layer);
             EditorGUILayout.EndHorizontal();
             RowSpace();
-            if (en != layer.UIPosterizeEnabled)
+            if (en != layer.UI.PosterizeEnabled)
             {
-                layer.UIPosterizeEnabled = en;
+                layer.UI.PosterizeEnabled = en;
                 _needsRecomposite = true;
             }
             if (!en) return;
 
-            float nl = IndentedSlider(new GUIContent("階調数", "表現する階調数（2 〜 255）を設定します。"), layer.UIPosterizeLevels, 2f, 255f, indent);
-            if (!Mathf.Approximately(nl, layer.UIPosterizeLevels))
+            float nl = IndentedSlider(new GUIContent("階調数", "表現する階調数（2 〜 255）を設定します。"), layer.UI.PosterizeLevels, 2f, 255f, indent);
+            if (!Mathf.Approximately(nl, layer.UI.PosterizeLevels))
             {
-                layer.UIPosterizeLevels = nl;
+                layer.UI.PosterizeLevels = nl;
                 _needsRecomposite = true;
             }
         }
@@ -138,35 +138,35 @@ namespace PSDSimpleEditor
         {
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            bool en = EditorGUILayout.ToggleLeft(new GUIContent("レベル補正", "ハイライト・シャドウや中間調の入力/出力レベルを調整して、画像の明暗のバランスを補正します。"), layer.UILevelsEnabled, GUILayout.Height(RowH));
+            bool en = EditorGUILayout.ToggleLeft(new GUIContent("レベル補正", "ハイライト・シャドウや中間調の入力/出力レベルを調整して、画像の明暗のバランスを補正します。"), layer.UI.LevelsEnabled, GUILayout.Height(RowH));
             GUILayout.FlexibleSpace();
             DrawAdjustmentGearMenu(ClipboardKind.Levels, layer);
             EditorGUILayout.EndHorizontal();
             RowSpace();
-            if (en != layer.UILevelsEnabled)
+            if (en != layer.UI.LevelsEnabled)
             {
-                layer.UILevelsEnabled = en;
+                layer.UI.LevelsEnabled = en;
                 _needsRecomposite = true;
             }
             if (!en) return;
 
             int ci = indent + 1;
-            float nib = IndentedSlider(new GUIContent("入力シャドウ", "最も暗い部分をどの入力レベル（0〜255）から開始するかを設定します。"), layer.UILevelsInputBlack,  0f, 255f, ci);
-            float niw = IndentedSlider(new GUIContent("入力ハイライト", "最も明るい部分をどの入力レベル（0〜255）で終了するかを設定します。"), layer.UILevelsInputWhite,  0f, 255f, ci);
-            float ng  = IndentedSlider(new GUIContent("ガンマ", "中間調の明るさ（ガンマ値、0.01〜9.99）を調整します。1.0が基準です。"),        layer.UILevelsGamma,       0.01f, 9.99f, ci);
-            float nob = IndentedSlider(new GUIContent("出力シャドウ", "出力される画像の最も暗い部分の明るさ下限（0〜255）を制限します。"),   layer.UILevelsOutputBlack, 0f, 255f, ci);
-            float now = IndentedSlider(new GUIContent("出力ハイライト", "出力される画像の最も明るい部分の明るさ上限（0〜255）を制限します。"), layer.UILevelsOutputWhite, 0f, 255f, ci);
-            if (!Mathf.Approximately(nib, layer.UILevelsInputBlack)  ||
-                !Mathf.Approximately(niw, layer.UILevelsInputWhite)  ||
-                !Mathf.Approximately(ng,  layer.UILevelsGamma)       ||
-                !Mathf.Approximately(nob, layer.UILevelsOutputBlack) ||
-                !Mathf.Approximately(now, layer.UILevelsOutputWhite))
+            float nib = IndentedSlider(new GUIContent("入力シャドウ", "最も暗い部分をどの入力レベル（0〜255）から開始するかを設定します。"), layer.UI.LevelsInputBlack,  0f, 255f, ci);
+            float niw = IndentedSlider(new GUIContent("入力ハイライト", "最も明るい部分をどの入力レベル（0〜255）で終了するかを設定します。"), layer.UI.LevelsInputWhite,  0f, 255f, ci);
+            float ng  = IndentedSlider(new GUIContent("ガンマ", "中間調の明るさ（ガンマ値、0.01〜9.99）を調整します。1.0が基準です。"),        layer.UI.LevelsGamma,       0.01f, 9.99f, ci);
+            float nob = IndentedSlider(new GUIContent("出力シャドウ", "出力される画像の最も暗い部分の明るさ下限（0〜255）を制限します。"),   layer.UI.LevelsOutputBlack, 0f, 255f, ci);
+            float now = IndentedSlider(new GUIContent("出力ハイライト", "出力される画像の最も明るい部分の明るさ上限（0〜255）を制限します。"), layer.UI.LevelsOutputWhite, 0f, 255f, ci);
+            if (!Mathf.Approximately(nib, layer.UI.LevelsInputBlack)  ||
+                !Mathf.Approximately(niw, layer.UI.LevelsInputWhite)  ||
+                !Mathf.Approximately(ng,  layer.UI.LevelsGamma)       ||
+                !Mathf.Approximately(nob, layer.UI.LevelsOutputBlack) ||
+                !Mathf.Approximately(now, layer.UI.LevelsOutputWhite))
             {
-                layer.UILevelsInputBlack  = nib;
-                layer.UILevelsInputWhite  = niw;
-                layer.UILevelsGamma       = ng;
-                layer.UILevelsOutputBlack = nob;
-                layer.UILevelsOutputWhite = now;
+                layer.UI.LevelsInputBlack  = nib;
+                layer.UI.LevelsInputWhite  = niw;
+                layer.UI.LevelsGamma       = ng;
+                layer.UI.LevelsOutputBlack = nob;
+                layer.UI.LevelsOutputWhite = now;
                 _needsRecomposite = true;
             }
         }
@@ -178,14 +178,14 @@ namespace PSDSimpleEditor
             GUILayout.Space(indent * IndentWidth + 18f);
             bool en = EditorGUILayout.ToggleLeft(
                 new GUIContent("カラーバランス", "シャドウ・中間調・ハイライトごとに色味（シアン-赤/マゼンタ-緑/黄-青）を調整します。"),
-                layer.UIColorBalanceEnabled, GUILayout.Height(RowH));
+                layer.UI.ColorBalanceEnabled, GUILayout.Height(RowH));
             GUILayout.FlexibleSpace();
             DrawAdjustmentGearMenu(ClipboardKind.ColorBalance, layer);
             EditorGUILayout.EndHorizontal();
             RowSpace();
-            if (en != layer.UIColorBalanceEnabled)
+            if (en != layer.UI.ColorBalanceEnabled)
             {
-                layer.UIColorBalanceEnabled = en;
+                layer.UI.ColorBalanceEnabled = en;
                 _needsRecomposite = true;
             }
             if (!en) return;
@@ -207,23 +207,23 @@ namespace PSDSimpleEditor
                 return nv;
             }
 
-            var s = DrawRange("シャドウ",   layer.UICBShadows);
-            var m = DrawRange("中間調",     layer.UICBMidtones);
-            var h = DrawRange("ハイライト", layer.UICBHighlights);
+            var s = DrawRange("シャドウ",   layer.UI.CBShadows);
+            var m = DrawRange("中間調",     layer.UI.CBMidtones);
+            var h = DrawRange("ハイライト", layer.UI.CBHighlights);
 
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
             bool pl = EditorGUILayout.ToggleLeft(new GUIContent("輝度を保持", "色を変えても明るさ（輝度）を維持します。"),
-                                                 layer.UICBPreserveLuminosity, GUILayout.Height(RowH));
+                                                 layer.UI.CBPreserveLuminosity, GUILayout.Height(RowH));
             EditorGUILayout.EndHorizontal();
             RowSpace();
 
-            if (changed || pl != layer.UICBPreserveLuminosity)
+            if (changed || pl != layer.UI.CBPreserveLuminosity)
             {
-                layer.UICBShadows            = s;
-                layer.UICBMidtones           = m;
-                layer.UICBHighlights         = h;
-                layer.UICBPreserveLuminosity = pl;
+                layer.UI.CBShadows            = s;
+                layer.UI.CBMidtones           = m;
+                layer.UI.CBHighlights         = h;
+                layer.UI.CBPreserveLuminosity = pl;
                 _needsRecomposite            = true;
             }
         }
@@ -233,14 +233,14 @@ namespace PSDSimpleEditor
         {
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            bool en = EditorGUILayout.ToggleLeft(new GUIContent("トーンカーブ", "トーンカーブによる色調補正を有効にします。"), layer.UICurveEnabled, GUILayout.Height(RowH));
+            bool en = EditorGUILayout.ToggleLeft(new GUIContent("トーンカーブ", "トーンカーブによる色調補正を有効にします。"), layer.UI.CurveEnabled, GUILayout.Height(RowH));
             GUILayout.FlexibleSpace();
             DrawAdjustmentGearMenu(ClipboardKind.Curve, layer);
             EditorGUILayout.EndHorizontal();
             RowSpace();
-            if (en != layer.UICurveEnabled)
+            if (en != layer.UI.CurveEnabled)
             {
-                layer.UICurveEnabled = en;
+                layer.UI.CurveEnabled = en;
                 _needsRecomposite = true;
             }
             if (!en) return;
@@ -253,13 +253,13 @@ namespace PSDSimpleEditor
             GUILayout.Label(new GUIContent("カーブ", "入力レベルに対する出力レベルをグラフで編集して微調整します。"), PSDEditorTheme.ControlLabelStyle,
                             GUILayout.Width(48), GUILayout.Height(RowH));
             EditorGUI.BeginChangeCheck();
-            AnimationCurve nc = EditorGUILayout.CurveField(layer.UICurve, GUILayout.Height(60));
+            AnimationCurve nc = EditorGUILayout.CurveField(layer.UI.Curve, GUILayout.Height(60));
             bool curveChanged = EditorGUI.EndChangeCheck();
             EditorGUILayout.EndHorizontal();
             RowSpace();
             if (curveChanged)
             {
-                layer.UICurve = nc;
+                layer.UI.Curve = nc;
                 BakeCurveLut(layer);
                 _needsRecomposite = true;
             }
@@ -275,11 +275,11 @@ namespace PSDSimpleEditor
         /// <summary>トーンカーブ有効時に LUT が無ければ焼く。</summary>
         void EnsureCurveLut(PSDLayer layer)
         {
-            if (layer.UICurve == null) layer.UICurve = CreateDefaultCurve();
+            if (layer.UI.Curve == null) layer.UI.Curve = CreateDefaultCurve();
             if (layer._curveLut == null) BakeCurveLut(layer);
         }
 
-        /// <summary>UICurve (+ パース済みチャンネル別カーブ) を 256×1 の LUT テクスチャに焼き込む。
+        /// <summary>UI.Curve (+ パース済みチャンネル別カーブ) を 256×1 の LUT テクスチャに焼き込む。
         /// R/G/B 各チャンネル値 = 複合カーブ(チャンネルカーブ(入力))。チャンネルカーブが無い場合は R=G=B。</summary>
         static void BakeCurveLut(PSDLayer layer)
         {
@@ -310,10 +310,10 @@ namespace PSDSimpleEditor
         /// <summary>チャンネルカーブ → 複合カーブの順で評価した出力値 (0..255)。</summary>
         static byte EvalCurveChannel(PSDLayer layer, int channel, float x)
         {
-            var chCurves = layer.UICurveChannels;
+            var chCurves = layer.UI.CurveChannels;
             if (chCurves != null && chCurves[channel] != null)
                 x = Mathf.Clamp01(chCurves[channel].Evaluate(x));
-            float v = Mathf.Clamp01(layer.UICurve.Evaluate(x));
+            float v = Mathf.Clamp01(layer.UI.Curve.Evaluate(x));
             return (byte)Mathf.RoundToInt(v * 255f);
         }
 
@@ -322,15 +322,15 @@ namespace PSDSimpleEditor
         {
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            bool en = EditorGUILayout.ToggleLeft(new GUIContent("画像クリップ合成", "別の外部画像をこのレイヤーの不透明形状（アルファ）に合わせて合成します。"), layer.UIImageClipEnabled,
+            bool en = EditorGUILayout.ToggleLeft(new GUIContent("画像クリップ合成", "別の外部画像をこのレイヤーの不透明形状（アルファ）に合わせて合成します。"), layer.UI.ImageClipEnabled,
                                                  GUILayout.Height(RowH));
             GUILayout.FlexibleSpace();
             DrawAdjustmentGearMenu(ClipboardKind.ImageClip, layer);
             EditorGUILayout.EndHorizontal();
             RowSpace();
-            if (en != layer.UIImageClipEnabled)
+            if (en != layer.UI.ImageClipEnabled)
             {
-                layer.UIImageClipEnabled = en;
+                layer.UI.ImageClipEnabled = en;
                 _needsRecomposite = true;
             }
             if (!en) return;
@@ -341,13 +341,13 @@ namespace PSDSimpleEditor
             GUILayout.Label(new GUIContent("画像", "合成に使用するテクスチャ画像（Asset）を指定します。"), PSDEditorTheme.ControlLabelStyle,
                             GUILayout.Width(48), GUILayout.Height(RowH));
             var tex = (Texture2D)EditorGUILayout.ObjectField(
-                layer.UIImageClipTex, typeof(Texture2D), false,
+                layer.UI.ImageClipTex, typeof(Texture2D), false,
                 GUILayout.Width(64), GUILayout.Height(64));
             EditorGUILayout.EndHorizontal();
             RowSpace();
-            if (tex != layer.UIImageClipTex)
+            if (tex != layer.UI.ImageClipTex)
             {
-                layer.UIImageClipTex = tex;
+                layer.UI.ImageClipTex = tex;
                 _needsRecomposite = true;
             }
 
@@ -357,14 +357,14 @@ namespace PSDSimpleEditor
             GUILayout.Label(new GUIContent("タイル", "合成画像の縦横タイリング反復回数を設定します。1.0で等倍です。"), PSDEditorTheme.ControlLabelStyle,
                             GUILayout.Width(48), GUILayout.Height(RowH));
             Vector2 nt = NarrowLabelField(() =>
-                EditorGUILayout.Vector2Field(new GUIContent("", "合成画像の縦横タイリング反復回数"), layer.UIImageClipTile,
+                EditorGUILayout.Vector2Field(new GUIContent("", "合成画像の縦横タイリング反復回数"), layer.UI.ImageClipTile,
                                              GUILayout.Height(RowH)));
             EditorGUILayout.EndHorizontal();
             RowSpace();
-            if (nt != layer.UIImageClipTile)
+            if (nt != layer.UI.ImageClipTile)
             {
                 // 0 / 負値はタイリングが破綻するため下限でクランプ
-                layer.UIImageClipTile = new Vector2(Mathf.Max(0.01f, nt.x), Mathf.Max(0.01f, nt.y));
+                layer.UI.ImageClipTile = new Vector2(Mathf.Max(0.01f, nt.x), Mathf.Max(0.01f, nt.y));
                 _needsRecomposite = true;
             }
 
@@ -375,22 +375,22 @@ namespace PSDSimpleEditor
                             GUILayout.Width(48), GUILayout.Height(RowH));
             BlendMode[] modes  = _blendModesNormal;
             string[]    labels = _blendLabelsNormal ?? (_blendLabelsNormal = BuildBlendLabels(_blendModesNormal));
-            int curIndex = Mathf.Max(0, Array.IndexOf(modes, layer.UIImageClipBlend));
+            int curIndex = Mathf.Max(0, Array.IndexOf(modes, layer.UI.ImageClipBlend));
             int newIndex = NarrowLabelField(() =>
                 EditorGUILayout.Popup(new GUIContent("", "ブレンドモード"), curIndex, labels, GUILayout.Height(RowH)));
             EditorGUILayout.EndHorizontal();
             RowSpace();
             if (newIndex != curIndex)
             {
-                layer.UIImageClipBlend = modes[newIndex];
+                layer.UI.ImageClipBlend = modes[newIndex];
                 _needsRecomposite = true;
             }
 
             // 不透明度
-            float no = IndentedSlider(new GUIContent("不透明度", "合成するクリップ画像の重ね合わせ不透明度を調整します。"), layer.UIImageClipOpacity, 0f, 1f, indent);
-            if (!Mathf.Approximately(no, layer.UIImageClipOpacity))
+            float no = IndentedSlider(new GUIContent("不透明度", "合成するクリップ画像の重ね合わせ不透明度を調整します。"), layer.UI.ImageClipOpacity, 0f, 1f, indent);
+            if (!Mathf.Approximately(no, layer.UI.ImageClipOpacity))
             {
-                layer.UIImageClipOpacity = no;
+                layer.UI.ImageClipOpacity = no;
                 _needsRecomposite = true;
             }
         }
@@ -400,32 +400,32 @@ namespace PSDSimpleEditor
         {
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
-            bool en = EditorGUILayout.ToggleLeft(new GUIContent("グラデーションマップ", "輝度（白黒の明るさ）に基づいて別のグラデーション色を適用する機能を有効にします。"), layer.UIGradientMapEnabled,
+            bool en = EditorGUILayout.ToggleLeft(new GUIContent("グラデーションマップ", "輝度（白黒の明るさ）に基づいて別のグラデーション色を適用する機能を有効にします。"), layer.UI.GradientMapEnabled,
                                                  GUILayout.Height(RowH));
             GUILayout.FlexibleSpace();
             DrawAdjustmentGearMenu(ClipboardKind.GradientMap, layer);
             EditorGUILayout.EndHorizontal();
             RowSpace();
-            if (en != layer.UIGradientMapEnabled)
+            if (en != layer.UI.GradientMapEnabled)
             {
-                layer.UIGradientMapEnabled = en;
+                layer.UI.GradientMapEnabled = en;
                 if (en) EnsureGradientLut(layer);   // 初回有効化時に LUT を焼く
                 _needsRecomposite = true;
             }
             if (!en) return;
 
-            if (layer.UIGradient == null) layer.UIGradient = CreateDefaultGradient();
+            if (layer.UI.Gradient == null) layer.UI.Gradient = CreateDefaultGradient();
 
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
             bool normalize = EditorGUILayout.ToggleLeft(
                 new GUIContent("輝度を正規化", "レイヤー内の最も暗い色から最も明るい色の輝度範囲を0〜1に自動ストレッチして、グラデーションが均等にかかるように調整します。"),
-                layer.UIGradientMapNormalize, GUILayout.Height(RowH));
+                layer.UI.GradientMapNormalize, GUILayout.Height(RowH));
             EditorGUILayout.EndHorizontal();
             RowSpace();
-            if (normalize != layer.UIGradientMapNormalize)
+            if (normalize != layer.UI.GradientMapNormalize)
             {
-                layer.UIGradientMapNormalize = normalize;
+                layer.UI.GradientMapNormalize = normalize;
                 if (normalize) ComputeGradientLumRange(layer);
                 _needsRecomposite = true;
             }
@@ -436,21 +436,21 @@ namespace PSDSimpleEditor
                             GUILayout.Width(48), GUILayout.Height(RowH));
             EditorGUI.BeginChangeCheck();
             Gradient ng = NarrowLabelField(() =>
-                EditorGUILayout.GradientField(new GUIContent("", "グラデーションマップで使用するグラデーション"), layer.UIGradient, GUILayout.Height(RowH)));
+                EditorGUILayout.GradientField(new GUIContent("", "グラデーションマップで使用するグラデーション"), layer.UI.Gradient, GUILayout.Height(RowH)));
             bool gradientChanged = EditorGUI.EndChangeCheck();
             EditorGUILayout.EndHorizontal();
             RowSpace();
             if (gradientChanged)
             {
-                layer.UIGradient = ng;
+                layer.UI.Gradient = ng;
                 BakeGradientLut(layer);
                 _needsRecomposite = true;
             }
 
-            float no = IndentedSlider(new GUIContent("適用率", "グラデーションマップを適用する強度（0.0 〜 1.0）を設定します。"), layer.UIGradientMapOpacity, 0f, 1f, indent);
-            if (!Mathf.Approximately(no, layer.UIGradientMapOpacity))
+            float no = IndentedSlider(new GUIContent("適用率", "グラデーションマップを適用する強度（0.0 〜 1.0）を設定します。"), layer.UI.GradientMapOpacity, 0f, 1f, indent);
+            if (!Mathf.Approximately(no, layer.UI.GradientMapOpacity))
             {
-                layer.UIGradientMapOpacity = no;
+                layer.UI.GradientMapOpacity = no;
                 _needsRecomposite = true;
             }
         }
@@ -471,11 +471,11 @@ namespace PSDSimpleEditor
             if (layers == null) return;
             foreach (var l in layers)
             {
-                if (l.UIGradientMapEnabled && l.UIGradient != null)
+                if (l.UI.GradientMapEnabled && l.UI.Gradient != null)
                     EnsureGradientLut(l);
                 if (l.Adjustment != null && l.Adjustment.HasGradientFill && l.Adjustment.GradientFillGradient != null)
                     BakeGradientFillLut(l);
-                if (l.UICurveEnabled)
+                if (l.UI.CurveEnabled)
                     EnsureCurveLut(l);
                 BakeImportedLuts(l.Children);
             }
@@ -504,11 +504,11 @@ namespace PSDSimpleEditor
         /// <summary>グラデーション有効時に LUT が無ければ焼く。</summary>
         void EnsureGradientLut(PSDLayer layer)
         {
-            if (layer.UIGradient == null) layer.UIGradient = CreateDefaultGradient();
+            if (layer.UI.Gradient == null) layer.UI.Gradient = CreateDefaultGradient();
             if (layer._gradientLut == null) BakeGradientLut(layer);
         }
 
-        /// <summary>UIGradient を 256×1 の LUT テクスチャ (linear) に焼き込む。</summary>
+        /// <summary>UI.Gradient を 256×1 の LUT テクスチャ (linear) に焼き込む。</summary>
         static void BakeGradientLut(PSDLayer layer)
         {
             const int N = 256;
@@ -523,7 +523,7 @@ namespace PSDSimpleEditor
             }
             var px = new Color32[N];
             for (int i = 0; i < N; i++)
-                px[i] = layer.UIGradient.Evaluate(i / (float)(N - 1));
+                px[i] = layer.UI.Gradient.Evaluate(i / (float)(N - 1));
             layer._gradientLut.SetPixels32(px);
             layer._gradientLut.Apply(false);
         }

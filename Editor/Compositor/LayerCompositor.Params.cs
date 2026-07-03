@@ -174,26 +174,26 @@ namespace PSDSimpleEditor
         // UI 調整値を契約どおりの除数で正規化して反映 (REWRITE_SPEC.md §3)
         static void SetAdjustmentsFrom(ref DrawParams p, PSDLayer layer)
         {
-            p.Brightness = layer.UIBrightness / 150f;
-            p.Contrast   = layer.UIContrast   / 100f;
-            p.Hue        = layer.UIHue        / 180f;
-            p.Saturation = layer.UISaturation / 100f;
-            p.Lightness  = layer.UILightness  / 100f;
-            p.Colorize   = layer.UIColorize;
+            p.Brightness = layer.UI.Brightness / 150f;
+            p.Contrast   = layer.UI.Contrast   / 100f;
+            p.Hue        = layer.UI.Hue        / 180f;
+            p.Saturation = layer.UI.Saturation / 100f;
+            p.Lightness  = layer.UI.Lightness  / 100f;
+            p.Colorize   = layer.UI.Colorize;
 
-            p.Invert          = layer.UIInvert;
-            p.Threshold       = layer.UIThresholdEnabled;
-            p.ThresholdLevel  = layer.UIThresholdLevel / 255f;
-            p.Posterize       = layer.UIPosterizeEnabled;
-            p.PosterizeLevels = layer.UIPosterizeLevels;
+            p.Invert          = layer.UI.Invert;
+            p.Threshold       = layer.UI.ThresholdEnabled;
+            p.ThresholdLevel  = layer.UI.ThresholdLevel / 255f;
+            p.Posterize       = layer.UI.PosterizeEnabled;
+            p.PosterizeLevels = layer.UI.PosterizeLevels;
 
-            if (layer.UILevelsEnabled)
+            if (layer.UI.LevelsEnabled)
             {
-                p.LevelsInBlack  = layer.UILevelsInputBlack  / 255f;
-                p.LevelsInWhite  = layer.UILevelsInputWhite  / 255f;
-                p.LevelsGamma    = Mathf.Max(0.01f, layer.UILevelsGamma);
-                p.LevelsOutBlack = layer.UILevelsOutputBlack / 255f;
-                p.LevelsOutWhite = layer.UILevelsOutputWhite / 255f;
+                p.LevelsInBlack  = layer.UI.LevelsInputBlack  / 255f;
+                p.LevelsInWhite  = layer.UI.LevelsInputWhite  / 255f;
+                p.LevelsGamma    = Mathf.Max(0.01f, layer.UI.LevelsGamma);
+                p.LevelsOutBlack = layer.UI.LevelsOutputBlack / 255f;
+                p.LevelsOutWhite = layer.UI.LevelsOutputWhite / 255f;
 
                 // R/G/B チャンネル別レコード (PSD 由来。UI 編集対象外、有効トグルには連動)
                 var a = layer.Adjustment;
@@ -222,25 +222,25 @@ namespace PSDSimpleEditor
                 p.LevelsOutWhite = 1f;
             }
 
-            if (layer.UICurveEnabled && layer._curveLut != null)
+            if (layer.UI.CurveEnabled && layer._curveLut != null)
                 p.CurveLutTex = layer._curveLut;
 
-            if (layer.UIGradientMapEnabled && layer._gradientLut != null)
+            if (layer.UI.GradientMapEnabled && layer._gradientLut != null)
             {
                 p.GradientMapTex       = layer._gradientLut;
-                p.GradientMapOpacity   = layer.UIGradientMapOpacity;
-                p.GradientMapNormalize = layer.UIGradientMapNormalize;
+                p.GradientMapOpacity   = layer.UI.GradientMapOpacity;
+                p.GradientMapNormalize = layer.UI.GradientMapNormalize;
                 p.GradientMapLumMin    = layer._gradientLumMin;
                 p.GradientMapLumMax    = layer._gradientLumMax;
             }
 
-            if (layer.UIColorBalanceEnabled)
+            if (layer.UI.ColorBalanceEnabled)
             {
                 p.ColorBalance   = true;
-                p.CBShadows      = layer.UICBShadows    / 100f;
-                p.CBMidtones     = layer.UICBMidtones   / 100f;
-                p.CBHighlights   = layer.UICBHighlights / 100f;
-                p.CBPreserveLum  = layer.UICBPreserveLuminosity;
+                p.CBShadows      = layer.UI.CBShadows    / 100f;
+                p.CBMidtones     = layer.UI.CBMidtones   / 100f;
+                p.CBHighlights   = layer.UI.CBHighlights / 100f;
+                p.CBPreserveLum  = layer.UI.CBPreserveLuminosity;
             }
         }
 
@@ -272,7 +272,7 @@ namespace PSDSimpleEditor
             var p = NewParams();
             p.LayerTex  = tex;
             p.LayerRect = FullCanvasRect;
-            p.Opacity   = layer.UIOpacity;
+            p.Opacity   = layer.UI.Opacity;
             p.BlendMode = blendMode;
             SetMaskFrom(ref p, layer);
             p.ClipMaskTex = clipMask;

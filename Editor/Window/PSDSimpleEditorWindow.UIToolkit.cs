@@ -648,9 +648,9 @@ namespace PSDSimpleEditor
 
             // Visibility toggle
             var visibilityToggle = new Toggle();
-            visibilityToggle.value = layer.UIVisible;
+            visibilityToggle.value = layer.UI.Visible;
             visibilityToggle.RegisterValueChangedCallback(evt => {
-                layer.UIVisible = evt.newValue;
+                layer.UI.Visible = evt.newValue;
                 _needsRecomposite = true;
                 RebuildLayerTree();
             });
@@ -669,7 +669,7 @@ namespace PSDSimpleEditor
             container.Add(header);
 
             // Body (shown when visible)
-            if (layer.UIVisible)
+            if (layer.UI.Visible)
             {
                 var body = new VisualElement();
                 body.AddToClassList("layer-group-body");
@@ -727,9 +727,9 @@ namespace PSDSimpleEditor
 
             // Visibility toggle
             var visibilityToggle = new Toggle();
-            visibilityToggle.value = layer.UIVisible;
+            visibilityToggle.value = layer.UI.Visible;
             visibilityToggle.RegisterValueChangedCallback(evt => {
-                layer.UIVisible = evt.newValue;
+                layer.UI.Visible = evt.newValue;
                 _needsRecomposite = true;
                 RebuildLayerTree();
             });
@@ -748,7 +748,7 @@ namespace PSDSimpleEditor
             container.Add(header);
 
             // Controls (shown when visible)
-            if (layer.UIVisible)
+            if (layer.UI.Visible)
             {
                 var imguiContainer = new IMGUIContainer(() => {
                     PSDEditorTheme.PushEditorTheme();

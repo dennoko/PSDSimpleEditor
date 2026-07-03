@@ -112,56 +112,56 @@ namespace PSDSimpleEditor
             if (layers == null) return;
             foreach (var l in layers)
             {
-                l.UIVisible    = l.IsVisible;
-                l.UIOpacity    = l.Opacity / 255f;
-                l.UIBrightness = l.Adjustment.HasBrightnessContrast ? l.Adjustment.Brightness : 0f;
-                l.UIContrast   = l.Adjustment.HasBrightnessContrast ? l.Adjustment.Contrast   : 0f;
-                l.UIHue        = l.Adjustment.HasHueSaturation ? l.Adjustment.Hue        : 0f;
-                l.UISaturation = l.Adjustment.HasHueSaturation ? l.Adjustment.Saturation : 0f;
-                l.UILightness  = l.Adjustment.HasHueSaturation ? l.Adjustment.Lightness  : 0f;
-                l.UIColorize   = l.Adjustment.HasHueSaturation && l.Adjustment.HueColorize;
-                l.UIInvert            = l.Adjustment.HasInvert;
-                l.UIThresholdEnabled  = l.Adjustment.HasThreshold;
-                l.UIThresholdLevel    = l.Adjustment.HasThreshold ? l.Adjustment.ThresholdLevel : 128f;
-                l.UIPosterizeEnabled  = l.Adjustment.HasPosterize;
-                l.UIPosterizeLevels   = l.Adjustment.HasPosterize ? l.Adjustment.PosterizeLevels : 4f;
-                l.UILevelsEnabled     = l.Adjustment.HasLevels;
-                l.UILevelsInputBlack  = l.Adjustment.HasLevels ? l.Adjustment.LevelsInputBlack  : 0f;
-                l.UILevelsInputWhite  = l.Adjustment.HasLevels ? l.Adjustment.LevelsInputWhite  : 255f;
-                l.UILevelsGamma       = l.Adjustment.HasLevels ? l.Adjustment.LevelsGamma       : 1f;
-                l.UILevelsOutputBlack = l.Adjustment.HasLevels ? l.Adjustment.LevelsOutputBlack : 0f;
-                l.UILevelsOutputWhite = l.Adjustment.HasLevels ? l.Adjustment.LevelsOutputWhite : 255f;
-                l.UICurveEnabled = l.Adjustment.HasCurves;
+                l.UI.Visible    = l.IsVisible;
+                l.UI.Opacity    = l.Opacity / 255f;
+                l.UI.Brightness = l.Adjustment.HasBrightnessContrast ? l.Adjustment.Brightness : 0f;
+                l.UI.Contrast   = l.Adjustment.HasBrightnessContrast ? l.Adjustment.Contrast   : 0f;
+                l.UI.Hue        = l.Adjustment.HasHueSaturation ? l.Adjustment.Hue        : 0f;
+                l.UI.Saturation = l.Adjustment.HasHueSaturation ? l.Adjustment.Saturation : 0f;
+                l.UI.Lightness  = l.Adjustment.HasHueSaturation ? l.Adjustment.Lightness  : 0f;
+                l.UI.Colorize   = l.Adjustment.HasHueSaturation && l.Adjustment.HueColorize;
+                l.UI.Invert            = l.Adjustment.HasInvert;
+                l.UI.ThresholdEnabled  = l.Adjustment.HasThreshold;
+                l.UI.ThresholdLevel    = l.Adjustment.HasThreshold ? l.Adjustment.ThresholdLevel : 128f;
+                l.UI.PosterizeEnabled  = l.Adjustment.HasPosterize;
+                l.UI.PosterizeLevels   = l.Adjustment.HasPosterize ? l.Adjustment.PosterizeLevels : 4f;
+                l.UI.LevelsEnabled     = l.Adjustment.HasLevels;
+                l.UI.LevelsInputBlack  = l.Adjustment.HasLevels ? l.Adjustment.LevelsInputBlack  : 0f;
+                l.UI.LevelsInputWhite  = l.Adjustment.HasLevels ? l.Adjustment.LevelsInputWhite  : 255f;
+                l.UI.LevelsGamma       = l.Adjustment.HasLevels ? l.Adjustment.LevelsGamma       : 1f;
+                l.UI.LevelsOutputBlack = l.Adjustment.HasLevels ? l.Adjustment.LevelsOutputBlack : 0f;
+                l.UI.LevelsOutputWhite = l.Adjustment.HasLevels ? l.Adjustment.LevelsOutputWhite : 255f;
+                l.UI.CurveEnabled = l.Adjustment.HasCurves;
                 if (l.Adjustment.HasCurves && l.Adjustment.CurvePoints != null && l.Adjustment.CurvePoints.Count >= 2)
-                    l.UICurve = BuildAnimationCurveFromPoints(l.Adjustment.CurvePoints);
+                    l.UI.Curve = BuildAnimationCurveFromPoints(l.Adjustment.CurvePoints);
 
                 // R/G/B チャンネル別カーブ (合成へ反映のみ。LUT ベイク時に複合カーブと畳み込む)
                 if (l.Adjustment.HasChannelCurves && l.Adjustment.CurveChannelPoints != null)
                 {
-                    l.UICurveChannels = new AnimationCurve[3];
+                    l.UI.CurveChannels = new AnimationCurve[3];
                     for (int c = 0; c < 3; c++)
                     {
                         var pts = l.Adjustment.CurveChannelPoints[c];
                         if (pts != null && pts.Count >= 2)
-                            l.UICurveChannels[c] = BuildAnimationCurveFromPoints(pts);
+                            l.UI.CurveChannels[c] = BuildAnimationCurveFromPoints(pts);
                     }
                 }
 
                 // グラデーションマップ (LUT は Editor 側でロード後に焼く。ここでは有効化とグラデーションのみ)
                 if (l.Adjustment.HasGradientMap && l.Adjustment.GradientMapGradient != null)
                 {
-                    l.UIGradientMapEnabled = true;
-                    l.UIGradient           = l.Adjustment.GradientMapGradient;
+                    l.UI.GradientMapEnabled = true;
+                    l.UI.Gradient           = l.Adjustment.GradientMapGradient;
                 }
 
                 // カラーバランス
-                l.UIColorBalanceEnabled = l.Adjustment.HasColorBalance;
+                l.UI.ColorBalanceEnabled = l.Adjustment.HasColorBalance;
                 if (l.Adjustment.HasColorBalance)
                 {
-                    l.UICBShadows            = l.Adjustment.CBShadows;
-                    l.UICBMidtones           = l.Adjustment.CBMidtones;
-                    l.UICBHighlights         = l.Adjustment.CBHighlights;
-                    l.UICBPreserveLuminosity = l.Adjustment.CBPreserveLuminosity;
+                    l.UI.CBShadows            = l.Adjustment.CBShadows;
+                    l.UI.CBMidtones           = l.Adjustment.CBMidtones;
+                    l.UI.CBHighlights         = l.Adjustment.CBHighlights;
+                    l.UI.CBPreserveLuminosity = l.Adjustment.CBPreserveLuminosity;
                 }
 
                 InitUIState(l.Children);
@@ -174,7 +174,7 @@ namespace PSDSimpleEditor
         // ════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// dPSE マーカー付きのクリップ調整レイヤーを直下のピクセルレイヤーの UI* へ吸収し、
+        /// dPSE マーカー付きのクリップ調整レイヤーを直下のピクセルレイヤーの編集状態 (UI) へ吸収し、
         /// ツリーから除去する (InitUIState 実行後に呼ぶこと)。
         /// Photoshop 側でマスク付与・非表示化・不透明度変更・ブレンド変更されたものは
         /// 情報を壊さないよう畳み戻さず通常の調整レイヤーとして残す。
@@ -219,53 +219,53 @@ namespace PSDSimpleEditor
             var a = m.Adjustment;
             if (a == null) return;
 
-            if (a.HasInvert) b.UIInvert = true;
+            if (a.HasInvert) b.UI.Invert = true;
 
             if (a.HasThreshold)
             {
-                b.UIThresholdEnabled = true;
-                b.UIThresholdLevel   = m.UIThresholdLevel;
+                b.UI.ThresholdEnabled = true;
+                b.UI.ThresholdLevel   = m.UI.ThresholdLevel;
             }
 
             if (a.HasPosterize)
             {
-                b.UIPosterizeEnabled = true;
-                b.UIPosterizeLevels  = m.UIPosterizeLevels;
+                b.UI.PosterizeEnabled = true;
+                b.UI.PosterizeLevels  = m.UI.PosterizeLevels;
             }
 
             if (a.HasBrightnessContrast)
             {
-                b.UIBrightness = m.UIBrightness;
-                b.UIContrast   = m.UIContrast;
+                b.UI.Brightness = m.UI.Brightness;
+                b.UI.Contrast   = m.UI.Contrast;
             }
 
             if (a.HasHueSaturation)
             {
-                b.UIHue        = m.UIHue;
-                b.UISaturation = m.UISaturation;
-                b.UILightness  = m.UILightness;
-                b.UIColorize   = m.UIColorize;
+                b.UI.Hue        = m.UI.Hue;
+                b.UI.Saturation = m.UI.Saturation;
+                b.UI.Lightness  = m.UI.Lightness;
+                b.UI.Colorize   = m.UI.Colorize;
             }
 
             if (a.HasLevels)
             {
-                b.UILevelsEnabled     = true;
-                b.UILevelsInputBlack  = m.UILevelsInputBlack;
-                b.UILevelsInputWhite  = m.UILevelsInputWhite;
-                b.UILevelsGamma       = m.UILevelsGamma;
-                b.UILevelsOutputBlack = m.UILevelsOutputBlack;
-                b.UILevelsOutputWhite = m.UILevelsOutputWhite;
+                b.UI.LevelsEnabled     = true;
+                b.UI.LevelsInputBlack  = m.UI.LevelsInputBlack;
+                b.UI.LevelsInputWhite  = m.UI.LevelsInputWhite;
+                b.UI.LevelsGamma       = m.UI.LevelsGamma;
+                b.UI.LevelsOutputBlack = m.UI.LevelsOutputBlack;
+                b.UI.LevelsOutputWhite = m.UI.LevelsOutputWhite;
                 // R/G/B チャンネル別レコードは合成・書き出しとも Adjustment 側を参照する
                 b.Adjustment.HasChannelLevels    = a.HasChannelLevels;
                 b.Adjustment.LevelsChannelRanges = a.LevelsChannelRanges;
                 b.Adjustment.LevelsChannelGamma  = a.LevelsChannelGamma;
             }
 
-            if (a.HasCurves && m.UICurve != null)
+            if (a.HasCurves && m.UI.Curve != null)
             {
-                b.UICurveEnabled  = true;
-                b.UICurve         = m.UICurve;
-                b.UICurveChannels = m.UICurveChannels;
+                b.UI.CurveEnabled  = true;
+                b.UI.Curve         = m.UI.Curve;
+                b.UI.CurveChannels = m.UI.CurveChannels;
                 // チャンネル別カーブの書き戻し (EncodeCurv) は Adjustment 側を参照する
                 b.Adjustment.HasChannelCurves   = a.HasChannelCurves;
                 b.Adjustment.CurveChannelPoints = a.CurveChannelPoints;
@@ -273,18 +273,18 @@ namespace PSDSimpleEditor
 
             if (a.HasColorBalance)
             {
-                b.UIColorBalanceEnabled  = true;
-                b.UICBShadows            = m.UICBShadows;
-                b.UICBMidtones           = m.UICBMidtones;
-                b.UICBHighlights         = m.UICBHighlights;
-                b.UICBPreserveLuminosity = m.UICBPreserveLuminosity;
+                b.UI.ColorBalanceEnabled  = true;
+                b.UI.CBShadows            = m.UI.CBShadows;
+                b.UI.CBMidtones           = m.UI.CBMidtones;
+                b.UI.CBHighlights         = m.UI.CBHighlights;
+                b.UI.CBPreserveLuminosity = m.UI.CBPreserveLuminosity;
             }
 
-            if (a.HasGradientMap && m.UIGradient != null)
+            if (a.HasGradientMap && m.UI.Gradient != null)
             {
-                b.UIGradientMapEnabled = true;
-                b.UIGradient           = m.UIGradient;
-                b.UIGradientMapOpacity = m.UIOpacity; // 書き出し時に適用率をレイヤー不透明度へ載せている
+                b.UI.GradientMapEnabled = true;
+                b.UI.Gradient           = m.UI.Gradient;
+                b.UI.GradientMapOpacity = m.UI.Opacity; // 書き出し時に適用率をレイヤー不透明度へ載せている
             }
         }
 

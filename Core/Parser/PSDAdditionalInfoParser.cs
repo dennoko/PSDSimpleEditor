@@ -88,7 +88,7 @@ namespace PSDSimpleEditor
                     layer.BlendClippedAsGroup = r.ReadByte() != 0;
                     break;
 
-                case "dPSE": // 本ツール製クリップ調整レイヤーのマーカー (読み込み時に UI* へ畳み戻す)
+                case "dPSE": // 本ツール製クリップ調整レイヤーのマーカー (読み込み時に 編集状態 (UI) へ畳み戻す)
                     layer.IsToolAdjustmentClip = true;
                     break;
 

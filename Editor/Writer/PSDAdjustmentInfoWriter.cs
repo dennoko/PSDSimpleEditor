@@ -9,14 +9,14 @@ namespace PSDSimpleEditor
     //  調整レイヤーキーのバイナリ組み立て (PSDAdditionalInfoParser の逆)
     //
     //  PSD 書き出し時に、調整レイヤー / SoCo べた塗り / GdFl グラデーション塗りつぶしの
-    //  内容を追加情報ブロックへ書き戻す。値は UI で編集中のもの (UI*) を採用するため、
+    //  内容を追加情報ブロックへ書き戻す。値は UI で編集中のもの (LayerEditState) を採用するため、
     //  ツール内での編集がそのまま Photoshop 側の調整レイヤーとして往復する。
     //  バイナリ形式は psd-tools (adjustments.py) と照合済み。
     // ════════════════════════════════════════════════════════════════
     internal static class PSDAdjustmentInfoWriter
     {
         /// <summary>本ツール製クリップ調整レイヤーを識別する追加情報キー。
-        /// 読み込み時にベースレイヤーの UI* へ畳み戻す対象の印になる。
+        /// 読み込み時にベースレイヤーの 編集状態 (UI) へ畳み戻す対象の印になる。
         /// (Photoshop 等は未知キーを保存時に破棄するため、外部で編集された
         ///  ファイルは自動的に通常の調整レイヤーとして扱われる)</summary>
         internal const string ClipMarkerKey = "dPSE";
@@ -46,36 +46,36 @@ namespace PSDSimpleEditor
 
             if (a.HasBrightnessContrast)
             {
-                blocks.Add(EncodeBrit(layer.UIBrightness, layer.UIContrast));
-                blocks.Add(EncodeCgEd(layer.UIBrightness, layer.UIContrast));
+                blocks.Add(EncodeBrit(layer.UI.Brightness, layer.UI.Contrast));
+                blocks.Add(EncodeCgEd(layer.UI.Brightness, layer.UI.Contrast));
             }
 
             if (a.HasHueSaturation)
-                blocks.Add(EncodeHue2(layer.UIHue, layer.UISaturation, layer.UILightness, layer.UIColorize));
+                blocks.Add(EncodeHue2(layer.UI.Hue, layer.UI.Saturation, layer.UI.Lightness, layer.UI.Colorize));
 
-            if (a.HasInvert && layer.UIInvert)
+            if (a.HasInvert && layer.UI.Invert)
                 blocks.Add(new ExportExtraBlock { Key = "nvrt", Data = new byte[0] });
 
-            if (a.HasThreshold && layer.UIThresholdEnabled)
-                blocks.Add(EncodeThrs(layer.UIThresholdLevel));
+            if (a.HasThreshold && layer.UI.ThresholdEnabled)
+                blocks.Add(EncodeThrs(layer.UI.ThresholdLevel));
 
-            if (a.HasPosterize && layer.UIPosterizeEnabled)
-                blocks.Add(EncodePost(layer.UIPosterizeLevels));
+            if (a.HasPosterize && layer.UI.PosterizeEnabled)
+                blocks.Add(EncodePost(layer.UI.PosterizeLevels));
 
-            if (a.HasLevels && layer.UILevelsEnabled)
+            if (a.HasLevels && layer.UI.LevelsEnabled)
                 blocks.Add(EncodeLevl(layer));
 
-            if (a.HasCurves && layer.UICurveEnabled)
+            if (a.HasCurves && layer.UI.CurveEnabled)
             {
                 var b = EncodeCurv(layer);
                 if (b != null) blocks.Add(b);
             }
 
-            if (a.HasColorBalance && layer.UIColorBalanceEnabled)
+            if (a.HasColorBalance && layer.UI.ColorBalanceEnabled)
                 blocks.Add(EncodeBlnc(layer));
 
-            if (a.HasGradientMap && layer.UIGradientMapEnabled && layer.UIGradient != null)
-                blocks.Add(EncodeGrdm(layer.UIGradient));
+            if (a.HasGradientMap && layer.UI.GradientMapEnabled && layer.UI.Gradient != null)
+                blocks.Add(EncodeGrdm(layer.UI.Gradient));
 
             return blocks.Count > 0 ? blocks : null;
         }
@@ -145,10 +145,10 @@ namespace PSDSimpleEditor
             Key = "blnc",
             Data = Build(w =>
             {
-                WriteCbTriple(w, layer.UICBShadows);
-                WriteCbTriple(w, layer.UICBMidtones);
-                WriteCbTriple(w, layer.UICBHighlights);
-                w.Write((byte)(layer.UICBPreserveLuminosity ? 1 : 0));
+                WriteCbTriple(w, layer.UI.CBShadows);
+                WriteCbTriple(w, layer.UI.CBMidtones);
+                WriteCbTriple(w, layer.UI.CBHighlights);
+                w.Write((byte)(layer.UI.CBPreserveLuminosity ? 1 : 0));
                 w.Write((byte)0); // パディング
             }),
         };
@@ -220,9 +220,9 @@ namespace PSDSimpleEditor
             {
                 w.WriteUInt16(2); // version
                 WriteLevelRecord(w,
-                    layer.UILevelsInputBlack, layer.UILevelsInputWhite,
-                    layer.UILevelsOutputBlack, layer.UILevelsOutputWhite,
-                    layer.UILevelsGamma);
+                    layer.UI.LevelsInputBlack, layer.UI.LevelsInputWhite,
+                    layer.UI.LevelsOutputBlack, layer.UI.LevelsOutputWhite,
+                    layer.UI.LevelsGamma);
 
                 var a = layer.Adjustment;
                 for (int i = 1; i < 29; i++)
@@ -254,10 +254,10 @@ namespace PSDSimpleEditor
 
         // curv: is_map(1, =0) + version(2, =1) + チャンネルビットマップ(4)
         //       + チャンネルごと (ビット昇順): pointCount(2) + 点 (output(2), input(2))×N
-        //       複合カーブは UICurve (編集値)、R/G/B はパース済み点列をそのまま書き戻す
+        //       複合カーブは UI.Curve (編集値)、R/G/B はパース済み点列をそのまま書き戻す
         internal static ExportExtraBlock EncodeCurv(PSDLayer layer)
         {
-            var composite = CurvePointsFrom(layer.UICurve);
+            var composite = CurvePointsFrom(layer.UI.Curve);
             if (composite == null) composite = layer.Adjustment.CurvePoints;
             if (composite == null || composite.Count < 2) return null;
 
@@ -346,7 +346,7 @@ namespace PSDSimpleEditor
                 Data = Build(w =>
                 {
                     w.WriteUInt16(1);  // version
-                    w.Write((byte)0);  // reverse (UIGradient に反映済みのため常に 0)
+                    w.Write((byte)0);  // reverse (UI.Gradient に反映済みのため常に 0)
                     w.Write((byte)0);  // dithered
                     w.WriteUnicodeString("Custom");
 

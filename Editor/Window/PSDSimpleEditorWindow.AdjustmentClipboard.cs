@@ -95,25 +95,25 @@ namespace PSDSimpleEditor
         }
 
         static CurveSnapshot CopyCurveSnapshot(PSDLayer layer) =>
-            new CurveSnapshot { Enabled = layer.UICurveEnabled, Curve = CloneCurve(layer.UICurve) };
+            new CurveSnapshot { Enabled = layer.UI.CurveEnabled, Curve = CloneCurve(layer.UI.Curve) };
 
         static GradientMapSnapshot CopyGradientMapSnapshot(PSDLayer layer) =>
             new GradientMapSnapshot
             {
-                Enabled   = layer.UIGradientMapEnabled,
-                Gradient  = CloneGradient(layer.UIGradient),
-                Opacity   = layer.UIGradientMapOpacity,
-                Normalize = layer.UIGradientMapNormalize,
+                Enabled   = layer.UI.GradientMapEnabled,
+                Gradient  = CloneGradient(layer.UI.Gradient),
+                Opacity   = layer.UI.GradientMapOpacity,
+                Normalize = layer.UI.GradientMapNormalize,
             };
 
         static ImageClipSnapshot CopyImageClipSnapshot(PSDLayer layer) =>
             new ImageClipSnapshot
             {
-                Enabled = layer.UIImageClipEnabled,
-                Tex     = layer.UIImageClipTex,
-                Tile    = layer.UIImageClipTile,
-                Blend   = layer.UIImageClipBlend,
-                Opacity = layer.UIImageClipOpacity,
+                Enabled = layer.UI.ImageClipEnabled,
+                Tex     = layer.UI.ImageClipTex,
+                Tile    = layer.UI.ImageClipTile,
+                Blend   = layer.UI.ImageClipBlend,
+                Opacity = layer.UI.ImageClipOpacity,
             };
 
         /// <summary>指定した種類の調整パラメーターを layer からクリップボードへコピーする。</summary>
@@ -122,36 +122,36 @@ namespace PSDSimpleEditor
             switch (kind)
             {
                 case ClipboardKind.Colorize:
-                    _adjustmentClipboard[kind] = new ColorizeSnapshot { Value = layer.UIColorize };
+                    _adjustmentClipboard[kind] = new ColorizeSnapshot { Value = layer.UI.Colorize };
                     break;
                 case ClipboardKind.Invert:
-                    _adjustmentClipboard[kind] = new InvertSnapshot { Value = layer.UIInvert };
+                    _adjustmentClipboard[kind] = new InvertSnapshot { Value = layer.UI.Invert };
                     break;
                 case ClipboardKind.Threshold:
-                    _adjustmentClipboard[kind] = new ThresholdSnapshot { Enabled = layer.UIThresholdEnabled, Level = layer.UIThresholdLevel };
+                    _adjustmentClipboard[kind] = new ThresholdSnapshot { Enabled = layer.UI.ThresholdEnabled, Level = layer.UI.ThresholdLevel };
                     break;
                 case ClipboardKind.Posterize:
-                    _adjustmentClipboard[kind] = new PosterizeSnapshot { Enabled = layer.UIPosterizeEnabled, Levels = layer.UIPosterizeLevels };
+                    _adjustmentClipboard[kind] = new PosterizeSnapshot { Enabled = layer.UI.PosterizeEnabled, Levels = layer.UI.PosterizeLevels };
                     break;
                 case ClipboardKind.Levels:
                     _adjustmentClipboard[kind] = new LevelsSnapshot
                     {
-                        Enabled     = layer.UILevelsEnabled,
-                        InputBlack  = layer.UILevelsInputBlack,
-                        InputWhite  = layer.UILevelsInputWhite,
-                        Gamma       = layer.UILevelsGamma,
-                        OutputBlack = layer.UILevelsOutputBlack,
-                        OutputWhite = layer.UILevelsOutputWhite,
+                        Enabled     = layer.UI.LevelsEnabled,
+                        InputBlack  = layer.UI.LevelsInputBlack,
+                        InputWhite  = layer.UI.LevelsInputWhite,
+                        Gamma       = layer.UI.LevelsGamma,
+                        OutputBlack = layer.UI.LevelsOutputBlack,
+                        OutputWhite = layer.UI.LevelsOutputWhite,
                     };
                     break;
                 case ClipboardKind.ColorBalance:
                     _adjustmentClipboard[kind] = new ColorBalanceSnapshot
                     {
-                        Enabled            = layer.UIColorBalanceEnabled,
-                        Shadows            = layer.UICBShadows,
-                        Midtones           = layer.UICBMidtones,
-                        Highlights         = layer.UICBHighlights,
-                        PreserveLuminosity = layer.UICBPreserveLuminosity,
+                        Enabled            = layer.UI.ColorBalanceEnabled,
+                        Shadows            = layer.UI.CBShadows,
+                        Midtones           = layer.UI.CBMidtones,
+                        Highlights         = layer.UI.CBHighlights,
+                        PreserveLuminosity = layer.UI.CBPreserveLuminosity,
                     };
                     break;
                 case ClipboardKind.Curve:
@@ -164,36 +164,36 @@ namespace PSDSimpleEditor
                     _adjustmentClipboard[kind] = CopyImageClipSnapshot(layer);
                     break;
                 case ClipboardKind.ColorRangeMask:
-                    _adjustmentClipboard[kind] = new ColorRangeMaskSnapshot { Target = layer.UIColorRangeTarget, Threshold = layer.UIColorRangeThreshold };
+                    _adjustmentClipboard[kind] = new ColorRangeMaskSnapshot { Target = layer.UI.ColorRangeTarget, Threshold = layer.UI.ColorRangeThreshold };
                     break;
                 case ClipboardKind.FullAdjustmentSection:
                     _adjustmentClipboard[kind] = new FullAdjustmentSnapshot
                     {
-                        Brightness   = layer.UIBrightness,
-                        Contrast     = layer.UIContrast,
-                        Hue          = layer.UIHue,
-                        Saturation   = layer.UISaturation,
-                        Lightness    = layer.UILightness,
-                        Colorize     = layer.UIColorize,
-                        Invert       = layer.UIInvert,
-                        Threshold    = new ThresholdSnapshot { Enabled = layer.UIThresholdEnabled, Level = layer.UIThresholdLevel },
-                        Posterize    = new PosterizeSnapshot { Enabled = layer.UIPosterizeEnabled, Levels = layer.UIPosterizeLevels },
+                        Brightness   = layer.UI.Brightness,
+                        Contrast     = layer.UI.Contrast,
+                        Hue          = layer.UI.Hue,
+                        Saturation   = layer.UI.Saturation,
+                        Lightness    = layer.UI.Lightness,
+                        Colorize     = layer.UI.Colorize,
+                        Invert       = layer.UI.Invert,
+                        Threshold    = new ThresholdSnapshot { Enabled = layer.UI.ThresholdEnabled, Level = layer.UI.ThresholdLevel },
+                        Posterize    = new PosterizeSnapshot { Enabled = layer.UI.PosterizeEnabled, Levels = layer.UI.PosterizeLevels },
                         Levels       = new LevelsSnapshot
                         {
-                            Enabled     = layer.UILevelsEnabled,
-                            InputBlack  = layer.UILevelsInputBlack,
-                            InputWhite  = layer.UILevelsInputWhite,
-                            Gamma       = layer.UILevelsGamma,
-                            OutputBlack = layer.UILevelsOutputBlack,
-                            OutputWhite = layer.UILevelsOutputWhite,
+                            Enabled     = layer.UI.LevelsEnabled,
+                            InputBlack  = layer.UI.LevelsInputBlack,
+                            InputWhite  = layer.UI.LevelsInputWhite,
+                            Gamma       = layer.UI.LevelsGamma,
+                            OutputBlack = layer.UI.LevelsOutputBlack,
+                            OutputWhite = layer.UI.LevelsOutputWhite,
                         },
                         ColorBalance = new ColorBalanceSnapshot
                         {
-                            Enabled            = layer.UIColorBalanceEnabled,
-                            Shadows            = layer.UICBShadows,
-                            Midtones           = layer.UICBMidtones,
-                            Highlights         = layer.UICBHighlights,
-                            PreserveLuminosity = layer.UICBPreserveLuminosity,
+                            Enabled            = layer.UI.ColorBalanceEnabled,
+                            Shadows            = layer.UI.CBShadows,
+                            Midtones           = layer.UI.CBMidtones,
+                            Highlights         = layer.UI.CBHighlights,
+                            PreserveLuminosity = layer.UI.CBPreserveLuminosity,
                         },
                         Curve        = CopyCurveSnapshot(layer),
                         GradientMap  = CopyGradientMapSnapshot(layer),
@@ -205,28 +205,28 @@ namespace PSDSimpleEditor
 
         static void ApplyCurveSnapshot(PSDLayer layer, CurveSnapshot s)
         {
-            layer.UICurveEnabled = s.Enabled;
-            layer.UICurve        = CloneCurve(s.Curve);
+            layer.UI.CurveEnabled = s.Enabled;
+            layer.UI.Curve        = CloneCurve(s.Curve);
             BakeCurveLut(layer);
         }
 
         static void ApplyGradientMapSnapshot(PSDLayer layer, GradientMapSnapshot s)
         {
-            layer.UIGradientMapEnabled   = s.Enabled;
-            layer.UIGradient             = CloneGradient(s.Gradient);
-            layer.UIGradientMapOpacity   = s.Opacity;
-            layer.UIGradientMapNormalize = s.Normalize;
+            layer.UI.GradientMapEnabled   = s.Enabled;
+            layer.UI.Gradient             = CloneGradient(s.Gradient);
+            layer.UI.GradientMapOpacity   = s.Opacity;
+            layer.UI.GradientMapNormalize = s.Normalize;
             BakeGradientLut(layer);
             if (s.Normalize) ComputeGradientLumRange(layer);
         }
 
         static void ApplyImageClipSnapshot(PSDLayer layer, ImageClipSnapshot s)
         {
-            layer.UIImageClipEnabled = s.Enabled;
-            layer.UIImageClipTex     = s.Tex;
-            layer.UIImageClipTile    = s.Tile;
-            layer.UIImageClipBlend   = s.Blend;
-            layer.UIImageClipOpacity = s.Opacity;
+            layer.UI.ImageClipEnabled = s.Enabled;
+            layer.UI.ImageClipTex     = s.Tex;
+            layer.UI.ImageClipTile    = s.Tile;
+            layer.UI.ImageClipBlend   = s.Blend;
+            layer.UI.ImageClipOpacity = s.Opacity;
         }
 
         /// <summary>クリップボードから指定した種類の調整パラメーターを layer へ貼り付ける。データが無ければ false。</summary>
@@ -237,44 +237,44 @@ namespace PSDSimpleEditor
             switch (kind)
             {
                 case ClipboardKind.Colorize:
-                    layer.UIColorize = ((ColorizeSnapshot)raw).Value;
+                    layer.UI.Colorize = ((ColorizeSnapshot)raw).Value;
                     break;
                 case ClipboardKind.Invert:
-                    layer.UIInvert = ((InvertSnapshot)raw).Value;
+                    layer.UI.Invert = ((InvertSnapshot)raw).Value;
                     break;
                 case ClipboardKind.Threshold:
                 {
                     var s = (ThresholdSnapshot)raw;
-                    layer.UIThresholdEnabled = s.Enabled;
-                    layer.UIThresholdLevel   = s.Level;
+                    layer.UI.ThresholdEnabled = s.Enabled;
+                    layer.UI.ThresholdLevel   = s.Level;
                     break;
                 }
                 case ClipboardKind.Posterize:
                 {
                     var s = (PosterizeSnapshot)raw;
-                    layer.UIPosterizeEnabled = s.Enabled;
-                    layer.UIPosterizeLevels  = s.Levels;
+                    layer.UI.PosterizeEnabled = s.Enabled;
+                    layer.UI.PosterizeLevels  = s.Levels;
                     break;
                 }
                 case ClipboardKind.Levels:
                 {
                     var s = (LevelsSnapshot)raw;
-                    layer.UILevelsEnabled     = s.Enabled;
-                    layer.UILevelsInputBlack  = s.InputBlack;
-                    layer.UILevelsInputWhite  = s.InputWhite;
-                    layer.UILevelsGamma       = s.Gamma;
-                    layer.UILevelsOutputBlack = s.OutputBlack;
-                    layer.UILevelsOutputWhite = s.OutputWhite;
+                    layer.UI.LevelsEnabled     = s.Enabled;
+                    layer.UI.LevelsInputBlack  = s.InputBlack;
+                    layer.UI.LevelsInputWhite  = s.InputWhite;
+                    layer.UI.LevelsGamma       = s.Gamma;
+                    layer.UI.LevelsOutputBlack = s.OutputBlack;
+                    layer.UI.LevelsOutputWhite = s.OutputWhite;
                     break;
                 }
                 case ClipboardKind.ColorBalance:
                 {
                     var s = (ColorBalanceSnapshot)raw;
-                    layer.UIColorBalanceEnabled  = s.Enabled;
-                    layer.UICBShadows            = s.Shadows;
-                    layer.UICBMidtones           = s.Midtones;
-                    layer.UICBHighlights         = s.Highlights;
-                    layer.UICBPreserveLuminosity = s.PreserveLuminosity;
+                    layer.UI.ColorBalanceEnabled  = s.Enabled;
+                    layer.UI.CBShadows            = s.Shadows;
+                    layer.UI.CBMidtones           = s.Midtones;
+                    layer.UI.CBHighlights         = s.Highlights;
+                    layer.UI.CBPreserveLuminosity = s.PreserveLuminosity;
                     break;
                 }
                 case ClipboardKind.Curve:
@@ -289,40 +289,40 @@ namespace PSDSimpleEditor
                 case ClipboardKind.ColorRangeMask:
                 {
                     var s = (ColorRangeMaskSnapshot)raw;
-                    layer.UIColorRangeTarget    = s.Target;
-                    layer.UIColorRangeThreshold = s.Threshold;
+                    layer.UI.ColorRangeTarget    = s.Target;
+                    layer.UI.ColorRangeThreshold = s.Threshold;
                     BeginColorRangePreview(layer);
                     break;
                 }
                 case ClipboardKind.FullAdjustmentSection:
                 {
                     var s = (FullAdjustmentSnapshot)raw;
-                    layer.UIBrightness = s.Brightness;
-                    layer.UIContrast   = s.Contrast;
-                    layer.UIHue        = s.Hue;
-                    layer.UISaturation = s.Saturation;
-                    layer.UILightness  = s.Lightness;
-                    layer.UIColorize   = s.Colorize;
-                    layer.UIInvert     = s.Invert;
+                    layer.UI.Brightness = s.Brightness;
+                    layer.UI.Contrast   = s.Contrast;
+                    layer.UI.Hue        = s.Hue;
+                    layer.UI.Saturation = s.Saturation;
+                    layer.UI.Lightness  = s.Lightness;
+                    layer.UI.Colorize   = s.Colorize;
+                    layer.UI.Invert     = s.Invert;
 
-                    layer.UIThresholdEnabled = s.Threshold.Enabled;
-                    layer.UIThresholdLevel   = s.Threshold.Level;
+                    layer.UI.ThresholdEnabled = s.Threshold.Enabled;
+                    layer.UI.ThresholdLevel   = s.Threshold.Level;
 
-                    layer.UIPosterizeEnabled = s.Posterize.Enabled;
-                    layer.UIPosterizeLevels  = s.Posterize.Levels;
+                    layer.UI.PosterizeEnabled = s.Posterize.Enabled;
+                    layer.UI.PosterizeLevels  = s.Posterize.Levels;
 
-                    layer.UILevelsEnabled     = s.Levels.Enabled;
-                    layer.UILevelsInputBlack  = s.Levels.InputBlack;
-                    layer.UILevelsInputWhite  = s.Levels.InputWhite;
-                    layer.UILevelsGamma       = s.Levels.Gamma;
-                    layer.UILevelsOutputBlack = s.Levels.OutputBlack;
-                    layer.UILevelsOutputWhite = s.Levels.OutputWhite;
+                    layer.UI.LevelsEnabled     = s.Levels.Enabled;
+                    layer.UI.LevelsInputBlack  = s.Levels.InputBlack;
+                    layer.UI.LevelsInputWhite  = s.Levels.InputWhite;
+                    layer.UI.LevelsGamma       = s.Levels.Gamma;
+                    layer.UI.LevelsOutputBlack = s.Levels.OutputBlack;
+                    layer.UI.LevelsOutputWhite = s.Levels.OutputWhite;
 
-                    layer.UIColorBalanceEnabled  = s.ColorBalance.Enabled;
-                    layer.UICBShadows            = s.ColorBalance.Shadows;
-                    layer.UICBMidtones           = s.ColorBalance.Midtones;
-                    layer.UICBHighlights         = s.ColorBalance.Highlights;
-                    layer.UICBPreserveLuminosity = s.ColorBalance.PreserveLuminosity;
+                    layer.UI.ColorBalanceEnabled  = s.ColorBalance.Enabled;
+                    layer.UI.CBShadows            = s.ColorBalance.Shadows;
+                    layer.UI.CBMidtones           = s.ColorBalance.Midtones;
+                    layer.UI.CBHighlights         = s.ColorBalance.Highlights;
+                    layer.UI.CBPreserveLuminosity = s.ColorBalance.PreserveLuminosity;
 
                     ApplyCurveSnapshot(layer, s.Curve);
                     ApplyGradientMapSnapshot(layer, s.GradientMap);

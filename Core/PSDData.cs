@@ -122,6 +122,74 @@ namespace PSDSimpleEditor
         public float     OverlayOpacity   = 1f;
     }
 
+    // ─── レイヤーの編集状態 (ランタイム UI 状態) ─────────────────────────────
+    // パース済みの PSD 値 (PSDLayer / AdjustmentData) を初期値として InitUIState が設定し、
+    // 以降は Editor 側 (window) が編集する可変状態。パース結果とは分離して保持する。
+    public class LayerEditState
+    {
+        // ── 表示・不透明度 ──
+        public bool  Visible;
+        public float Opacity;      // 0 .. 1
+
+        // ── 色調補正 ──
+        public float Brightness;   // -150 .. 150
+        public float Contrast;     // -50  .. 100
+        public float Hue;          // -180 .. 180
+        public float Saturation;   // -100 .. 100
+        public float Lightness;    // -100 .. 100
+
+        // ── 階調反転・しきい値・ポスタリゼーション (非破壊。全ピクセルレイヤーに適用可) ──
+        public bool  Invert;               // 階調反転 ON/OFF (invr はパラメータを持たないため有効フラグそのもの)
+        public bool  ThresholdEnabled;
+        public float ThresholdLevel = 128f;  // 0 .. 255
+        public bool  PosterizeEnabled;
+        public float PosterizeLevels = 4f;   // 2 .. 255
+
+        // ── レベル補正 (非破壊。全ピクセルレイヤーに適用可。既定値は恒等変換) ──
+        public bool  LevelsEnabled;
+        public float LevelsInputBlack  = 0f;    // 0 .. 255
+        public float LevelsInputWhite  = 255f;  // 0 .. 255
+        public float LevelsGamma       = 1f;    // 0.01 .. 9.99
+        public float LevelsOutputBlack = 0f;    // 0 .. 255
+        public float LevelsOutputWhite = 255f;  // 0 .. 255
+
+        // ── トーンカーブ (非破壊。全ピクセルレイヤーに適用可) ──
+        public bool             CurveEnabled;
+        public AnimationCurve   Curve;         // 既定: 直線 (0,0)-(1,1)
+        public AnimationCurve[] CurveChannels; // [3] = R/G/B 個別カーブ (PSD 由来・UI 編集対象外)
+
+        // ── 着色 (Colorize): ON で絶対値の色相・彩度を強制し、白黒 (彩度0) にも着色する ──
+        public bool Colorize;
+
+        // ── 画像クリップ合成 (非破壊。任意画像をレイヤーα形状へクリップ・タイリング・ブレンド) ──
+        public bool      ImageClipEnabled;
+        public Texture2D ImageClipTex;
+        public Vector2   ImageClipTile = Vector2.one;  // タイル反復数 (X,Y)
+        public BlendMode ImageClipBlend = BlendMode.Normal;
+        public float     ImageClipOpacity = 1f;        // 0 .. 1
+
+        // ── グラデーションマップ (非破壊。ピクセル輝度 → グラデーション色へ) ──
+        public bool     GradientMapEnabled;
+        public Gradient Gradient;            // 既定: 黒→白
+        public float    GradientMapOpacity = 1f; // 0 .. 1
+        public bool     GradientMapNormalize;    // true: 輝度を対象レイヤーの最暗〜最明で 0..1 に正規化
+
+        // ── カラーバランス (非破壊。シャドウ/中間調/ハイライトごとの色味シフト) ──
+        public bool    ColorBalanceEnabled;
+        public Vector3 CBShadows;              // (CR, MG, YB) 各 -100..100
+        public Vector3 CBMidtones;
+        public Vector3 CBHighlights;
+        public bool    CBPreserveLuminosity = true;
+
+        // ── UI フォールドアウト状態 (色調補正セクションの開閉) ──
+        public bool AdjustExpanded;
+
+        // ── 色域選択マスク (このレイヤー自身の画素から、対象色 ± 閾値で選択範囲を作り PNG 出力) ──
+        public bool  ColorRangeExpanded;
+        public Color ColorRangeTarget    = Color.white; // 対象色
+        public float ColorRangeThreshold = 0.1f;        // 閾値 0..1 (RGB 正規化距離)
+    }
+
     // ─── PSD レイヤー ────────────────────────────────────────────────────────
     public class PSDLayer
     {
@@ -164,76 +232,19 @@ namespace PSDSimpleEditor
         // ── Unity テクスチャ (RGBA32, 上下反転済み = Unity 標準向き) ──
         public Texture2D Texture;
 
-        // ── ランタイム UI 状態 (PSD 値で初期化) ──
-        public bool  UIVisible;
-        public float UIOpacity;      // 0 .. 1
-        public float UIBrightness;   // -150 .. 150
-        public float UIContrast;     // -50  .. 100
-        public float UIHue;          // -180 .. 180
-        public float UISaturation;   // -100 .. 100
-        public float UILightness;    // -100 .. 100
+        // ── ランタイム編集状態 (PSD 値で初期化。詳細は LayerEditState を参照) ──
+        [System.NonSerialized] public LayerEditState UI = new LayerEditState();
 
-        // ── 階調反転・しきい値・ポスタリゼーション (非破壊。全ピクセルレイヤーに適用可) ──
-        public bool  UIInvert;               // 階調反転 ON/OFF (invr はパラメータを持たないため有効フラグそのもの)
-        public bool  UIThresholdEnabled;
-        public float UIThresholdLevel = 128f;  // 0 .. 255
-        public bool  UIPosterizeEnabled;
-        public float UIPosterizeLevels = 4f;   // 2 .. 255
-
-        // ── レベル補正 (非破壊。全ピクセルレイヤーに適用可。既定値は恒等変換) ──
-        public bool  UILevelsEnabled;
-        public float UILevelsInputBlack  = 0f;    // 0 .. 255
-        public float UILevelsInputWhite  = 255f;  // 0 .. 255
-        public float UILevelsGamma       = 1f;    // 0.01 .. 9.99
-        public float UILevelsOutputBlack = 0f;    // 0 .. 255
-        public float UILevelsOutputWhite = 255f;  // 0 .. 255
-
-        // ── トーンカーブ (非破壊。全ピクセルレイヤーに適用可) ──
-        [System.NonSerialized] public bool           UICurveEnabled;
-        [System.NonSerialized] public AnimationCurve  UICurve;    // 既定: 直線 (0,0)-(1,1)
-        [System.NonSerialized] public AnimationCurve[] UICurveChannels; // [3] = R/G/B 個別カーブ (PSD 由来・UI 編集対象外)
-        [System.NonSerialized] public Texture2D       _curveLut;  // 256×1 焼き込み LUT (window が管理)
-
-        // ── 着色 (Colorize): ON で絶対値の色相・彩度を強制し、白黒 (彩度0) にも着色する ──
-        [System.NonSerialized] public bool UIColorize;
-
-        // ── 画像クリップ合成 (非破壊。任意画像をレイヤーα形状へクリップ・タイリング・ブレンド) ──
-        [System.NonSerialized] public bool      UIImageClipEnabled;
-        [System.NonSerialized] public Texture2D UIImageClipTex;
-        [System.NonSerialized] public Vector2   UIImageClipTile = Vector2.one;  // タイル反復数 (X,Y)
-        [System.NonSerialized] public BlendMode UIImageClipBlend = BlendMode.Normal;
-        [System.NonSerialized] public float     UIImageClipOpacity = 1f;        // 0 .. 1
-
-        // ── グラデーションマップ (非破壊。ピクセル輝度 → グラデーション色へ) ──
-        [System.NonSerialized] public bool      UIGradientMapEnabled;
-        [System.NonSerialized] public Gradient  UIGradient;            // 既定: 黒→白
-        [System.NonSerialized] public float     UIGradientMapOpacity = 1f; // 0 .. 1
-        [System.NonSerialized] public Texture2D _gradientLut;          // 256×1 焼き込み LUT (window が管理)
-        [System.NonSerialized] public bool      UIGradientMapNormalize;    // true: 輝度を対象レイヤーの最暗〜最明で 0..1 に正規化
-        [System.NonSerialized] public float     _gradientLumMin = 0f;      // 正規化用レンジ (window が非透明画素から計算)
+        // ── 描画用ランタイムキャッシュ (window が生成・管理する焼き込み LUT 等) ──
+        [System.NonSerialized] public Texture2D _curveLut;         // トーンカーブ 256×1 LUT
+        [System.NonSerialized] public Texture2D _gradientLut;      // グラデーションマップ 256×1 LUT
+        [System.NonSerialized] public Texture2D _gradientFillLut;  // グラデーション塗りつぶし (GdFl) 256×1 LUT (α 込み)
+        [System.NonSerialized] public float     _gradientLumMin = 0f;  // グラデーションマップ正規化レンジ (window が非透明画素から計算)
         [System.NonSerialized] public float     _gradientLumMax = 1f;
-
-        // ── グラデーション塗りつぶし (GdFl) の焼き込み LUT (window が管理) ──
-        [System.NonSerialized] public Texture2D _gradientFillLut;          // 256×1 (α 込み)
-
-        // ── カラーバランス (非破壊。シャドウ/中間調/ハイライトごとの色味シフト) ──
-        public bool    UIColorBalanceEnabled;
-        public Vector3 UICBShadows;              // (CR, MG, YB) 各 -100..100
-        public Vector3 UICBMidtones;
-        public Vector3 UICBHighlights;
-        public bool    UICBPreserveLuminosity = true;
-
-        // ── UI フォールドアウト状態 (色調補正セクションの開閉) ──
-        [System.NonSerialized] public bool UIAdjustExpanded;
-
-        // ── 色域選択マスク (このレイヤー自身の画素から、対象色 ± 閾値で選択範囲を作り PNG 出力) ──
-        [System.NonSerialized] public bool  UIColorRangeExpanded;
-        [System.NonSerialized] public Color UIColorRangeTarget    = Color.white; // 対象色
-        [System.NonSerialized] public float UIColorRangeThreshold = 0.1f;        // 閾値 0..1 (RGB 正規化距離)
 
         // ── 本ツール製クリップ調整レイヤーの識別 (追加情報キー dPSE) ──
         // 書き出し時にピクセルレイヤーの非破壊調整をクリップ調整レイヤーへ変換した印。
-        // 読み込み時にベースレイヤーの UI* へ畳み戻す対象かどうかの判定に使う。
+        // 読み込み時にベースレイヤーの 編集状態 (UI) へ畳み戻す対象かどうかの判定に使う。
         public bool IsToolAdjustmentClip;
 
         // ── ヘルパー ──

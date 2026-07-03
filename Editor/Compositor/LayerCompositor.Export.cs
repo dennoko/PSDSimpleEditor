@@ -47,7 +47,7 @@ namespace PSDSimpleEditor
             var p = NewParams();
             p.LayerTex  = tex;
             p.LayerRect = rect;
-            p.Opacity   = layer.UIOpacity;
+            p.Opacity   = layer.UI.Opacity;
             p.BlendMode = 0; // Normal (α の算出にブレンド関数は影響しない)
             SetMaskFrom(ref p, layer);
             p.ClipMaskTex = clipMask;
@@ -70,7 +70,7 @@ namespace PSDSimpleEditor
             var p = NewParams();
             p.LayerTex  = tex;
             p.LayerRect = FullCanvasRect;
-            p.Opacity   = layer.UIOpacity;
+            p.Opacity   = layer.UI.Opacity;
             p.BlendMode = 0; // Normal
             SetMaskFrom(ref p, layer);
             p.ClipMaskTex = clipMask;
@@ -148,7 +148,7 @@ namespace PSDSimpleEditor
         public Color32[] RenderImageClipForExport(PSDLayer baseLayer)
         {
             if (!IsValid || baseLayer == null) return null;
-            if (!baseLayer.UIImageClipEnabled || baseLayer.UIImageClipTex == null) return null;
+            if (!baseLayer.UI.ImageClipEnabled || baseLayer.UI.ImageClipTex == null) return null;
             int lw = baseLayer.Width, lh = baseLayer.Height;
             if (lw <= 0 || lh <= 0) return null;
 
@@ -166,10 +166,10 @@ namespace PSDSimpleEditor
 
                 // クリップ画像を全面 (0,0,lw,lh) へタイル展開。ブレンド/不透明度/クリップは適用しない。
                 var p = NewParams();
-                p.LayerTex  = baseLayer.UIImageClipTex;
+                p.LayerTex  = baseLayer.UI.ImageClipTex;
                 p.LayerRect = new Vector4(0, 0, lw, lh);
                 p.LayerWrap = true;
-                p.LayerTile = baseLayer.UIImageClipTile;
+                p.LayerTile = baseLayer.UI.ImageClipTile;
                 p.Opacity   = 1f;
                 p.BlendMode = 0; // Normal
                 ApplyParams(p, new Vector4(lw, lh, 0, 0));

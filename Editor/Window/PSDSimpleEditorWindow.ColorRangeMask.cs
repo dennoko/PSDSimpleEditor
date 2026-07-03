@@ -14,8 +14,8 @@ namespace PSDSimpleEditor
         /// </summary>
         void DrawColorRangeMaskControls(PSDLayer layer, int indent)
         {
-            layer.UIColorRangeExpanded = DrawSectionFoldout(new GUIContent("色域選択マスク", "特定の色とその周辺色を抽出した選択範囲マスクを生成します。スポイトで色を選択し、閾値で範囲を広げられます。"), layer.UIColorRangeExpanded, indent, layer, ClipboardKind.ColorRangeMask);
-            if (!layer.UIColorRangeExpanded)
+            layer.UI.ColorRangeExpanded = DrawSectionFoldout(new GUIContent("色域選択マスク", "特定の色とその周辺色を抽出した選択範囲マスクを生成します。スポイトで色を選択し、閾値で範囲を広げられます。"), layer.UI.ColorRangeExpanded, indent, layer, ClipboardKind.ColorRangeMask);
+            if (!layer.UI.ColorRangeExpanded)
             {
                 // フォールドアウトを閉じたら、このレイヤーのスポイト待機・ハイライトを解除する
                 if (_eyedropperTarget == layer)        _eyedropperTarget = null;
@@ -30,16 +30,16 @@ namespace PSDSimpleEditor
             GUILayout.Space(indent * IndentWidth + 18f);
             GUILayout.Label(new GUIContent("対象色", "抽出する対象の色を指定します。"), PSDEditorTheme.ControlLabelStyle,
                             GUILayout.Width(48), GUILayout.Height(RowH));
-            Color nc = EditorGUILayout.ColorField(new GUIContent("", "抽出する対象の色を指定します。"), layer.UIColorRangeTarget, true, false, false,
+            Color nc = EditorGUILayout.ColorField(new GUIContent("", "抽出する対象の色を指定します。"), layer.UI.ColorRangeTarget, true, false, false,
                                                   GUILayout.Width(80), GUILayout.Height(RowH));
             GUILayout.FlexibleSpace();
             bool armed = _eyedropperTarget == layer;
             bool newArmed = GUILayout.Toggle(armed, new GUIContent("スポイト", "スポイトツールを有効にします。プレビュー上でクリックした対象レイヤーの画素色を直接取得できます。"), PSDEditorTheme.MiniButtonStyle,
                                              GUILayout.Width(60), GUILayout.Height(RowH));
             EditorGUILayout.EndHorizontal();
-            if (nc != layer.UIColorRangeTarget)
+            if (nc != layer.UI.ColorRangeTarget)
             {
-                layer.UIColorRangeTarget = nc;
+                layer.UI.ColorRangeTarget = nc;
                 BeginColorRangePreview(layer);   // 対象色の編集後はハイライトプレビューを表示
             }
             if (newArmed != armed)
@@ -60,10 +60,10 @@ namespace PSDSimpleEditor
             }
 
             // 閾値
-            float nt = IndentedSlider(new GUIContent("閾値", "指定した対象色から許容する色のズレ幅を設定します。値が大きいほど、似た色を広く含めるようになります（0.0で完全一致のみ）。"), layer.UIColorRangeThreshold, 0f, 1f, indent);
-            if (!Mathf.Approximately(nt, layer.UIColorRangeThreshold))
+            float nt = IndentedSlider(new GUIContent("閾値", "指定した対象色から許容する色のズレ幅を設定します。値が大きいほど、似た色を広く含めるようになります（0.0で完全一致のみ）。"), layer.UI.ColorRangeThreshold, 0f, 1f, indent);
+            if (!Mathf.Approximately(nt, layer.UI.ColorRangeThreshold))
             {
-                layer.UIColorRangeThreshold = nt;
+                layer.UI.ColorRangeThreshold = nt;
                 BeginColorRangePreview(layer);   // 閾値変更でもハイライトを更新表示
             }
 
@@ -134,7 +134,7 @@ namespace PSDSimpleEditor
             if (layer == null) return;
 
             var px = ColorRangeMask.BuildHighlightPixels(
-                layer, layer.UIColorRangeTarget, layer.UIColorRangeThreshold,
+                layer, layer.UI.ColorRangeTarget, layer.UI.ColorRangeThreshold,
                 ColorRangeHighlightColor, out int w, out int h);
             if (px == null) return;
 
@@ -180,7 +180,7 @@ namespace PSDSimpleEditor
             int by = layer.Height - 1 - ly;
             Color picked = layer.Texture.GetPixel(lx, by);
             picked.a = 1f;
-            layer.UIColorRangeTarget = picked;
+            layer.UI.ColorRangeTarget = picked;
 
             _eyedropperTarget = null;          // 1 回拾ったら解除
             BeginColorRangePreview(layer);     // 取得色でハイライトプレビューを表示
@@ -206,7 +206,7 @@ namespace PSDSimpleEditor
             try
             {
                 var layerPixels = ColorRangeMask.BuildMaskPixels(
-                    layer, layer.UIColorRangeTarget, layer.UIColorRangeThreshold,
+                    layer, layer.UI.ColorRangeTarget, layer.UI.ColorRangeThreshold,
                     out int lw, out int lh);
                 if (layerPixels == null)
                 {

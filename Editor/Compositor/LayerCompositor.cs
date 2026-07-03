@@ -168,7 +168,7 @@ namespace PSDSimpleEditor
                     while (runEnd < layers.Count && layers[runEnd].IsClipping) runEnd++;
 
                 // ベース層が非表示ならクリッピング群ごとスキップ
-                if (!baseLayer.UIVisible) { i = runEnd; continue; }
+                if (!baseLayer.UI.Visible) { i = runEnd; continue; }
 
                 bool hasClipRun = runEnd > i + 1;
 
@@ -195,7 +195,7 @@ namespace PSDSimpleEditor
                     for (int j = i + 1; j < runEnd; j++)
                     {
                         var c = layers[j];
-                        if (!c.UIVisible) continue;
+                        if (!c.UI.Visible) continue;
                         DrawClipRunMember(c, clipMask, ref cur, ref next);
                     }
 
@@ -216,7 +216,7 @@ namespace PSDSimpleEditor
             if (group.GroupBlendMode == BlendMode.PassThrough)
             {
                 // ── パススルー: 子を現在のバッファへ直接再帰合成 ──
-                // 簡略化: パススルーグループの UIOpacity (< 1) とグループ自身のマスクは無視する
+                // 簡略化: パススルーグループの UI.Opacity (< 1) とグループ自身のマスクは無視する
                 CompositeList(group.Children, ref cur, ref next);
 
                 // 簡略化: パススルーグループをベースとするクリッピング層は
@@ -224,7 +224,7 @@ namespace PSDSimpleEditor
                 for (int j = groupIdx + 1; j < runEnd; j++)
                 {
                     var c = layers[j];
-                    if (!c.UIVisible) continue;
+                    if (!c.UI.Visible) continue;
                     DrawClipRunMember(c, null, ref cur, ref next);
                 }
                 return;
@@ -247,7 +247,7 @@ namespace PSDSimpleEditor
                 for (int j = groupIdx + 1; j < runEnd; j++)
                 {
                     var c = layers[j];
-                    if (!c.UIVisible) continue;
+                    if (!c.UI.Visible) continue;
                     DrawClipRunMember(c, clipMask, ref gCur, ref gNext);
                 }
                 ReleaseToPool(clipMask);
@@ -268,7 +268,7 @@ namespace PSDSimpleEditor
                 for (int j = groupIdx + 1; j < runEnd; j++)
                 {
                     var c = layers[j];
-                    if (!c.UIVisible) continue;
+                    if (!c.UI.Visible) continue;
                     DrawClipRunMember(c, clipMask, ref cur, ref next);
                 }
 
@@ -298,10 +298,10 @@ namespace PSDSimpleEditor
             var gNext = AcquireRT(clearToTransparent: false);
 
             // ベース層を不透明度 1 で単独描画 (不透明度は最後に群全体へかける)
-            float savedOpacity = baseLayer.UIOpacity;
-            baseLayer.UIOpacity = 1f;
+            float savedOpacity = baseLayer.UI.Opacity;
+            baseLayer.UI.Opacity = 1f;
             try     { DrawLayer(baseLayer, null, ref gCur, ref gNext); }
-            finally { baseLayer.UIOpacity = savedOpacity; }
+            finally { baseLayer.UI.Opacity = savedOpacity; }
 
             // ベース層の実効 α をコピーで保持 (メンバー描画で gCur が変化するため)
             var clipMask = AcquireRT(clearToTransparent: false);
@@ -310,7 +310,7 @@ namespace PSDSimpleEditor
             for (int j = baseIdx + 1; j < runEnd; j++)
             {
                 var c = layers[j];
-                if (!c.UIVisible) continue;
+                if (!c.UI.Visible) continue;
                 DrawClipRunMember(c, clipMask, ref gCur, ref gNext);
             }
 
@@ -363,20 +363,20 @@ namespace PSDSimpleEditor
             {
                 bool hasAdj = layer.Adjustment.HasBrightnessContrast
                            || layer.Adjustment.HasHueSaturation
-                           || layer.UIColorize
-                           || layer.UIInvert
-                           || layer.UIThresholdEnabled
-                           || layer.UIPosterizeEnabled
+                           || layer.UI.Colorize
+                           || layer.UI.Invert
+                           || layer.UI.ThresholdEnabled
+                           || layer.UI.PosterizeEnabled
                            || layer.Adjustment.HasLevels
-                           || layer.UICurveEnabled
-                           || layer.UIColorBalanceEnabled
-                           || (layer.UIGradientMapEnabled && layer._gradientLut != null);
+                           || layer.UI.CurveEnabled
+                           || layer.UI.ColorBalanceEnabled
+                           || (layer.UI.GradientMapEnabled && layer._gradientLut != null);
                 // 補正項目を持たない調整レイヤーは素通し (バッファは変化しないため描画自体を省略)
                 if (!hasAdj) return;
 
                 var ap = NewParams();
                 ap.IsAdjustment = true;
-                ap.Opacity      = layer.UIOpacity;
+                ap.Opacity      = layer.UI.Opacity;
                 SetMaskFrom(ref ap, layer);
                 ap.ClipMaskTex  = clipMask;
                 SetAdjustmentsFrom(ref ap, layer);
@@ -392,7 +392,7 @@ namespace PSDSimpleEditor
                 var sp = NewParams();
                 sp.LayerTex  = GetSolidTexture(layer.Adjustment.SolidColor);
                 sp.LayerRect = FullCanvasRect;
-                sp.Opacity   = layer.UIOpacity;
+                sp.Opacity   = layer.UI.Opacity;
                 sp.BlendMode = ToShaderBlendMode(layer.BlendMode);
                 SetMaskFrom(ref sp, layer);
                 sp.ClipMaskTex = clipMask;
@@ -409,7 +409,7 @@ namespace PSDSimpleEditor
                 var gp = NewParams();
                 gp.LayerTex  = Texture2D.whiteTexture; // 色はシェーダーが _GradFillTex で上書きする
                 gp.LayerRect = FullCanvasRect;
-                gp.Opacity   = layer.UIOpacity;
+                gp.Opacity   = layer.UI.Opacity;
                 gp.BlendMode = ToShaderBlendMode(layer.BlendMode);
                 SetMaskFrom(ref gp, layer);
                 gp.ClipMaskTex = clipMask;
@@ -427,7 +427,7 @@ namespace PSDSimpleEditor
             var p = NewParams();
             p.LayerTex  = layer.Texture;
             p.LayerRect = LayerRectOf(layer);
-            p.Opacity   = layer.UIOpacity;
+            p.Opacity   = layer.UI.Opacity;
             p.BlendMode = ToShaderBlendMode(layer.BlendMode);
             SetMaskFrom(ref p, layer);
             p.ClipMaskTex = clipMask;
@@ -461,7 +461,7 @@ namespace PSDSimpleEditor
             }
 
             // ── 画像クリップ合成 (任意画像をレイヤーα形状へクリップ・タイリング・ブレンド) ──
-            if (layer.UIImageClipEnabled && layer.UIImageClipTex != null)
+            if (layer.UI.ImageClipEnabled && layer.UI.ImageClipTex != null)
             {
                 // 1) レイヤー本体 (補正込み) を temp へ合成
                 var temp = AcquireRT(clearToTransparent: false);
@@ -473,12 +473,12 @@ namespace PSDSimpleEditor
 
                 // 3) クリップ画像をレイヤー矩形基準でタイリングし、実効 α でクリップして合成
                 var op = NewParams();
-                op.LayerTex    = layer.UIImageClipTex;
+                op.LayerTex    = layer.UI.ImageClipTex;
                 op.LayerRect   = LayerRectOf(layer); // 保存レイヤー (同矩形) とプレビューを一致させる
                 op.LayerWrap   = true;
-                op.LayerTile   = layer.UIImageClipTile;
-                op.Opacity     = layer.UIImageClipOpacity;
-                op.BlendMode   = ToShaderBlendMode(layer.UIImageClipBlend);
+                op.LayerTile   = layer.UI.ImageClipTile;
+                op.Opacity     = layer.UI.ImageClipOpacity;
+                op.BlendMode   = ToShaderBlendMode(layer.UI.ImageClipBlend);
                 op.ClipMaskTex = shape;
                 ApplyParams(op);
                 Graphics.Blit(temp, next, _mat);

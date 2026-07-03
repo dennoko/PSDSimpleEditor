@@ -38,7 +38,7 @@ namespace PSDSimpleEditor
                     // 画像クリップ合成は独立したクリッピングレイヤーとして最上段に挿入する。
                     // (ファイル格納順 = 下→上なので、直後 append = クリップ群の最上段)
                     // 既知の制限: ベースが既に他のクリッピングメンバーを真上に持つ場合、その間に入る。
-                    if (layer.UIImageClipEnabled && layer.UIImageClipTex != null)
+                    if (layer.UI.ImageClipEnabled && layer.UI.ImageClipTex != null)
                         outRecs.Add(BuildImageClipRecord(layer, comp));
                 }
             }
@@ -64,8 +64,8 @@ namespace PSDSimpleEditor
             {
                 Name          = layer.Name,
                 BlendKey      = gkey,
-                Opacity       = ToByteOpacity(layer.UIOpacity),
-                Flags         = (byte)(layer.UIVisible ? 0x00 : 0x02),
+                Opacity       = ToByteOpacity(layer.UI.Opacity),
+                Flags         = (byte)(layer.UI.Visible ? 0x00 : 0x02),
                 LsctType      = layer.IsExpanded ? 1 : 2,
                 GroupBlendKey = gkey,
                 Channels      = EmptyChannels(),
@@ -91,9 +91,9 @@ namespace PSDSimpleEditor
                 Right    = layer.Right,
                 Name     = layer.Name,
                 BlendKey = PSDWriter.KeyOf(layer.BlendMode),
-                Opacity  = ToByteOpacity(layer.UIOpacity),
+                Opacity  = ToByteOpacity(layer.UI.Opacity),
                 Clipping = (byte)(layer.IsClipping ? 1 : 0),
-                Flags    = (byte)(layer.UIVisible ? 0x00 : 0x02),
+                Flags    = (byte)(layer.UI.Visible ? 0x00 : 0x02),
             };
 
             int lw = layer.Width, lh = layer.Height;
@@ -169,8 +169,8 @@ namespace PSDSimpleEditor
                 Bottom   = baseLayer.Bottom,
                 Right    = baseLayer.Right,
                 Name     = baseLayer.Name + " 画像合成",
-                BlendKey = PSDWriter.KeyOf(baseLayer.UIImageClipBlend),
-                Opacity  = ToByteOpacity(baseLayer.UIImageClipOpacity),
+                BlendKey = PSDWriter.KeyOf(baseLayer.UI.ImageClipBlend),
+                Opacity  = ToByteOpacity(baseLayer.UI.ImageClipOpacity),
                 Clipping = 1,
                 Flags    = 0x00, // 表示
             };
@@ -215,24 +215,24 @@ namespace PSDSimpleEditor
 
         static bool HasAnyActiveAdjustment(PSDLayer layer)
         {
-            return !Mathf.Approximately(layer.UIBrightness, 0f)
-                || !Mathf.Approximately(layer.UIContrast,   0f)
+            return !Mathf.Approximately(layer.UI.Brightness, 0f)
+                || !Mathf.Approximately(layer.UI.Contrast,   0f)
                 || HasActiveHsl(layer)
-                || layer.UIInvert
-                || layer.UIThresholdEnabled
-                || layer.UIPosterizeEnabled
-                || layer.UILevelsEnabled
-                || (layer.UICurveEnabled && layer.UICurve != null)
-                || (layer.UIGradientMapEnabled && layer.UIGradient != null)
-                || layer.UIColorBalanceEnabled;
+                || layer.UI.Invert
+                || layer.UI.ThresholdEnabled
+                || layer.UI.PosterizeEnabled
+                || layer.UI.LevelsEnabled
+                || (layer.UI.CurveEnabled && layer.UI.Curve != null)
+                || (layer.UI.GradientMapEnabled && layer.UI.Gradient != null)
+                || layer.UI.ColorBalanceEnabled;
         }
 
         static bool HasActiveHsl(PSDLayer layer)
         {
-            return !Mathf.Approximately(layer.UIHue,        0f)
-                || !Mathf.Approximately(layer.UISaturation, 0f)
-                || !Mathf.Approximately(layer.UILightness,  0f)
-                || layer.UIColorize;
+            return !Mathf.Approximately(layer.UI.Hue,        0f)
+                || !Mathf.Approximately(layer.UI.Saturation, 0f)
+                || !Mathf.Approximately(layer.UI.Lightness,  0f)
+                || layer.UI.Colorize;
         }
 
         /// <summary>
@@ -249,7 +249,7 @@ namespace PSDSimpleEditor
             // 「ブレンド前のベース画素への補正」を調整レイヤーで再現できない
             if (!layer.BlendClippedAsGroup) return true;
             // 輝度正規化グラデーションマップは PSD に対応する表現が無い
-            if (layer.UIGradientMapEnabled && layer.UIGradientMapNormalize) return true;
+            if (layer.UI.GradientMapEnabled && layer.UI.GradientMapNormalize) return true;
             return false;
         }
 
@@ -264,48 +264,48 @@ namespace PSDSimpleEditor
         {
             if (!IsPlainPixelLayer(layer) || WillBakeAdjustments(layer)) return;
 
-            if (layer.UIInvert)
+            if (layer.UI.Invert)
                 outRecs.Add(BuildAdjustmentClipRecord("階調の反転",
                     new ExportExtraBlock { Key = "nvrt", Data = new byte[0] }));
 
-            if (layer.UILevelsEnabled)
+            if (layer.UI.LevelsEnabled)
                 outRecs.Add(BuildAdjustmentClipRecord("レベル補正",
                     PSDAdjustmentInfoWriter.EncodeLevl(layer)));
 
-            if (layer.UICurveEnabled && layer.UICurve != null)
+            if (layer.UI.CurveEnabled && layer.UI.Curve != null)
             {
                 var curv = PSDAdjustmentInfoWriter.EncodeCurv(layer);
                 if (curv != null)
                     outRecs.Add(BuildAdjustmentClipRecord("トーンカーブ", curv));
             }
 
-            if (layer.UIPosterizeEnabled)
+            if (layer.UI.PosterizeEnabled)
                 outRecs.Add(BuildAdjustmentClipRecord("ポスタリゼーション",
-                    PSDAdjustmentInfoWriter.EncodePost(layer.UIPosterizeLevels)));
+                    PSDAdjustmentInfoWriter.EncodePost(layer.UI.PosterizeLevels)));
 
-            if (layer.UIThresholdEnabled)
+            if (layer.UI.ThresholdEnabled)
                 outRecs.Add(BuildAdjustmentClipRecord("2階調化",
-                    PSDAdjustmentInfoWriter.EncodeThrs(layer.UIThresholdLevel)));
+                    PSDAdjustmentInfoWriter.EncodeThrs(layer.UI.ThresholdLevel)));
 
-            if (!Mathf.Approximately(layer.UIBrightness, 0f) || !Mathf.Approximately(layer.UIContrast, 0f))
+            if (!Mathf.Approximately(layer.UI.Brightness, 0f) || !Mathf.Approximately(layer.UI.Contrast, 0f))
                 outRecs.Add(BuildAdjustmentClipRecord("明るさ・コントラスト",
-                    PSDAdjustmentInfoWriter.EncodeBrit(layer.UIBrightness, layer.UIContrast),
-                    PSDAdjustmentInfoWriter.EncodeCgEd(layer.UIBrightness, layer.UIContrast)));
+                    PSDAdjustmentInfoWriter.EncodeBrit(layer.UI.Brightness, layer.UI.Contrast),
+                    PSDAdjustmentInfoWriter.EncodeCgEd(layer.UI.Brightness, layer.UI.Contrast)));
 
-            if (layer.UIColorBalanceEnabled)
+            if (layer.UI.ColorBalanceEnabled)
                 outRecs.Add(BuildAdjustmentClipRecord("カラーバランス",
                     PSDAdjustmentInfoWriter.EncodeBlnc(layer)));
 
             if (HasActiveHsl(layer))
                 outRecs.Add(BuildAdjustmentClipRecord("色相・彩度",
                     PSDAdjustmentInfoWriter.EncodeHue2(
-                        layer.UIHue, layer.UISaturation, layer.UILightness, layer.UIColorize)));
+                        layer.UI.Hue, layer.UI.Saturation, layer.UI.Lightness, layer.UI.Colorize)));
 
-            if (layer.UIGradientMapEnabled && layer.UIGradient != null)
+            if (layer.UI.GradientMapEnabled && layer.UI.Gradient != null)
             {
                 var rec = BuildAdjustmentClipRecord("グラデーションマップ",
-                    PSDAdjustmentInfoWriter.EncodeGrdm(layer.UIGradient));
-                rec.Opacity = ToByteOpacity(layer.UIGradientMapOpacity); // 適用率 → レイヤー不透明度
+                    PSDAdjustmentInfoWriter.EncodeGrdm(layer.UI.Gradient));
+                rec.Opacity = ToByteOpacity(layer.UI.GradientMapOpacity); // 適用率 → レイヤー不透明度
                 outRecs.Add(rec);
             }
         }

@@ -88,13 +88,13 @@ namespace PSDSimpleEditor
             // 明るさ・コントラスト (brit / CgEd)
             if (layer.Adjustment != null && layer.Adjustment.HasBrightnessContrast)
             {
-                float nb = IndentedSlider(new GUIContent("明るさ", "レイヤーの明るさを調整します（-150 〜 150）。"), layer.UIBrightness, -150f, 150f, indent);
-                float nc = IndentedSlider(new GUIContent("ｺﾝﾄﾗｽﾄ", "レイヤーのコントラスト（明暗差）を調整します（-50 〜 100）。"), layer.UIContrast,    -50f, 100f, indent);
-                if (!Mathf.Approximately(nb, layer.UIBrightness) ||
-                    !Mathf.Approximately(nc, layer.UIContrast))
+                float nb = IndentedSlider(new GUIContent("明るさ", "レイヤーの明るさを調整します（-150 〜 150）。"), layer.UI.Brightness, -150f, 150f, indent);
+                float nc = IndentedSlider(new GUIContent("ｺﾝﾄﾗｽﾄ", "レイヤーのコントラスト（明暗差）を調整します（-50 〜 100）。"), layer.UI.Contrast,    -50f, 100f, indent);
+                if (!Mathf.Approximately(nb, layer.UI.Brightness) ||
+                    !Mathf.Approximately(nc, layer.UI.Contrast))
                 {
-                    layer.UIBrightness = nb;
-                    layer.UIContrast   = nc;
+                    layer.UI.Brightness = nb;
+                    layer.UI.Contrast   = nc;
                     _needsRecomposite  = true;
                 }
             }
@@ -102,16 +102,16 @@ namespace PSDSimpleEditor
             // 色相・彩度・明度 (hue2)
             if (layer.Adjustment != null && layer.Adjustment.HasHueSaturation)
             {
-                float nh = IndentedSlider(new GUIContent("色相", "レイヤーの色相（カラー）を調整します（-180度 〜 180度）。"), layer.UIHue,        -180f, 180f, indent);
-                float ns = IndentedSlider(new GUIContent("彩度", "レイヤーの彩度（鮮やかさ）を調整します（-100 〜 100）。"), layer.UISaturation, -100f, 100f, indent);
-                float nl = IndentedSlider(new GUIContent("明度", "レイヤーの明度を調整します（-100 〜 100）。"), layer.UILightness,  -100f, 100f, indent);
-                if (!Mathf.Approximately(nh, layer.UIHue) ||
-                    !Mathf.Approximately(ns, layer.UISaturation) ||
-                    !Mathf.Approximately(nl, layer.UILightness))
+                float nh = IndentedSlider(new GUIContent("色相", "レイヤーの色相（カラー）を調整します（-180度 〜 180度）。"), layer.UI.Hue,        -180f, 180f, indent);
+                float ns = IndentedSlider(new GUIContent("彩度", "レイヤーの彩度（鮮やかさ）を調整します（-100 〜 100）。"), layer.UI.Saturation, -100f, 100f, indent);
+                float nl = IndentedSlider(new GUIContent("明度", "レイヤーの明度を調整します（-100 〜 100）。"), layer.UI.Lightness,  -100f, 100f, indent);
+                if (!Mathf.Approximately(nh, layer.UI.Hue) ||
+                    !Mathf.Approximately(ns, layer.UI.Saturation) ||
+                    !Mathf.Approximately(nl, layer.UI.Lightness))
                 {
-                    layer.UIHue        = nh;
-                    layer.UISaturation = ns;
-                    layer.UILightness  = nl;
+                    layer.UI.Hue        = nh;
+                    layer.UI.Saturation = ns;
+                    layer.UI.Lightness  = nl;
                     _needsRecomposite  = true;
                 }
                 DrawColorizeToggle(layer, indent);
@@ -187,10 +187,10 @@ namespace PSDSimpleEditor
 
         void DrawOpacitySlider(PSDLayer layer, int indent)
         {
-            float newOpacity = IndentedSlider(new GUIContent("不透明度", "レイヤーの不透明度（アルファ）を 0.0（完全透明）から 1.0（完全不透明）の間で調整します。"), layer.UIOpacity, 0f, 1f, indent);
-            if (!Mathf.Approximately(newOpacity, layer.UIOpacity))
+            float newOpacity = IndentedSlider(new GUIContent("不透明度", "レイヤーの不透明度（アルファ）を 0.0（完全透明）から 1.0（完全不透明）の間で調整します。"), layer.UI.Opacity, 0f, 1f, indent);
+            if (!Mathf.Approximately(newOpacity, layer.UI.Opacity))
             {
-                layer.UIOpacity   = newOpacity;
+                layer.UI.Opacity   = newOpacity;
                 _needsRecomposite = true;
             }
         }
