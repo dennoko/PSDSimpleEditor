@@ -111,6 +111,12 @@ namespace PSDSimpleEditor
         public Vector3 CBMidtones;           // 中間調
         public Vector3 CBHighlights;         // ハイライト
         public bool    CBPreserveLuminosity = true;
+
+        /// <summary>いずれかの調整/塗りつぶしデータをパース済みか (調整レイヤー判定用)。</summary>
+        public bool HasAny =>
+            HasBrightnessContrast || HasHueSaturation || HasSolidColor || HasInvert ||
+            HasThreshold || HasPosterize || HasLevels || HasCurves ||
+            HasGradientMap || HasGradientFill || HasColorBalance;
     }
 
     // ─── レイヤーエフェクト (lfx2 / lrFX, best effort) ───────────────────────
@@ -248,7 +254,12 @@ namespace PSDSimpleEditor
         public bool IsToolAdjustmentClip;
 
         // ── ヘルパー ──
-        public bool IsAdjustmentLayer => Width <= 0 || Height <= 0;
+        /// <summary>調整レイヤー判定: ピクセルを持たず (ゼロ面積)、かつ何らかの調整キーを
+        /// パース済みのレイヤー。キーを持たないゼロ面積レイヤーは「空のピクセルレイヤー」であり対象外。</summary>
+        public bool IsAdjustmentLayer =>
+            (Width <= 0 || Height <= 0) &&
+            SectionType == LayerSectionType.Normal &&
+            Adjustment != null && Adjustment.HasAny;
 
         // ── 内部 (テクスチャ構築後に null 化) ──
         [System.NonSerialized] public byte[] _rawPixels;
