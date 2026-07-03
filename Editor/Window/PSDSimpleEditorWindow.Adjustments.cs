@@ -283,7 +283,7 @@ namespace PSDSimpleEditor
         void EnsureCurveLut(PSDLayer layer)
         {
             if (layer.UI.Curve == null) layer.UI.Curve = CreateDefaultCurve();
-            if (layer._curveLut == null) BakeCurveLut(layer);
+            if (layer.Runtime.CurveLut == null) BakeCurveLut(layer);
         }
 
         /// <summary>UI.Curve (+ パース済みチャンネル別カーブ) を 256×1 の LUT テクスチャに焼き込む。
@@ -291,9 +291,9 @@ namespace PSDSimpleEditor
         static void BakeCurveLut(PSDLayer layer)
         {
             const int N = 256;
-            if (layer._curveLut == null)
+            if (layer.Runtime.CurveLut == null)
             {
-                layer._curveLut = new Texture2D(N, 1, TextureFormat.RGBA32, false, linear: true)
+                layer.Runtime.CurveLut = new Texture2D(N, 1, TextureFormat.RGBA32, false, linear: true)
                 {
                     hideFlags  = HideFlags.HideAndDontSave,
                     wrapMode   = TextureWrapMode.Clamp,
@@ -310,8 +310,8 @@ namespace PSDSimpleEditor
                     EvalCurveChannel(layer, 2, x),
                     255);
             }
-            layer._curveLut.SetPixels32(px);
-            layer._curveLut.Apply(false);
+            layer.Runtime.CurveLut.SetPixels32(px);
+            layer.Runtime.CurveLut.Apply(false);
         }
 
         /// <summary>チャンネルカーブ → 複合カーブの順で評価した出力値 (0..255)。</summary>
@@ -492,9 +492,9 @@ namespace PSDSimpleEditor
         static void BakeGradientFillLut(PSDLayer layer)
         {
             const int N = 256;
-            if (layer._gradientFillLut == null)
+            if (layer.Runtime.GradientFillLut == null)
             {
-                layer._gradientFillLut = new Texture2D(N, 1, TextureFormat.RGBA32, false, linear: true)
+                layer.Runtime.GradientFillLut = new Texture2D(N, 1, TextureFormat.RGBA32, false, linear: true)
                 {
                     hideFlags  = HideFlags.HideAndDontSave,
                     wrapMode   = TextureWrapMode.Clamp,
@@ -504,24 +504,24 @@ namespace PSDSimpleEditor
             var px = new Color32[N];
             for (int i = 0; i < N; i++)
                 px[i] = layer.Adjustment.GradientFillGradient.Evaluate(i / (float)(N - 1));
-            layer._gradientFillLut.SetPixels32(px);
-            layer._gradientFillLut.Apply(false);
+            layer.Runtime.GradientFillLut.SetPixels32(px);
+            layer.Runtime.GradientFillLut.Apply(false);
         }
 
         /// <summary>グラデーション有効時に LUT が無ければ焼く。</summary>
         void EnsureGradientLut(PSDLayer layer)
         {
             if (layer.UI.Gradient == null) layer.UI.Gradient = CreateDefaultGradient();
-            if (layer._gradientLut == null) BakeGradientLut(layer);
+            if (layer.Runtime.GradientLut == null) BakeGradientLut(layer);
         }
 
         /// <summary>UI.Gradient を 256×1 の LUT テクスチャ (linear) に焼き込む。</summary>
         static void BakeGradientLut(PSDLayer layer)
         {
             const int N = 256;
-            if (layer._gradientLut == null)
+            if (layer.Runtime.GradientLut == null)
             {
-                layer._gradientLut = new Texture2D(N, 1, TextureFormat.RGBA32, false, linear: true)
+                layer.Runtime.GradientLut = new Texture2D(N, 1, TextureFormat.RGBA32, false, linear: true)
                 {
                     hideFlags  = HideFlags.HideAndDontSave,
                     wrapMode   = TextureWrapMode.Clamp,
@@ -531,8 +531,8 @@ namespace PSDSimpleEditor
             var px = new Color32[N];
             for (int i = 0; i < N; i++)
                 px[i] = layer.UI.Gradient.Evaluate(i / (float)(N - 1));
-            layer._gradientLut.SetPixels32(px);
-            layer._gradientLut.Apply(false);
+            layer.Runtime.GradientLut.SetPixels32(px);
+            layer.Runtime.GradientLut.Apply(false);
         }
 
         /// <summary>
@@ -555,8 +555,8 @@ namespace PSDSimpleEditor
                 }
             }
             if (min > max) { min = 0f; max = 1f; } // 不透明画素なし → フォールバック (正規化を実質無効化)
-            layer._gradientLumMin = min;
-            layer._gradientLumMax = max;
+            layer.Runtime.GradientLumMin = min;
+            layer.Runtime.GradientLumMax = max;
         }
 
         /// <summary>

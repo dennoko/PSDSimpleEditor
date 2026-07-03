@@ -159,9 +159,9 @@ namespace PSDSimpleEditor
             {
                 if (layer.Texture     != null) { DestroyImmediate(layer.Texture);     layer.Texture     = null; }
                 if (layer.MaskTexture != null) { DestroyImmediate(layer.MaskTexture); layer.MaskTexture = null; }
-                if (layer._gradientLut != null) { DestroyImmediate(layer._gradientLut); layer._gradientLut = null; }
-                if (layer._curveLut    != null) { DestroyImmediate(layer._curveLut);    layer._curveLut    = null; }
-                if (layer._gradientFillLut != null) { DestroyImmediate(layer._gradientFillLut); layer._gradientFillLut = null; }
+                if (layer.Runtime.GradientLut != null) { DestroyImmediate(layer.Runtime.GradientLut); layer.Runtime.GradientLut = null; }
+                if (layer.Runtime.CurveLut    != null) { DestroyImmediate(layer.Runtime.CurveLut);    layer.Runtime.CurveLut    = null; }
+                if (layer.Runtime.GradientFillLut != null) { DestroyImmediate(layer.Runtime.GradientFillLut); layer.Runtime.GradientFillLut = null; }
                 DestroyLayerTexturesRecursive(layer.Children);
             }
         }

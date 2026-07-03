@@ -29,7 +29,7 @@ namespace PSDSimpleEditor
                 tex  = GetSolidTexture(layer.Adjustment.SolidColor);
                 rect = FullCanvasRect;
             }
-            else if (layer.Adjustment.HasGradientFill && layer._gradientFillLut != null)
+            else if (layer.Adjustment.HasGradientFill && layer.Runtime.GradientFillLut != null)
             {
                 // GdFl: α はグラデーション LUT (透明ストップ) が決める
                 tex      = Texture2D.whiteTexture;

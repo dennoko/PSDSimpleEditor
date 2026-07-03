@@ -196,6 +196,18 @@ namespace PSDSimpleEditor
         public float ColorRangeThreshold = 0.1f;        // 閾値 0..1 (RGB 正規化距離)
     }
 
+    // ─── レイヤーの描画用ランタイムキャッシュ ─────────────────────────────
+    // パース結果ではなく、Editor 側 (window) が生成・更新・破棄する一時データ。
+    // Texture2D は HideFlags.HideAndDontSave で生成し、レイヤー破棄時に明示破棄すること。
+    public class LayerRuntime
+    {
+        public Texture2D CurveLut;         // トーンカーブ 256×1 焼き込み LUT
+        public Texture2D GradientLut;      // グラデーションマップ 256×1 LUT
+        public Texture2D GradientFillLut;  // GdFl グラデーション塗りつぶし 256×1 LUT (α 込み)
+        public float     GradientLumMin = 0f;  // グラデーションマップ正規化レンジ
+        public float     GradientLumMax = 1f;
+    }
+
     // ─── PSD レイヤー ────────────────────────────────────────────────────────
     public class PSDLayer
     {
@@ -241,12 +253,8 @@ namespace PSDSimpleEditor
         // ── ランタイム編集状態 (PSD 値で初期化。詳細は LayerEditState を参照) ──
         [System.NonSerialized] public LayerEditState UI = new LayerEditState();
 
-        // ── 描画用ランタイムキャッシュ (window が生成・管理する焼き込み LUT 等) ──
-        [System.NonSerialized] public Texture2D _curveLut;         // トーンカーブ 256×1 LUT
-        [System.NonSerialized] public Texture2D _gradientLut;      // グラデーションマップ 256×1 LUT
-        [System.NonSerialized] public Texture2D _gradientFillLut;  // グラデーション塗りつぶし (GdFl) 256×1 LUT (α 込み)
-        [System.NonSerialized] public float     _gradientLumMin = 0f;  // グラデーションマップ正規化レンジ (window が非透明画素から計算)
-        [System.NonSerialized] public float     _gradientLumMax = 1f;
+        // ── 描画用ランタイムキャッシュ (Editor 側が管理。常に非 null) ──
+        [System.NonSerialized] public LayerRuntime Runtime = new LayerRuntime();
 
         // ── 本ツール製クリップ調整レイヤーの識別 (追加情報キー dPSE) ──
         // 書き出し時にピクセルレイヤーの非破壊調整をクリップ調整レイヤーへ変換した印。

@@ -228,16 +228,16 @@ namespace PSDSimpleEditor
                 p.LevelsOutWhite = 1f;
             }
 
-            if (layer.UI.CurveEnabled && layer._curveLut != null)
-                p.CurveLutTex = layer._curveLut;
+            if (layer.UI.CurveEnabled && layer.Runtime.CurveLut != null)
+                p.CurveLutTex = layer.Runtime.CurveLut;
 
-            if (layer.UI.GradientMapEnabled && layer._gradientLut != null)
+            if (layer.UI.GradientMapEnabled && layer.Runtime.GradientLut != null)
             {
-                p.GradientMapTex       = layer._gradientLut;
+                p.GradientMapTex       = layer.Runtime.GradientLut;
                 p.GradientMapOpacity   = layer.UI.GradientMapOpacity;
                 p.GradientMapNormalize = layer.UI.GradientMapNormalize;
-                p.GradientMapLumMin    = layer._gradientLumMin;
-                p.GradientMapLumMax    = layer._gradientLumMax;
+                p.GradientMapLumMin    = layer.Runtime.GradientLumMin;
+                p.GradientMapLumMax    = layer.Runtime.GradientLumMax;
             }
 
             if (layer.UI.ColorBalanceEnabled)
@@ -254,9 +254,9 @@ namespace PSDSimpleEditor
         static void SetGradientFillFrom(ref DrawParams p, PSDLayer layer)
         {
             var a = layer.Adjustment;
-            if (a == null || !a.HasGradientFill || layer._gradientFillLut == null) return;
+            if (a == null || !a.HasGradientFill || layer.Runtime.GradientFillLut == null) return;
             float rad = a.GradientFillAngle * Mathf.Deg2Rad;
-            p.GradFillTex    = layer._gradientFillLut;
+            p.GradFillTex    = layer.Runtime.GradientFillLut;
             p.GradFillParams = new Vector4(
                 Mathf.Cos(rad), Mathf.Sin(rad),
                 a.GradientFillRadial ? 1f : 0f,

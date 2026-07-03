@@ -378,7 +378,7 @@ namespace PSDSimpleEditor
                            || layer.Adjustment.HasLevels
                            || layer.UI.CurveEnabled
                            || layer.UI.ColorBalanceEnabled
-                           || (layer.UI.GradientMapEnabled && layer._gradientLut != null);
+                           || (layer.UI.GradientMapEnabled && layer.Runtime.GradientLut != null);
                 // 補正項目を持たない調整レイヤーは素通し (バッファは変化しないため描画自体を省略)
                 if (!hasAdj) return;
 
@@ -412,7 +412,7 @@ namespace PSDSimpleEditor
             }
 
             // ── GdFl グラデーション塗りつぶしレイヤー: LUT + 角度/タイプで全面レイヤーとして合成 ──
-            if (layer.Adjustment.HasGradientFill && layer._gradientFillLut != null)
+            if (layer.Adjustment.HasGradientFill && layer.Runtime.GradientFillLut != null)
             {
                 var gp = NewParams();
                 gp.LayerTex  = Texture2D.whiteTexture; // 色はシェーダーが _GradFillTex で上書きする
