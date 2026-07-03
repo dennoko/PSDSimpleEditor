@@ -6,6 +6,13 @@ using UnityEditor;
 namespace PSDSimpleEditor
 {
     // ── 色域選択マスク: 対象色 ± 閾値でレイヤー自身の画素から選択範囲を作り PNG 出力 ──
+    // ─── partial 見取り図 ───────────────────────────────────────────
+    // 責務   : 色域選択マスクのパラメータ UI、プレビュー上でのスポイト色抽出、ハイライトプレビュー生成、PNG 書き出し
+    // 宣言   : なし
+    // 参照   : _eyedropperTarget (RW), _colorRangePreviewLayer (RW), _colorRangePreviewTex (RW),
+    //          _colorRangePreviewDirty (RW), _exportDir (R)
+    // 依存   : DrawSectionFoldout (.LayerPanel.cs), RowSpace (.LayerPanel.cs), SetStatus (本体)
+    // ────────────────────────────────────────────────────────────────
     public partial class PSDSimpleEditorWindow
     {
         /// <summary>

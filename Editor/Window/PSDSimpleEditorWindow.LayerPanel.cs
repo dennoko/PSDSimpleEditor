@@ -6,6 +6,14 @@ using UnityEditor;
 namespace PSDSimpleEditor
 {
     // ── レイヤーパネル (左): ツリー描画・スプリッター・ブレンドモード Popup ──
+    // ─── partial 見取り図 ───────────────────────────────────────────
+    // 責務   : レイヤーパネル UI (左側) のツリー構造・各レイヤーの補正スライダー等の描画
+    // 宣言   : RowGap, RowH
+    // 参照   : _needsRecomposite (RW), _blendModesNormal (R), _blendModesGroup (R),
+    //          _blendLabelsNormal (R), _blendLabelsGroup (R), _eyedropperTarget (RW)
+    // 依存   : DrawAdjustmentGearMenu (.AdjustmentClipboard.cs), IndentedSlider (.Adjustments.cs),
+    //          DrawColorizeToggle (.Adjustments.cs) 等
+    // ────────────────────────────────────────────────────────────────
     public partial class PSDSimpleEditorWindow
     {
 

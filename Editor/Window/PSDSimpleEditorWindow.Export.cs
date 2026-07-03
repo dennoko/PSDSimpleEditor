@@ -7,6 +7,12 @@ using UnityEditor;
 namespace PSDSimpleEditor
 {
     // ── 下部バー / PNG・PSD 書き出し ────────────────────────────────────────
+    // ─── partial 見取り図 ───────────────────────────────────────────
+    // 責務   : ウィンドウ下部ステータスバーの描画、および PNG/PSD エクスポート処理
+    // 宣言   : なし
+    // 参照   : _psdFile (R), _compositeTexture (R), _exportDir (RW), _exportFormat (RW), _psdPath (R)
+    // 依存   : SetStatus (本体)
+    // ────────────────────────────────────────────────────────────────
     public partial class PSDSimpleEditorWindow
     {
 

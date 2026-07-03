@@ -5,6 +5,12 @@ namespace PSDSimpleEditor
     // ════════════════════════════════════════════════════════════════
     //  uniform 一括設定 (Material はステートフルなため毎回全 uniform を明示設定)
     // ════════════════════════════════════════════════════════════════
+    // ─── partial 見取り図 ───────────────────────────────────────────
+    // 責務   : GPU 合成に必要な全 uniform 値の構造体定義と Material への一括適用
+    // 宣言   : DrawParams 構造体
+    // 参照   : _canvasW (R), _canvasH (R), _mat (RW)
+    // 依存   : FullCanvasRect (本体), NewParams (本体), Swap (本体)
+    // ────────────────────────────────────────────────────────────────
     public partial class LayerCompositor
     {
         /// <summary>1 回の Blit に必要な全 uniform 値。未設定スロットは安全な既定値になる。</summary>

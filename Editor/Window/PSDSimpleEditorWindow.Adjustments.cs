@@ -5,6 +5,13 @@ using UnityEditor;
 namespace PSDSimpleEditor
 {
     // ── 色調補正 + グラデーションマップ + 画像クリップ (非破壊・全ピクセルレイヤー) ──
+    // ─── partial 見取り図 ───────────────────────────────────────────
+    // 責務   : 非破壊色調補正・トーンカーブ・グラデーションマップ・画像クリップ合成のパラメータ制御と LUT ベイク処理
+    // 宣言   : なし
+    // 参照   : _needsRecomposite (RW), _blendModesNormal (R), _blendLabelsNormal (R)
+    // 依存   : DrawSectionFoldout (.LayerPanel.cs), DrawAdjustmentGearMenu (.AdjustmentClipboard.cs),
+    //          RowSpace (.LayerPanel.cs)
+    // ────────────────────────────────────────────────────────────────
     public partial class PSDSimpleEditorWindow
     {
         /// <summary>「色調補正」フォールドアウト。明るさ/コントラスト/色相/彩度/明度 + グラデーションマップ。</summary>

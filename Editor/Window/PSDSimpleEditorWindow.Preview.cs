@@ -4,6 +4,12 @@ using UnityEditor;
 namespace PSDSimpleEditor
 {
     // ── プレビューパネル (右): 合成結果表示 / チェッカー背景 / マージ参照小窓 ──
+    // ─── partial 見取り図 ───────────────────────────────────────────
+    // 責務   : プレビューパネル (右側) の描画、チェッカー背景の表示、およびマージ参照小窓の描画
+    // 宣言   : なし
+    // 参照   : _compositeTexture (R), _showMergedRef (RW), _checkerTexture (RW), _eyedropperTarget (RW)
+    // 依存   : HandleEyedropper (.ColorRangeMask.cs)
+    // ────────────────────────────────────────────────────────────────
     public partial class PSDSimpleEditorWindow
     {
         void DrawPreviewPanel()

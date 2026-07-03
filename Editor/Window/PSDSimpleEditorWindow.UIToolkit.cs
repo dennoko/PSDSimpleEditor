@@ -8,6 +8,13 @@ using UnityEditor.UIElements;
 
 namespace PSDSimpleEditor
 {
+    // ─── partial 見取り図 ───────────────────────────────────────────
+    // 責務   : UI Toolkit を使用したウィンドウ全体のレイアウト構築、データバインディング、表示の動的更新
+    // 宣言   : _rootContainer などの UI 要素フィールド
+    // 参照   : _psdPath (RW), _exportDir (RW), _previewMaterial (RW), _previewSlotName (RW),
+    //          _isRealtimePreviewEnabled (RW), _exportFormat (RW), _statusMessage (R), _needsRecomposite (RW)
+    // 依存   : LoadPSD (本体), DoComposite (本体), RevertRealtimePreview (本体), ApplyRealtimePreview (本体)
+    // ────────────────────────────────────────────────────────────────
     public partial class PSDSimpleEditorWindow
     {
         // ── UI Toolkit Elements ───────────────────────────────────────────

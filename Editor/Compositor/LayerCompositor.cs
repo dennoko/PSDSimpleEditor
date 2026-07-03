@@ -25,6 +25,12 @@ namespace PSDSimpleEditor
     /// (LayerCompositor.Export.cs) / RenderTexture プール管理 (LayerCompositor.RT.cs) へ
     /// partial class として分割されている。このファイルは合成パイプラインの本体を担う。
     /// </summary>
+    // ─── partial 見取り図 ───────────────────────────────────────────
+    // 責務   : レイヤーツリーを GPU 合成し最終結果テクスチャを生成する合成パイプライン本体
+    // 宣言   : ShaderPath, _canvasW, _canvasH, _mat, _rtA, _rtB, _pool, _solidCache
+    // 参照   : なし (本体ファイル)
+    // 依存   : ApplyParams (Params.cs), RenderLayerAlpha (Export.cs), AcquireRT (RT.cs) 等
+    // ────────────────────────────────────────────────────────────────
     public partial class LayerCompositor
     {
         const string ShaderPath = "Assets/dennokoworks/DennokoPSDEditor/Shader/LayerBlend.shader";

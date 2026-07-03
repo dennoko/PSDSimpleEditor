@@ -5,6 +5,12 @@ namespace PSDSimpleEditor
     // ════════════════════════════════════════════════════════════════
     //  RenderTexture / ソリッドテクスチャ ユーティリティ
     // ════════════════════════════════════════════════════════════════
+    // ─── partial 見取り図 ───────────────────────────────────────────
+    // 責務   : RenderTexture およびソリッドテクスチャの生成・プール管理・破棄
+    // 宣言   : SolidCacheMax
+    // 参照   : _canvasW (R), _canvasH (R), _pool (RW), _solidCache (RW)
+    // 依存   : なし
+    // ────────────────────────────────────────────────────────────────
     public partial class LayerCompositor
     {
         RenderTexture CreateRT()

@@ -5,6 +5,12 @@ using UnityEditor;
 namespace PSDSimpleEditor
 {
     // ── 調整パラメーターのコピー&ペースト: 種類ごとに直近1件を保持する単純なクリップボード ──
+    // ─── partial 見取り図 ───────────────────────────────────────────
+    // 責務   : 補正パラメータ（色調補正/トーンカーブ等）のコピー＆ペーストクリップボード機能
+    // 宣言   : ClipboardKind, 各種 Snapshot 構造体
+    // 参照   : _needsRecomposite (RW)
+    // 依存   : RowSpace (.LayerPanel.cs), BakeCurveLut (.Adjustments.cs), BakeGradientLut (.Adjustments.cs)
+    // ────────────────────────────────────────────────────────────────
     public partial class PSDSimpleEditorWindow
     {
         internal enum ClipboardKind
