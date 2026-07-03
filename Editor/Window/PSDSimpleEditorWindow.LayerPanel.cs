@@ -208,34 +208,34 @@ namespace PSDSimpleEditor
         {
             switch (mode)
             {
-                case BlendMode.Normal:       return "Norm";
-                case BlendMode.Multiply:     return "Mul";
-                case BlendMode.Screen:       return "Scrn";
-                case BlendMode.Overlay:      return "Over";
-                case BlendMode.Dissolve:     return "Diss";
-                case BlendMode.Darken:       return "Dark";
-                case BlendMode.ColorBurn:    return "CBrn";
-                case BlendMode.LinearBurn:   return "LBrn";
-                case BlendMode.DarkerColor:  return "DkCl";
-                case BlendMode.Lighten:      return "Lite";
-                case BlendMode.ColorDodge:   return "CDdg";
-                case BlendMode.LinearDodge:  return "Add";
-                case BlendMode.LighterColor: return "LtCl";
-                case BlendMode.SoftLight:    return "SLit";
-                case BlendMode.HardLight:    return "HLit";
-                case BlendMode.VividLight:   return "VLit";
-                case BlendMode.LinearLight:  return "LLit";
-                case BlendMode.PinLight:     return "PLit";
-                case BlendMode.HardMix:      return "HMix";
-                case BlendMode.Difference:   return "Diff";
-                case BlendMode.Exclusion:    return "Excl";
-                case BlendMode.Subtract:     return "Sub";
-                case BlendMode.Divide:       return "Div";
-                case BlendMode.Hue:          return "Hue";
-                case BlendMode.Saturation:   return "Sat";
-                case BlendMode.Color:        return "Colr";
-                case BlendMode.Luminosity:   return "Lum";
-                case BlendMode.PassThrough:  return "Pass";
+                case BlendMode.Normal:       return "通常";
+                case BlendMode.Multiply:     return "乗算";
+                case BlendMode.Screen:       return "スクリーン";
+                case BlendMode.Overlay:      return "オーバーレイ";
+                case BlendMode.Dissolve:     return "ディゾルブ";
+                case BlendMode.Darken:       return "比較(暗)";
+                case BlendMode.ColorBurn:    return "焼き込み(カラー)";
+                case BlendMode.LinearBurn:   return "焼き込み(リニア)";
+                case BlendMode.DarkerColor:  return "カラー比較(暗)";
+                case BlendMode.Lighten:      return "比較(明)";
+                case BlendMode.ColorDodge:   return "覆い焼き(カラー)";
+                case BlendMode.LinearDodge:  return "覆い焼き(リニア)";
+                case BlendMode.LighterColor: return "カラー比較(明)";
+                case BlendMode.SoftLight:    return "ソフトライト";
+                case BlendMode.HardLight:    return "ハードライト";
+                case BlendMode.VividLight:   return "ビビッドライト";
+                case BlendMode.LinearLight:  return "リニアライト";
+                case BlendMode.PinLight:     return "ピンライト";
+                case BlendMode.HardMix:      return "ハードミックス";
+                case BlendMode.Difference:   return "差の絶対値";
+                case BlendMode.Exclusion:    return "除外";
+                case BlendMode.Subtract:     return "減算";
+                case BlendMode.Divide:       return "除算";
+                case BlendMode.Hue:          return "色相";
+                case BlendMode.Saturation:   return "彩度";
+                case BlendMode.Color:        return "カラー";
+                case BlendMode.Luminosity:   return "輝度";
+                case BlendMode.PassThrough:  return "通過";
                 default:                     return "?";
             }
         }
