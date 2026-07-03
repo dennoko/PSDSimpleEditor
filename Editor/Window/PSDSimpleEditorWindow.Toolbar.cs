@@ -24,7 +24,7 @@ namespace PSDSimpleEditor
 
             if (list.Count == 0)
             {
-                menu.AddDisabledItem(new GUIContent("(履歴なし)"));
+                menu.AddDisabledItem(new GUIContent(PSDTranslation.Get("NoHistory", "(履歴なし)")));
             }
             else
             {
@@ -34,7 +34,7 @@ namespace PSDSimpleEditor
                     bool exists = File.Exists(path);
                     // GenericMenu は '/' をサブメニュー区切りとして解釈するため除算記号へ置換
                     string display = $"{i + 1}: {path}".Replace('/', '∕');
-                    if (!exists) display += "  (見つかりません)";
+                    if (!exists) display += PSDTranslation.Get("HistoryNotFound", "  (見つかりません)");
 
                     if (exists)
                         menu.AddItem(new GUIContent(display), false, () => LoadFromHistory(path));
@@ -42,7 +42,7 @@ namespace PSDSimpleEditor
                         menu.AddDisabledItem(new GUIContent(display));
                 }
                 menu.AddSeparator("");
-                menu.AddItem(new GUIContent("履歴をクリア"), false, ClearHistory);
+                menu.AddItem(new GUIContent(PSDTranslation.Get("HistoryClear", "履歴をクリア")), false, ClearHistory);
             }
 
             menu.ShowAsContext();

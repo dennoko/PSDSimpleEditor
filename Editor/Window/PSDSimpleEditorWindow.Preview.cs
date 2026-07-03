@@ -21,9 +21,9 @@ namespace PSDSimpleEditor
 
             // ヘッダ帯 (Surface2): タイトル + マージ参照トグル
             EditorGUILayout.BeginHorizontal(PSDEditorTheme.ToolbarStyle);
-            GUILayout.Label("プレビュー", PSDEditorTheme.SectionHeaderStyle);
+            GUILayout.Label(PSDTranslation.Get("Preview", "プレビュー"), PSDEditorTheme.SectionHeaderStyle);
             GUILayout.FlexibleSpace();
-            _showMergedRef = GUILayout.Toggle(_showMergedRef, new GUIContent("マージ参照", "PSDファイル作成・保存時に内包されたPhotoshop側の合成画像（元の見た目）を、プレビューの右下に小窓表示して比較できるようにします。"),
+            _showMergedRef = GUILayout.Toggle(_showMergedRef, new GUIContent(PSDTranslation.Get("MergedRef", "マージ参照"), PSDTranslation.Get("MergedRefTooltip", "PSDファイル作成・保存時に内包されたPhotoshop側の合成画像（元の見た目）を、プレビューの右下に小窓表示して比較できるようにします。")),
                                               PSDEditorTheme.ToolbarButtonStyle, GUILayout.Width(80));
             EditorGUILayout.EndHorizontal();
 
@@ -82,7 +82,7 @@ namespace PSDSimpleEditor
                 }
                 else
                 {
-                    GUI.Label(area, "プレビューなし", PSDEditorTheme.CenteredCaptionStyle);
+                    GUI.Label(area, PSDTranslation.Get("PreviewNone", "プレビューなし"), PSDEditorTheme.CenteredCaptionStyle);
                 }
             }
         }
@@ -104,7 +104,7 @@ namespace PSDSimpleEditor
             DrawCheckerBackground(fit);
             GUI.DrawTexture(fit, merged, ScaleMode.StretchToFill, true);
             GUI.Label(new Rect(fit.x, fit.y - 15f, fit.width, 14f),
-                      "マージ参照", PSDEditorTheme.CenteredCaptionStyle);
+                      PSDTranslation.Get("MergedRef", "マージ参照"), PSDEditorTheme.CenteredCaptionStyle);
         }
 
         /// <summary>指定矩形にチェッカーパターンをタイル描画する。</summary>

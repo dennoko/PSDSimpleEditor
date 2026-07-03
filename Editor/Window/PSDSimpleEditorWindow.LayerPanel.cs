@@ -63,23 +63,23 @@ namespace PSDSimpleEditor
             string prefix = "";
 
             if (isGroup)
-                prefix += "[フォルダ] ";
+                prefix += PSDTranslation.Get("FolderPrefix", "[フォルダ] ");
             if (layer.IsClipping)
-                prefix += "[クリップ] ";
+                prefix += PSDTranslation.Get("ClipPrefix", "[クリップ] ");
             if (layer.HasMask)
-                prefix += layer.MaskIsDisabled ? "[マスク無効] " : "[マスク] ";
+                prefix += layer.MaskIsDisabled ? PSDTranslation.Get("MaskDisabledPrefix", "[マスク無効] ") : PSDTranslation.Get("MaskPrefix", "[マスク] ");
 
             if (layer.Adjustment != null && layer.Adjustment.HasSolidColor)
                 prefix += "[SoCo] ";
             else if (layer.Adjustment != null && layer.Adjustment.HasGradientFill)
-                prefix += "[グラデ塗り] ";
+                prefix += PSDTranslation.Get("GradFillPrefix", "[グラデ塗り] ");
             else if (!isGroup && layer.IsAdjustmentLayer &&
                      layer.Adjustment != null &&
                      (layer.Adjustment.HasBrightnessContrast || layer.Adjustment.HasHueSaturation ||
                       layer.Adjustment.HasInvert || layer.Adjustment.HasThreshold || layer.Adjustment.HasPosterize ||
                       layer.Adjustment.HasLevels || layer.Adjustment.HasCurves ||
                       layer.Adjustment.HasGradientMap || layer.Adjustment.HasColorBalance))
-                prefix += "[調整] ";
+                prefix += PSDTranslation.Get("AdjustPrefix", "[調整] ");
 
             if (layer.Effects != null && layer.Effects.HasColorOverlay)
                 prefix += "[CO] ";
@@ -96,8 +96,8 @@ namespace PSDSimpleEditor
             // 明るさ・コントラスト (brit / CgEd)
             if (layer.Adjustment != null && layer.Adjustment.HasBrightnessContrast)
             {
-                float nb = IndentedSlider(new GUIContent("明るさ", "レイヤーの明るさを調整します（-150 〜 150）。"), layer.UI.Brightness, -150f, 150f, indent);
-                float nc = IndentedSlider(new GUIContent("ｺﾝﾄﾗｽﾄ", "レイヤーのコントラスト（明暗差）を調整します（-50 〜 100）。"), layer.UI.Contrast,    -50f, 100f, indent);
+                float nb = IndentedSlider(new GUIContent(PSDTranslation.Get("Brightness", "明るさ"), PSDTranslation.Get("BrightnessTooltip", "レイヤーの明るさを調整します（-150 〜 150）。")), layer.UI.Brightness, -150f, 150f, indent);
+                float nc = IndentedSlider(new GUIContent(PSDTranslation.Get("Contrast", "ｺﾝﾄﾗｽﾄ"), PSDTranslation.Get("ContrastTooltip", "レイヤーのコントラスト（明暗差）を調整します（-50 〜 100）。")), layer.UI.Contrast,    -50f, 100f, indent);
                 if (!Mathf.Approximately(nb, layer.UI.Brightness) ||
                     !Mathf.Approximately(nc, layer.UI.Contrast))
                 {
@@ -110,9 +110,9 @@ namespace PSDSimpleEditor
             // 色相・彩度・明度 (hue2)
             if (layer.Adjustment != null && layer.Adjustment.HasHueSaturation)
             {
-                float nh = IndentedSlider(new GUIContent("色相", "レイヤーの色相（カラー）を調整します（-180度 〜 180度）。"), layer.UI.Hue,        -180f, 180f, indent);
-                float ns = IndentedSlider(new GUIContent("彩度", "レイヤーの彩度（鮮やかさ）を調整します（-100 〜 100）。"), layer.UI.Saturation, -100f, 100f, indent);
-                float nl = IndentedSlider(new GUIContent("明度", "レイヤーの明度を調整します（-100 〜 100）。"), layer.UI.Lightness,  -100f, 100f, indent);
+                float nh = IndentedSlider(new GUIContent(PSDTranslation.Get("Hue", "色相"), PSDTranslation.Get("HueTooltip", "レイヤーの色相（カラー）を調整します（-180度 〜 180度）。")), layer.UI.Hue,        -180f, 180f, indent);
+                float ns = IndentedSlider(new GUIContent(PSDTranslation.Get("Saturation", "彩度"), PSDTranslation.Get("SaturationTooltip", "レイヤーの彩度（鮮やかさ）を調整します（-100 〜 100）。")), layer.UI.Saturation, -100f, 100f, indent);
+                float nl = IndentedSlider(new GUIContent(PSDTranslation.Get("Lightness", "明度"), PSDTranslation.Get("LightnessTooltip", "レイヤーの明度を調整します（-100 〜 100）。")), layer.UI.Lightness,  -100f, 100f, indent);
                 if (!Mathf.Approximately(nh, layer.UI.Hue) ||
                     !Mathf.Approximately(ns, layer.UI.Saturation) ||
                     !Mathf.Approximately(nl, layer.UI.Lightness))
@@ -158,9 +158,9 @@ namespace PSDSimpleEditor
             {
                 EditorGUILayout.BeginHorizontal();
                 GUILayout.Space(indent * IndentWidth + 18f);
-                GUILayout.Label(new GUIContent("塗り色", "ベタ塗りレイヤーの塗りつぶし色を設定します。"), PSDEditorTheme.ControlLabelStyle,
+                GUILayout.Label(new GUIContent(PSDTranslation.Get("SolidColor", "塗り色"), PSDTranslation.Get("SolidColorTooltip", "ベタ塗りレイヤーの塗りつぶし色を設定します。")), PSDEditorTheme.ControlLabelStyle,
                                 GUILayout.Width(48), GUILayout.Height(RowH));
-                Color nc = EditorGUILayout.ColorField(new GUIContent("", "ベタ塗りレイヤーの塗りつぶし色を設定します。"), layer.Adjustment.SolidColor,
+                Color nc = EditorGUILayout.ColorField(new GUIContent("", PSDTranslation.Get("SolidColorTooltip", "ベタ塗りレイヤーの塗りつぶし色を設定します。")), layer.Adjustment.SolidColor,
                                                       GUILayout.Width(80), GUILayout.Height(RowH));
                 GUILayout.FlexibleSpace();
                 EditorGUILayout.EndHorizontal();
@@ -186,7 +186,7 @@ namespace PSDSimpleEditor
             {
                 EditorGUILayout.BeginHorizontal();
                 GUILayout.Space(indent * IndentWidth + 18f);
-                GUILayout.Label("マスク: " + (layer.MaskIsDisabled ? "無効" : "有効"),
+                GUILayout.Label(PSDTranslation.Get("MaskStatusLabel", "マスク: ") + (layer.MaskIsDisabled ? PSDTranslation.Get("MaskStatusDisabled", "無効") : PSDTranslation.Get("MaskStatusEnabled", "有効")),
                                 PSDEditorTheme.ControlLabelStyle, GUILayout.Height(RowH));
                 EditorGUILayout.EndHorizontal();
                 RowSpace();
@@ -195,7 +195,7 @@ namespace PSDSimpleEditor
 
         void DrawOpacitySlider(PSDLayer layer, int indent)
         {
-            float newOpacity = IndentedSlider(new GUIContent("不透明度", "レイヤーの不透明度（アルファ）を 0.0（完全透明）から 1.0（完全不透明）の間で調整します。"), layer.UI.Opacity, 0f, 1f, indent);
+            float newOpacity = IndentedSlider(new GUIContent(PSDTranslation.Get("Opacity", "不透明度"), PSDTranslation.Get("OpacityTooltip", "レイヤーの不透明度（アルファ）を 0.0（完全透明）から 1.0（完全不透明）の間で調整します。")), layer.UI.Opacity, 0f, 1f, indent);
             if (!Mathf.Approximately(newOpacity, layer.UI.Opacity))
             {
                 layer.UI.Opacity   = newOpacity;
@@ -208,34 +208,34 @@ namespace PSDSimpleEditor
         {
             switch (mode)
             {
-                case BlendMode.Normal:       return "通常";
-                case BlendMode.Multiply:     return "乗算";
-                case BlendMode.Screen:       return "スクリーン";
-                case BlendMode.Overlay:      return "オーバーレイ";
-                case BlendMode.Dissolve:     return "ディゾルブ";
-                case BlendMode.Darken:       return "比較(暗)";
-                case BlendMode.ColorBurn:    return "焼き込み(カラー)";
-                case BlendMode.LinearBurn:   return "焼き込み(リニア)";
-                case BlendMode.DarkerColor:  return "カラー比較(暗)";
-                case BlendMode.Lighten:      return "比較(明)";
-                case BlendMode.ColorDodge:   return "覆い焼き(カラー)";
-                case BlendMode.LinearDodge:  return "覆い焼き(リニア)";
-                case BlendMode.LighterColor: return "カラー比較(明)";
-                case BlendMode.SoftLight:    return "ソフトライト";
-                case BlendMode.HardLight:    return "ハードライト";
-                case BlendMode.VividLight:   return "ビビッドライト";
-                case BlendMode.LinearLight:  return "リニアライト";
-                case BlendMode.PinLight:     return "ピンライト";
-                case BlendMode.HardMix:      return "ハードミックス";
-                case BlendMode.Difference:   return "差の絶対値";
-                case BlendMode.Exclusion:    return "除外";
-                case BlendMode.Subtract:     return "減算";
-                case BlendMode.Divide:       return "除算";
-                case BlendMode.Hue:          return "色相";
-                case BlendMode.Saturation:   return "彩度";
-                case BlendMode.Color:        return "カラー";
-                case BlendMode.Luminosity:   return "輝度";
-                case BlendMode.PassThrough:  return "通過";
+                case BlendMode.Normal:       return PSDTranslation.Get("BlendNormal", "通常");
+                case BlendMode.Multiply:     return PSDTranslation.Get("BlendMultiply", "乗算");
+                case BlendMode.Screen:       return PSDTranslation.Get("BlendScreen", "スクリーン");
+                case BlendMode.Overlay:      return PSDTranslation.Get("BlendOverlay", "オーバーレイ");
+                case BlendMode.Dissolve:     return PSDTranslation.Get("BlendDissolve", "ディゾルブ");
+                case BlendMode.Darken:       return PSDTranslation.Get("BlendDarken", "比較(暗)");
+                case BlendMode.ColorBurn:    return PSDTranslation.Get("BlendColorBurn", "焼き込み(カラー)");
+                case BlendMode.LinearBurn:   return PSDTranslation.Get("BlendLinearBurn", "焼き込み(リニア)");
+                case BlendMode.DarkerColor:  return PSDTranslation.Get("BlendDarkerColor", "カラー比較(暗)");
+                case BlendMode.Lighten:      return PSDTranslation.Get("BlendLighten", "比較(明)");
+                case BlendMode.ColorDodge:   return PSDTranslation.Get("BlendColorDodge", "覆い焼き(カラー)");
+                case BlendMode.LinearDodge:  return PSDTranslation.Get("BlendLinearDodge", "覆い焼き(リニア)");
+                case BlendMode.LighterColor: return PSDTranslation.Get("BlendLighterColor", "カラー比較(明)");
+                case BlendMode.SoftLight:    return PSDTranslation.Get("BlendSoftLight", "ソフトライト");
+                case BlendMode.HardLight:    return PSDTranslation.Get("BlendHardLight", "ハードライト");
+                case BlendMode.VividLight:   return PSDTranslation.Get("BlendVividLight", "ビビッドライト");
+                case BlendMode.LinearLight:  return PSDTranslation.Get("BlendLinearLight", "リニアライト");
+                case BlendMode.PinLight:     return PSDTranslation.Get("BlendPinLight", "ピンライト");
+                case BlendMode.HardMix:      return PSDTranslation.Get("BlendHardMix", "ハードミックス");
+                case BlendMode.Difference:   return PSDTranslation.Get("BlendDifference", "差の絶対値");
+                case BlendMode.Exclusion:    return PSDTranslation.Get("BlendExclusion", "除外");
+                case BlendMode.Subtract:     return PSDTranslation.Get("BlendSubtract", "減算");
+                case BlendMode.Divide:       return PSDTranslation.Get("BlendDivide", "除算");
+                case BlendMode.Hue:          return PSDTranslation.Get("BlendHue", "色相");
+                case BlendMode.Saturation:   return PSDTranslation.Get("BlendSaturation", "彩度");
+                case BlendMode.Color:        return PSDTranslation.Get("BlendColor", "カラー");
+                case BlendMode.Luminosity:   return PSDTranslation.Get("BlendLuminosity", "輝度");
+                case BlendMode.PassThrough:  return PSDTranslation.Get("BlendPassThrough", "通過");
                 default:                     return "?";
             }
         }

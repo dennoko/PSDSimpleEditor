@@ -36,6 +36,10 @@ namespace PSDSimpleEditor
 
         void CreateGUI()
         {
+            // Load language settings
+            bool useEnglish = EditorPrefs.GetBool("DennokoPSDEditor_UseEnglish", false);
+            PSDTranslation.LoadLanguage(useEnglish ? "en" : "ja");
+
             // Ensure textures/styles are initialized
             PSDEditorTheme.Initialize();
 
@@ -68,14 +72,41 @@ namespace PSDSimpleEditor
             UpdateSettingsFields();
         }
 
+        void RebuildUI()
+        {
+            _blendLabelsNormal = null;
+            _blendLabelsGroup = null;
+            if (rootVisualElement != null)
+            {
+                rootVisualElement.Clear();
+                CreateGUI();
+            }
+        }
+
         void BuildHeader()
         {
             var header = new VisualElement();
             header.AddToClassList("header");
 
-            var titleLabel = new Label("Dennoko PSD Editor");
+            var titleLabel = new Label(PSDTranslation.Get("WindowTitle", "Dennoko PSD Editor"));
             titleLabel.AddToClassList("title");
             header.Add(titleLabel);
+
+            // Spacer to push the toggle to the right
+            var spacer = new VisualElement();
+            spacer.AddToClassList("grow");
+            header.Add(spacer);
+
+            // Language Toggle
+            var langToggle = new Toggle("English");
+            langToggle.value = EditorPrefs.GetBool("DennokoPSDEditor_UseEnglish", false);
+            langToggle.AddToClassList("settings-toggle");
+            langToggle.RegisterValueChangedCallback(evt => {
+                EditorPrefs.SetBool("DennokoPSDEditor_UseEnglish", evt.newValue);
+                PSDTranslation.LoadLanguage(evt.newValue ? "en" : "ja");
+                RebuildUI();
+            });
+            header.Add(langToggle);
 
             _rootContainer.Add(header);
 
@@ -115,23 +146,23 @@ namespace PSDSimpleEditor
                     if (File.Exists(resolved)) dir = Path.GetDirectoryName(resolved);
                 }
                 catch { }
-                string picked = EditorUtility.OpenFilePanel("PSD ファイルを開く", dir, "psd");
+                string picked = EditorUtility.OpenFilePanel(PSDTranslation.Get("PsdOpenTitle", "PSD ファイルを開く"), dir, "psd");
                 if (!string.IsNullOrEmpty(picked))
                 {
                     _psdPath = picked;
                     _psdPathField.value = picked;
                 }
-            }) { text = "参照" };
+            }) { text = PSDTranslation.Get("Browse", "参照") };
             browsePsdBtn.AddToClassList("button-tool");
             browsePsdBtn.AddToClassList("settings-button");
             row1.Add(browsePsdBtn);
 
-            var loadPsdBtn = new Button(LoadPSD) { text = "読み込み" };
+            var loadPsdBtn = new Button(LoadPSD) { text = PSDTranslation.Get("Load", "読み込み") };
             loadPsdBtn.AddToClassList("button-tool");
             loadPsdBtn.AddToClassList("settings-button-wide");
             row1.Add(loadPsdBtn);
 
-            var historyBtn = new Button(ShowHistoryMenu) { text = "履歴 ▾" };
+            var historyBtn = new Button(ShowHistoryMenu) { text = PSDTranslation.Get("History", "履歴 ▾") };
             historyBtn.AddToClassList("button-tool");
             historyBtn.AddToClassList("settings-button");
             row1.Add(historyBtn);
@@ -147,7 +178,7 @@ namespace PSDSimpleEditor
             var row2 = new VisualElement();
             row2.AddToClassList("settings-row");
 
-            var exportLabel = new Label("出力先");
+            var exportLabel = new Label(PSDTranslation.Get("ExportDir", "出力先"));
             exportLabel.AddToClassList("control-label");
             exportLabel.AddToClassList("settings-label");
             row2.Add(exportLabel);
@@ -161,7 +192,7 @@ namespace PSDSimpleEditor
             row2.Add(_exportDirField);
 
             var browseExportBtn = new Button(() => {
-                string picked = EditorUtility.OpenFolderPanel("出力先フォルダを選択", _exportDir, "");
+                string picked = EditorUtility.OpenFolderPanel(PSDTranslation.Get("ExportDirSelect", "出力先フォルダを選択"), _exportDir, "");
                 if (!string.IsNullOrEmpty(picked))
                 {
                     string projectPath = Path.GetFullPath(Application.dataPath);
@@ -177,7 +208,7 @@ namespace PSDSimpleEditor
                     }
                     _exportDirField.value = _exportDir;
                 }
-            }) { text = "参照" };
+            }) { text = PSDTranslation.Get("Browse", "参照") };
             browseExportBtn.AddToClassList("button-tool");
             browseExportBtn.AddToClassList("settings-button");
             row2.Add(browseExportBtn);
@@ -193,15 +224,15 @@ namespace PSDSimpleEditor
             var row3 = new VisualElement();
             row3.AddToClassList("settings-row");
 
-            var previewLabel = new Label("マテリアルプレビュー");
+            var previewLabel = new Label(PSDTranslation.Get("MaterialPreview", "マテリアルプレビュー"));
             previewLabel.AddToClassList("control-label");
             previewLabel.AddToClassList("settings-label-wide");
-            previewLabel.tooltip = "指定したマテリアルのテクスチャを合成結果に一時的に差し替えて、3Dビュー上で見た目を確認できます。";
+            previewLabel.tooltip = PSDTranslation.Get("MaterialPreviewTooltip", "指定したマテリアルのテクスチャを合成結果に一時的に差し替えて、3Dビュー上で見た目を確認できます。");
             row3.Add(previewLabel);
 
             _previewMaterialField = new ObjectField { objectType = typeof(Material), value = _previewMaterial, allowSceneObjects = true };
             _previewMaterialField.AddToClassList("settings-object-input");
-            _previewMaterialField.tooltip = "プレビュー先のマテリアルを指定します。設定すると自動的にプレビューが有効になります。";
+            _previewMaterialField.tooltip = PSDTranslation.Get("PreviewMatTooltip", "プレビュー先のマテリアルを指定します。設定すると自動的にプレビューが有効になります。");
             _previewMaterialField.RegisterValueChangedCallback(evt => {
                 var prevMat = (Material)evt.newValue;
                 if (prevMat != _previewMaterial)
@@ -217,7 +248,7 @@ namespace PSDSimpleEditor
             });
             row3.Add(_previewMaterialField);
 
-            var slotLabel = new Label("テクスチャ");
+            var slotLabel = new Label(PSDTranslation.Get("Texture", "テクスチャ"));
             slotLabel.AddToClassList("control-label");
             slotLabel.AddToClassList("settings-slot-label");
             row3.Add(slotLabel);
@@ -225,7 +256,7 @@ namespace PSDSimpleEditor
             _previewSlotField = new TextField();
             _previewSlotField.value = _previewSlotName;
             _previewSlotField.AddToClassList("settings-slot-input");
-            _previewSlotField.tooltip = "合成結果を差し替えるマテリアルのテクスチャプロパティ名です。右の「▾」からシェーダーのテクスチャ項目を選択できます。";
+            _previewSlotField.tooltip = PSDTranslation.Get("TextureSlotTooltip", "合成結果を差し替えるマテリアルのテクスチャプロパティ名です。右の「▾」からシェーダーのテクスチャ項目を選択できます。");
             _previewSlotField.RegisterValueChangedCallback(evt => {
                 var prevSlot = evt.newValue;
                 if (prevSlot != _previewSlotName)
@@ -240,7 +271,7 @@ namespace PSDSimpleEditor
             var slotPickerBtn = new Button(ShowTexturePropertyMenu) { text = "▾" };
             slotPickerBtn.AddToClassList("button-tool");
             slotPickerBtn.AddToClassList("settings-button-icon");
-            slotPickerBtn.tooltip = "マテリアルのシェーダーからテクスチャ項目を選んで指定します。";
+            slotPickerBtn.tooltip = PSDTranslation.Get("TexturePickerTooltip", "マテリアルのシェーダーからテクスチャ項目を選んで指定します。");
             row3.Add(slotPickerBtn);
 
             _realtimePreviewButton = new Button(ToggleRealtimePreview);
@@ -273,7 +304,7 @@ namespace PSDSimpleEditor
                 emptyState.AddToClassList("card");
                 emptyState.AddToClassList("empty-state");
 
-                var emptyHeader = new Label("PSD が読み込まれていません");
+                var emptyHeader = new Label(PSDTranslation.Get("PsdNotLoaded", "PSD が読み込まれていません"));
                 emptyHeader.AddToClassList("title");
                 emptyState.Add(emptyHeader);
 
@@ -282,7 +313,7 @@ namespace PSDSimpleEditor
                 emptySep.AddToClassList("empty-state-separator");
                 emptyState.Add(emptySep);
 
-                var emptyText = new Label("上部の「PSD」欄でファイルを指定し、「読み込み」を押してください。\n履歴からの再読み込みも可能です。");
+                var emptyText = new Label(PSDTranslation.Get("PsdLoadPrompt", "上部の「PSD」欄でファイルを指定し、「読み込み」を押してください。\n履歴からの再読み込みも可能です。"));
                 emptyText.AddToClassList("centered-caption");
                 emptyState.Add(emptyText);
 
@@ -302,9 +333,9 @@ namespace PSDSimpleEditor
                 var layerHeader = new VisualElement();
                 layerHeader.AddToClassList("toolbar-style");
                 
-                var layerTitle = new Label("レイヤー");
+                var layerTitle = new Label(PSDTranslation.Get("Layers", "レイヤー"));
                 layerTitle.AddToClassList("section-header");
-                layerTitle.tooltip = "PSD内のレイヤー構造を表示します。\n・左の目のトグル: 表示/非表示\n・右のドロップダウン: ブレンドモード\n・フォルダやレイヤーを展開すると詳細パラメータが表示されます。";
+                layerTitle.tooltip = PSDTranslation.Get("LayersTooltip", "PSD内のレイヤー構造を表示します。\n・左の目のトグル: 表示/非表示\n・右のドロップダウン: ブレンドモード\n・フォルダやレイヤーを展開すると詳細パラメータが表示されます。");
                 layerHeader.Add(layerTitle);
                 layerPanel.Add(layerHeader);
 
@@ -323,7 +354,7 @@ namespace PSDSimpleEditor
                 var previewHeader = new VisualElement();
                 previewHeader.AddToClassList("toolbar-style");
 
-                var previewTitle = new Label("プレビュー");
+                var previewTitle = new Label(PSDTranslation.Get("Preview", "プレビュー"));
                 previewTitle.AddToClassList("section-header");
                 previewTitle.AddToClassList("grow");
                 previewHeader.Add(previewTitle);
@@ -397,10 +428,10 @@ namespace PSDSimpleEditor
             _bottomBarContainer.Add(spacer);
 
             // Format Selector Label
-            var formatLabel = new Label("形式");
+            var formatLabel = new Label(PSDTranslation.Get("Format", "形式"));
             formatLabel.AddToClassList("control-label");
             formatLabel.AddToClassList("format-label");
-            formatLabel.tooltip = "書き出す画像のファイルフォーマットを指定します。\n・PNG: 合成結果をアルファ付きPNGとして書き出します。\n・PSD: 現在の編集パラメータを維持したままPSDとして書き出します。\n・TGA: 32bit（アルファあり）のTGA形式で書き出します。";
+            formatLabel.tooltip = PSDTranslation.Get("FormatTooltip", "書き出す画像のファイルフォーマットを指定します。\n・PNG: 合成結果をアルファ付きPNGとして書き出します。\n・PSD: 現在の編集パラメータを維持したままPSDとして書き出します。\n・TGA: 32bit（アルファあり）のTGA形式で書き出します。");
             _bottomBarContainer.Add(formatLabel);
 
             // Format Selector EnumField
@@ -426,7 +457,7 @@ namespace PSDSimpleEditor
                         ExportTGA();
                         break;
                 }
-            }) { text = "書き出し" };
+            }) { text = PSDTranslation.Get("Export", "書き出し") };
             _exportButton.AddToClassList("button-primary");
             _exportButton.AddToClassList("export-button");
             _bottomBarContainer.Add(_exportButton);
@@ -449,7 +480,7 @@ namespace PSDSimpleEditor
 
             // Info text
             _bottomInfoLabel.text = $"{_psdFile.Width} × {_psdFile.Height} px   |   " +
-                                   $"レイヤー数 {CountLayersRecursive(_psdFile.Layers)}   |   " +
+                                   $"{PSDTranslation.GetFormat("LayerCountFormat", CountLayersRecursive(_psdFile.Layers))}   |   " +
                                    $"{_psdFile.BitDepth}bit   |   " +
                                    ColorModeName(_psdFile.ColorMode);
 
@@ -512,7 +543,7 @@ namespace PSDSimpleEditor
 
             if (_previewMaterial == null || _previewMaterial.shader == null)
             {
-                menu.AddDisabledItem(new GUIContent("マテリアルが未設定です"));
+                menu.AddDisabledItem(new GUIContent(PSDTranslation.Get("MaterialNotSet", "マテリアルが未設定です")));
                 menu.ShowAsContext();
                 return;
             }
@@ -543,7 +574,7 @@ namespace PSDSimpleEditor
 
             if (!any)
             {
-                menu.AddDisabledItem(new GUIContent("テクスチャ項目が見つかりません"));
+                menu.AddDisabledItem(new GUIContent(PSDTranslation.Get("TextureNotFound", "テクスチャ項目が見つかりません")));
             }
 
             menu.ShowAsContext();
@@ -561,12 +592,12 @@ namespace PSDSimpleEditor
             if (_mergedRefButton == null) return;
             if (_showMergedRef)
             {
-                _mergedRefButton.text = "マージ参照中";
+                _mergedRefButton.text = PSDTranslation.Get("MergedRefActive", "マージ参照中");
                 _mergedRefButton.AddToClassList("button-tool-active");
             }
             else
             {
-                _mergedRefButton.text = "マージ参照";
+                _mergedRefButton.text = PSDTranslation.Get("MergedRef", "マージ参照");
                 _mergedRefButton.RemoveFromClassList("button-tool-active");
             }
         }
@@ -591,12 +622,12 @@ namespace PSDSimpleEditor
             if (_realtimePreviewButton == null) return;
             if (_isRealtimePreviewEnabled)
             {
-                _realtimePreviewButton.text = "プレビュー中";
+                _realtimePreviewButton.text = PSDTranslation.Get("PreviewActive", "プレビュー中");
                 _realtimePreviewButton.AddToClassList("button-tool-active");
             }
             else
             {
-                _realtimePreviewButton.text = "プレビュー";
+                _realtimePreviewButton.text = PSDTranslation.Get("Preview", "プレビュー");
                 _realtimePreviewButton.RemoveFromClassList("button-tool-active");
             }
         }
@@ -695,7 +726,7 @@ namespace PSDSimpleEditor
                         {
                             EditorGUILayout.BeginHorizontal();
                             GUILayout.Space(18f);
-                            GUILayout.Label("※ パススルー時は不透明度は適用されません", PSDEditorTheme.CaptionStyle);
+                            GUILayout.Label(PSDTranslation.Get("PassThroughWarning", "※ パススルー時は不透明度は適用されません"), PSDEditorTheme.CaptionStyle);
                             EditorGUILayout.EndHorizontal();
                         }
                     }
