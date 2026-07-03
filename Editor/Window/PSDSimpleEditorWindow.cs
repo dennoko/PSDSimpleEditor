@@ -98,23 +98,27 @@ namespace PSDSimpleEditor
         {
             wantsMouseMove = true;
 
-            // ドメインリロード（コンパイル）後にプレビューが有効状態であれば、再度バインドとバックアップを登録する
-            if (_isRealtimePreviewEnabled && _previewMaterial != null)
+            // ドメインリロード（コンパイル）や Unity 再起動をまたいで復帰したときの後始末。
+            //
+            // プレビュー関連フィールド (_isRealtimePreviewEnabled / _previewMaterial /
+            // _originalTexture / _previewSlotName) は [SerializeField] のため復帰するが、
+            // PSD データ (_psdFile / _compositor / _compositeTexture) は [NonSerialized] のため
+            // 復帰時には必ず失われている。つまり復帰直後は差し替えるべき合成結果が存在せず、
+            // プレビューを継続することは原理的にできない。
+            //
+            // ここで _isRealtimePreviewEnabled=true を残したまま再バインドすると、PSD 未読み込みなのに
+            // 「プレビュー中」表示だけが持続し、マテリアルは破棄済みの RenderTexture を指したまま
+            // 見た目が壊れる。そこで復帰時はプレビューを明示的に解除し、元テクスチャへ戻して整合を取る。
+            // （マテリアル自体の復元は PSDPreviewRecovery が EditorPrefs 経由で別途保証している。）
+            if (_isRealtimePreviewEnabled)
             {
                 EditorApplication.delayCall += () =>
                 {
-                    if (this != null && _isRealtimePreviewEnabled)
-                    {
-                        // 念のため _originalTexture が残っていなければ再設定する
-                        if (_originalTexture == null)
-                        {
-                            _originalTexture = _previewMaterial.GetTexture(_previewSlotName);
-                        }
-                        PSDPreviewRecovery.SaveBackup(_previewMaterial, _previewSlotName, _originalTexture);
-                        ApplyRealtimePreview();
-                        _needsRecomposite = true;
-                        Repaint();
-                    }
+                    if (this == null) return;
+                    RevertRealtimePreview();            // 元テクスチャへ戻し、バックアップも消去
+                    _isRealtimePreviewEnabled = false;  // 合成結果が無いのでプレビュー状態をリセット
+                    UpdateSettingsFields();             // ボタン表示 (「プレビュー中」→「プレビュー」) を更新
+                    Repaint();
                 };
             }
         }
