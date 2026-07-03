@@ -62,6 +62,8 @@ namespace PSDSimpleEditor
                 return;
             }
 
+            BlendModeMappingValidator.ValidateOnce(shader);
+
             _mat = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
             _rtA = CreateRT();
             _rtB = CreateRT();
