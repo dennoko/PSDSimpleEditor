@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -37,6 +38,11 @@ namespace PSDSimpleEditor
         /// <summary>true にすると Parse(path) でも詳細ダンプログを出力する。</summary>
         public static bool VerboseLog = false;
 
+        // この容量以下のファイルは全体をメモリへ読み込んでからパースする。
+        // FileStream 直読みだと BE 整数の 1 バイト読みやチャンネルごとの小さな読み取りが
+        // 大量に発生して遅いうえ、メモリ上のバッファがあればチャンネル解凍を並列化できる。
+        const long MaxInMemoryFileSize = 1L << 30; // 1GB
+
         /// <summary>PSD ファイルをパースする (既存呼び出し互換)。</summary>
         public static PSDFile Parse(string filePath)
         {
@@ -63,9 +69,24 @@ namespace PSDSimpleEditor
             var vlog = verbose ? new StringBuilder() : null;
             vlog?.AppendLine($"[PSDParser] ダンプ: {filePath}");
 
+            // 全体をメモリへ読み込む (巨大ファイルはストリーミングへフォールバック)
+            byte[] fileData = null;
+            try
+            {
+                if (new FileInfo(filePath).Length <= MaxInMemoryFileSize)
+                    fileData = File.ReadAllBytes(filePath);
+            }
+            catch (OutOfMemoryException)
+            {
+                fileData = null; // メモリ不足時はストリーミングで続行
+            }
+
             List<PSDLayer> flat;
-            using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
-            using (var r  = new BigEndianBinaryReader(fs))
+            Stream stream = fileData != null
+                ? (Stream)new MemoryStream(fileData, false)
+                : new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20);
+            using (stream)
+            using (var r = new BigEndianBinaryReader(stream))
             {
                 // Section 1: ヘッダ (致命的エラーはここで throw)
                 PSDHeaderReader.ParseHeader(r, psd, vlog);
@@ -74,8 +95,8 @@ namespace PSDSimpleEditor
                 PSDHeaderReader.SkipLengthPrefixedBlock(r);
                 PSDHeaderReader.SkipLengthPrefixedBlock(r);
 
-                // Section 4: レイヤーとマスク情報
-                flat = PSDLayerRecordParser.ParseLayerAndMaskSection(r, psd, vlog);
+                // Section 4: レイヤーとマスク情報 (fileData があればチャンネル解凍を並列実行)
+                flat = PSDLayerRecordParser.ParseLayerAndMaskSection(r, psd, fileData, vlog);
 
                 // Section 5: マージ済み画像 (失敗しても警告のみで続行)
                 PSDMergedImageParser.ParseMergedImage(r, psd, vlog);

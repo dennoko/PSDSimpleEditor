@@ -269,7 +269,7 @@ namespace PSDSimpleEditor
             SectionType == LayerSectionType.Normal &&
             Adjustment != null && Adjustment.HasAny;
 
-        // ── 内部 (テクスチャ構築後に null 化) ──
+        // ── 内部 (テクスチャ構築後に null 化。ボトムアップ = Unity 標準向きで格納) ──
         [System.NonSerialized] public byte[] _rawPixels;
         [System.NonSerialized] public byte[] _rawMaskPixels;
     }

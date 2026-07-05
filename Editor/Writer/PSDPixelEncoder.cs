@@ -1,6 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace PSDSimpleEditor
@@ -13,9 +13,9 @@ namespace PSDSimpleEditor
         /// <summary>1 プレーン (w×h, トップダウン) を [uint16 compr=1][行長テーブル][packbits 行] に圧縮する。</summary>
         internal static byte[] CompressPlaneRLE(byte[] plane, int w, int h)
         {
+            // 各行の PackBits は独立しているため並列に圧縮する (行順は組み立て時に維持)
             var rows = new byte[h][];
-            for (int y = 0; y < h; y++)
-                rows[y] = PackBits(plane, y * w, w);
+            Parallel.For(0, h, y => rows[y] = PackBits(plane, y * w, w));
 
             using (var ms = new MemoryStream())
             using (var bw = new BigEndianBinaryWriter(ms))
@@ -31,7 +31,9 @@ namespace PSDSimpleEditor
         /// <summary>PackBits で 1 走査線を圧縮する (DecodePackBitsRow の逆)。</summary>
         internal static byte[] PackBits(byte[] src, int off, int len)
         {
-            var o = new List<byte>(len + (len >> 7) + 1);
+            // 最悪ケース (ラン皆無) は 128 バイトごとに制御 1 バイト + 端数
+            var buf = new byte[len + (len >> 7) + 2];
+            int oi = 0;
             int i = 0;
             while (i < len)
             {
@@ -41,8 +43,8 @@ namespace PSDSimpleEditor
 
                 if (run >= 3)
                 {
-                    o.Add((byte)(1 - run)); // [-127..-1]
-                    o.Add(src[off + i]);
+                    buf[oi++] = (byte)(1 - run); // [-127..-1]
+                    buf[oi++] = src[off + i];
                     i += run;
                 }
                 else
@@ -57,11 +59,15 @@ namespace PSDSimpleEditor
                         if (r >= 3) break; // ラン開始 → リテラル終了
                         i++; lit++;
                     }
-                    o.Add((byte)(lit - 1)); // [0..127]
-                    for (int k = 0; k < lit; k++) o.Add(src[off + litStart + k]);
+                    buf[oi++] = (byte)(lit - 1); // [0..127]
+                    Buffer.BlockCopy(src, off + litStart, buf, oi, lit);
+                    oi += lit;
                 }
             }
-            return o.ToArray();
+
+            var result = new byte[oi];
+            Buffer.BlockCopy(buf, 0, result, 0, oi);
+            return result;
         }
 
         /// <summary>RGBA32 テクスチャをトップダウン (行 0 = 上端) の Color32[] で読み戻す。</summary>

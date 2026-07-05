@@ -13,6 +13,63 @@ namespace PSDSimpleEditor
     // ────────────────────────────────────────────────────────────────
     public partial class LayerCompositor
     {
+        // uniform 名 → ID の事前解決 (SetXxx(string) は呼び出しごとに文字列ハッシュが走るため、
+        // レイヤー数 × uniform 数だけ呼ばれる ApplyParams では ID 指定で設定する)
+        static class ShaderProp
+        {
+            public static readonly int CanvasSize     = Shader.PropertyToID("_CanvasSize");
+            public static readonly int LayerTex       = Shader.PropertyToID("_LayerTex");
+            public static readonly int LayerRect      = Shader.PropertyToID("_LayerRect");
+            public static readonly int LayerTile      = Shader.PropertyToID("_LayerTile");
+            public static readonly int LayerWrap      = Shader.PropertyToID("_LayerWrap");
+            public static readonly int Opacity        = Shader.PropertyToID("_Opacity");
+            public static readonly int BlendMode      = Shader.PropertyToID("_BlendMode");
+            public static readonly int IsAdjustment   = Shader.PropertyToID("_IsAdjustment");
+            public static readonly int HasMask        = Shader.PropertyToID("_HasMask");
+            public static readonly int MaskTex        = Shader.PropertyToID("_MaskTex");
+            public static readonly int MaskRect       = Shader.PropertyToID("_MaskRect");
+            public static readonly int MaskDefault    = Shader.PropertyToID("_MaskDefault");
+            public static readonly int HasClipMask    = Shader.PropertyToID("_HasClipMask");
+            public static readonly int ClipMaskTex    = Shader.PropertyToID("_ClipMaskTex");
+            public static readonly int Brightness     = Shader.PropertyToID("_Brightness");
+            public static readonly int Contrast       = Shader.PropertyToID("_Contrast");
+            public static readonly int Hue            = Shader.PropertyToID("_Hue");
+            public static readonly int Saturation     = Shader.PropertyToID("_Saturation");
+            public static readonly int Lightness      = Shader.PropertyToID("_Lightness");
+            public static readonly int Colorize       = Shader.PropertyToID("_Colorize");
+            public static readonly int HasInvert      = Shader.PropertyToID("_HasInvert");
+            public static readonly int HasThreshold   = Shader.PropertyToID("_HasThreshold");
+            public static readonly int ThresholdLevel = Shader.PropertyToID("_ThresholdLevel");
+            public static readonly int HasPosterize   = Shader.PropertyToID("_HasPosterize");
+            public static readonly int PosterizeLevels = Shader.PropertyToID("_PosterizeLevels");
+            public static readonly int LevelsInBlack  = Shader.PropertyToID("_LevelsInBlack");
+            public static readonly int LevelsInWhite  = Shader.PropertyToID("_LevelsInWhite");
+            public static readonly int LevelsGamma    = Shader.PropertyToID("_LevelsGamma");
+            public static readonly int LevelsOutBlack = Shader.PropertyToID("_LevelsOutBlack");
+            public static readonly int LevelsOutWhite = Shader.PropertyToID("_LevelsOutWhite");
+            public static readonly int LevelsChInBlack  = Shader.PropertyToID("_LevelsChInBlack");
+            public static readonly int LevelsChInWhite  = Shader.PropertyToID("_LevelsChInWhite");
+            public static readonly int LevelsChGamma    = Shader.PropertyToID("_LevelsChGamma");
+            public static readonly int LevelsChOutBlack = Shader.PropertyToID("_LevelsChOutBlack");
+            public static readonly int LevelsChOutWhite = Shader.PropertyToID("_LevelsChOutWhite");
+            public static readonly int HasCurveLut    = Shader.PropertyToID("_HasCurveLut");
+            public static readonly int CurveLutTex    = Shader.PropertyToID("_CurveLutTex");
+            public static readonly int HasGradientMap     = Shader.PropertyToID("_HasGradientMap");
+            public static readonly int GradientMapTex     = Shader.PropertyToID("_GradientMapTex");
+            public static readonly int GradientMapOpacity = Shader.PropertyToID("_GradientMapOpacity");
+            public static readonly int GradientMapNormalize = Shader.PropertyToID("_GradientMapNormalize");
+            public static readonly int GradientMapLumMin  = Shader.PropertyToID("_GradientMapLumMin");
+            public static readonly int GradientMapLumMax  = Shader.PropertyToID("_GradientMapLumMax");
+            public static readonly int HasColorBalance = Shader.PropertyToID("_HasColorBalance");
+            public static readonly int CBShadows       = Shader.PropertyToID("_CBShadows");
+            public static readonly int CBMidtones      = Shader.PropertyToID("_CBMidtones");
+            public static readonly int CBHighlights    = Shader.PropertyToID("_CBHighlights");
+            public static readonly int CBPreserveLum   = Shader.PropertyToID("_CBPreserveLum");
+            public static readonly int HasGradFill     = Shader.PropertyToID("_HasGradFill");
+            public static readonly int GradFillTex     = Shader.PropertyToID("_GradFillTex");
+            public static readonly int GradFillParams  = Shader.PropertyToID("_GradFillParams");
+        }
+
         /// <summary>1 回の Blit に必要な全 uniform 値。未設定スロットは安全な既定値になる。</summary>
         struct DrawParams
         {
@@ -92,78 +149,78 @@ namespace PSDSimpleEditor
         /// <summary>キャンバスサイズを明示指定する版 (レイヤー単独の 1:1 書き出しレンダリング用)。</summary>
         void ApplyParams(in DrawParams p, Vector4 canvasSize)
         {
-            _mat.SetVector("_CanvasSize", canvasSize);
+            _mat.SetVector(ShaderProp.CanvasSize, canvasSize);
 
             // レイヤー
-            _mat.SetTexture("_LayerTex", p.LayerTex != null ? p.LayerTex : Texture2D.blackTexture);
-            _mat.SetVector ("_LayerRect", p.LayerRect);
-            _mat.SetVector ("_LayerTile", new Vector4(p.LayerTile.x, p.LayerTile.y, 0, 0));
-            _mat.SetInt    ("_LayerWrap", p.LayerWrap ? 1 : 0);
-            _mat.SetFloat  ("_Opacity",   Mathf.Clamp01(p.Opacity));
-            _mat.SetInt    ("_BlendMode", p.BlendMode);
-            _mat.SetInt    ("_IsAdjustment", p.IsAdjustment ? 1 : 0);
+            _mat.SetTexture(ShaderProp.LayerTex, p.LayerTex != null ? p.LayerTex : Texture2D.blackTexture);
+            _mat.SetVector (ShaderProp.LayerRect, p.LayerRect);
+            _mat.SetVector (ShaderProp.LayerTile, new Vector4(p.LayerTile.x, p.LayerTile.y, 0, 0));
+            _mat.SetInt    (ShaderProp.LayerWrap, p.LayerWrap ? 1 : 0);
+            _mat.SetFloat  (ShaderProp.Opacity,   Mathf.Clamp01(p.Opacity));
+            _mat.SetInt    (ShaderProp.BlendMode, p.BlendMode);
+            _mat.SetInt    (ShaderProp.IsAdjustment, p.IsAdjustment ? 1 : 0);
 
             // レイヤーマスク (無効マスクは CPU 側で MaskTex = null とし _HasMask = 0 にする)
             bool hasMask = p.MaskTex != null;
-            _mat.SetInt    ("_HasMask",     hasMask ? 1 : 0);
-            _mat.SetTexture("_MaskTex",     hasMask ? p.MaskTex : (Texture)Texture2D.whiteTexture);
-            _mat.SetVector ("_MaskRect",    hasMask ? p.MaskRect : new Vector4(0, 0, 1, 1));
-            _mat.SetFloat  ("_MaskDefault", hasMask ? Mathf.Clamp01(p.MaskDefault) : 1f);
+            _mat.SetInt    (ShaderProp.HasMask,     hasMask ? 1 : 0);
+            _mat.SetTexture(ShaderProp.MaskTex,     hasMask ? p.MaskTex : (Texture)Texture2D.whiteTexture);
+            _mat.SetVector (ShaderProp.MaskRect,    hasMask ? p.MaskRect : new Vector4(0, 0, 1, 1));
+            _mat.SetFloat  (ShaderProp.MaskDefault, hasMask ? Mathf.Clamp01(p.MaskDefault) : 1f);
 
             // クリッピングマスク
             bool hasClip = p.ClipMaskTex != null;
-            _mat.SetInt    ("_HasClipMask", hasClip ? 1 : 0);
-            _mat.SetTexture("_ClipMaskTex", hasClip ? p.ClipMaskTex : (Texture)Texture2D.whiteTexture);
+            _mat.SetInt    (ShaderProp.HasClipMask, hasClip ? 1 : 0);
+            _mat.SetTexture(ShaderProp.ClipMaskTex, hasClip ? p.ClipMaskTex : (Texture)Texture2D.whiteTexture);
 
             // 色調補正 (通常パスでもレイヤー色へ適用される。REWRITE_SPEC.md §3)
-            _mat.SetFloat("_Brightness", Mathf.Clamp(p.Brightness, -1f, 1f));
-            _mat.SetFloat("_Contrast",   Mathf.Clamp(p.Contrast,   -1f, 1f));
-            _mat.SetFloat("_Hue",        Mathf.Clamp(p.Hue,        -1f, 1f));
-            _mat.SetFloat("_Saturation", Mathf.Clamp(p.Saturation, -1f, 1f));
-            _mat.SetFloat("_Lightness",  Mathf.Clamp(p.Lightness,  -1f, 1f));
-            _mat.SetInt  ("_Colorize",   p.Colorize ? 1 : 0);
-            _mat.SetInt  ("_HasInvert",    p.Invert ? 1 : 0);
-            _mat.SetInt  ("_HasThreshold", p.Threshold ? 1 : 0);
-            _mat.SetFloat("_ThresholdLevel", Mathf.Clamp01(p.ThresholdLevel));
-            _mat.SetInt  ("_HasPosterize", p.Posterize ? 1 : 0);
-            _mat.SetFloat("_PosterizeLevels", Mathf.Max(2f, p.PosterizeLevels));
-            _mat.SetFloat("_LevelsInBlack",  Mathf.Clamp01(p.LevelsInBlack));
-            _mat.SetFloat("_LevelsInWhite",  Mathf.Clamp01(p.LevelsInWhite));
-            _mat.SetFloat("_LevelsGamma",    Mathf.Max(0.01f, p.LevelsGamma));
-            _mat.SetFloat("_LevelsOutBlack", Mathf.Clamp01(p.LevelsOutBlack));
-            _mat.SetFloat("_LevelsOutWhite", Mathf.Clamp01(p.LevelsOutWhite));
-            _mat.SetVector("_LevelsChInBlack",  p.LevelsChInBlack);
-            _mat.SetVector("_LevelsChInWhite",  p.LevelsChInWhite);
-            _mat.SetVector("_LevelsChGamma",    p.LevelsChGamma);
-            _mat.SetVector("_LevelsChOutBlack", p.LevelsChOutBlack);
-            _mat.SetVector("_LevelsChOutWhite", p.LevelsChOutWhite);
+            _mat.SetFloat(ShaderProp.Brightness, Mathf.Clamp(p.Brightness, -1f, 1f));
+            _mat.SetFloat(ShaderProp.Contrast,   Mathf.Clamp(p.Contrast,   -1f, 1f));
+            _mat.SetFloat(ShaderProp.Hue,        Mathf.Clamp(p.Hue,        -1f, 1f));
+            _mat.SetFloat(ShaderProp.Saturation, Mathf.Clamp(p.Saturation, -1f, 1f));
+            _mat.SetFloat(ShaderProp.Lightness,  Mathf.Clamp(p.Lightness,  -1f, 1f));
+            _mat.SetInt  (ShaderProp.Colorize,   p.Colorize ? 1 : 0);
+            _mat.SetInt  (ShaderProp.HasInvert,    p.Invert ? 1 : 0);
+            _mat.SetInt  (ShaderProp.HasThreshold, p.Threshold ? 1 : 0);
+            _mat.SetFloat(ShaderProp.ThresholdLevel, Mathf.Clamp01(p.ThresholdLevel));
+            _mat.SetInt  (ShaderProp.HasPosterize, p.Posterize ? 1 : 0);
+            _mat.SetFloat(ShaderProp.PosterizeLevels, Mathf.Max(2f, p.PosterizeLevels));
+            _mat.SetFloat(ShaderProp.LevelsInBlack,  Mathf.Clamp01(p.LevelsInBlack));
+            _mat.SetFloat(ShaderProp.LevelsInWhite,  Mathf.Clamp01(p.LevelsInWhite));
+            _mat.SetFloat(ShaderProp.LevelsGamma,    Mathf.Max(0.01f, p.LevelsGamma));
+            _mat.SetFloat(ShaderProp.LevelsOutBlack, Mathf.Clamp01(p.LevelsOutBlack));
+            _mat.SetFloat(ShaderProp.LevelsOutWhite, Mathf.Clamp01(p.LevelsOutWhite));
+            _mat.SetVector(ShaderProp.LevelsChInBlack,  p.LevelsChInBlack);
+            _mat.SetVector(ShaderProp.LevelsChInWhite,  p.LevelsChInWhite);
+            _mat.SetVector(ShaderProp.LevelsChGamma,    p.LevelsChGamma);
+            _mat.SetVector(ShaderProp.LevelsChOutBlack, p.LevelsChOutBlack);
+            _mat.SetVector(ShaderProp.LevelsChOutWhite, p.LevelsChOutWhite);
 
             // トーンカーブ (LUT 未設定時は無効)
             bool hasCurve = p.CurveLutTex != null;
-            _mat.SetInt    ("_HasCurveLut", hasCurve ? 1 : 0);
-            _mat.SetTexture("_CurveLutTex", hasCurve ? p.CurveLutTex : (Texture)Texture2D.whiteTexture);
+            _mat.SetInt    (ShaderProp.HasCurveLut, hasCurve ? 1 : 0);
+            _mat.SetTexture(ShaderProp.CurveLutTex, hasCurve ? p.CurveLutTex : (Texture)Texture2D.whiteTexture);
 
             // グラデーションマップ (LUT 未設定時は無効)
             bool hasGrad = p.GradientMapTex != null;
-            _mat.SetInt    ("_HasGradientMap",     hasGrad ? 1 : 0);
-            _mat.SetTexture("_GradientMapTex",     hasGrad ? p.GradientMapTex : (Texture)Texture2D.whiteTexture);
-            _mat.SetFloat  ("_GradientMapOpacity", Mathf.Clamp01(p.GradientMapOpacity));
-            _mat.SetInt    ("_GradientMapNormalize", p.GradientMapNormalize ? 1 : 0);
-            _mat.SetFloat  ("_GradientMapLumMin", Mathf.Clamp01(p.GradientMapLumMin));
-            _mat.SetFloat  ("_GradientMapLumMax", Mathf.Clamp01(p.GradientMapLumMax));
+            _mat.SetInt    (ShaderProp.HasGradientMap,     hasGrad ? 1 : 0);
+            _mat.SetTexture(ShaderProp.GradientMapTex,     hasGrad ? p.GradientMapTex : (Texture)Texture2D.whiteTexture);
+            _mat.SetFloat  (ShaderProp.GradientMapOpacity, Mathf.Clamp01(p.GradientMapOpacity));
+            _mat.SetInt    (ShaderProp.GradientMapNormalize, p.GradientMapNormalize ? 1 : 0);
+            _mat.SetFloat  (ShaderProp.GradientMapLumMin, Mathf.Clamp01(p.GradientMapLumMin));
+            _mat.SetFloat  (ShaderProp.GradientMapLumMax, Mathf.Clamp01(p.GradientMapLumMax));
 
             // カラーバランス
-            _mat.SetInt    ("_HasColorBalance", p.ColorBalance ? 1 : 0);
-            _mat.SetVector ("_CBShadows",    p.CBShadows);
-            _mat.SetVector ("_CBMidtones",   p.CBMidtones);
-            _mat.SetVector ("_CBHighlights", p.CBHighlights);
-            _mat.SetInt    ("_CBPreserveLum", p.CBPreserveLum ? 1 : 0);
+            _mat.SetInt    (ShaderProp.HasColorBalance, p.ColorBalance ? 1 : 0);
+            _mat.SetVector (ShaderProp.CBShadows,    p.CBShadows);
+            _mat.SetVector (ShaderProp.CBMidtones,   p.CBMidtones);
+            _mat.SetVector (ShaderProp.CBHighlights, p.CBHighlights);
+            _mat.SetInt    (ShaderProp.CBPreserveLum, p.CBPreserveLum ? 1 : 0);
 
             // グラデーション塗りつぶし (GdFl。LUT 未設定時は無効)
             bool hasGradFill = p.GradFillTex != null;
-            _mat.SetInt    ("_HasGradFill",    hasGradFill ? 1 : 0);
-            _mat.SetTexture("_GradFillTex",    hasGradFill ? p.GradFillTex : (Texture)Texture2D.whiteTexture);
-            _mat.SetVector ("_GradFillParams", p.GradFillParams);
+            _mat.SetInt    (ShaderProp.HasGradFill,    hasGradFill ? 1 : 0);
+            _mat.SetTexture(ShaderProp.GradFillTex,    hasGradFill ? p.GradFillTex : (Texture)Texture2D.whiteTexture);
+            _mat.SetVector (ShaderProp.GradFillParams, p.GradFillParams);
         }
 
         // レイヤーのマスク情報を DrawParams へ反映 (無効・テクスチャなしは「マスクなし」扱い)

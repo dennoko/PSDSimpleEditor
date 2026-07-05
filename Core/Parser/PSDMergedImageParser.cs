@@ -36,11 +36,18 @@ namespace PSDSimpleEditor
 
                     for (int c = 0; c < channels; c++)
                     {
+                        // チャンネル全行を一括で読み、オフセット参照で行ごとに解凍する
+                        long srcTotal = 0;
+                        for (int y = 0; y < h; y++) srcTotal += rowLens[c * h + y];
+                        byte[] src = r.ReadBytesExact((int)srcTotal);
+
                         var plane = new byte[rowBytes * h];
+                        int so = 0;
                         for (int y = 0; y < h; y++)
                         {
-                            byte[] src = r.ReadBytesExact(rowLens[c * h + y]);
-                            PSDChannelDecoder.DecodePackBitsRow(src, plane, y * rowBytes, rowBytes);
+                            int len = rowLens[c * h + y];
+                            PSDChannelDecoder.DecodePackBitsRow(src, so, len, plane, y * rowBytes, rowBytes);
+                            so += len;
                         }
                         planes[c] = plane;
                     }

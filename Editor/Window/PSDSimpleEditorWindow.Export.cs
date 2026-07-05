@@ -47,7 +47,8 @@ namespace PSDSimpleEditor
 
         void ExportPNG()
         {
-            if (_compositeTexture == null)
+            var composite = GetCompositeTextureForExport();
+            if (composite == null)
             {
                 EditorUtility.DisplayDialog("エラー",
                     "合成結果がありません。先に PSD を読み込んでください。", "OK");
@@ -71,7 +72,7 @@ namespace PSDSimpleEditor
 
                 string savePath = GetUniqueExportPath(_exportDir, baseName, ".png");
 
-                byte[] png = _compositeTexture.EncodeToPNG();
+                byte[] png = composite.EncodeToPNG();
                 File.WriteAllBytes(savePath, png);
                 Debug.Log($"[PSDSimpleEditor] PNG を保存しました: {savePath}");
                 SetStatus($"PNG を書き出しました: {Path.GetFileName(savePath)}", StatusType.Success);
@@ -195,7 +196,7 @@ namespace PSDSimpleEditor
                 RecompositeNow();
 
                 EditorUtility.DisplayProgressBar("PSD 書き出し中", "PSD を書き出しています...", 0.6f);
-                PSDWriter.Save(_psdFile, _psdFile.Layers, _compositor, _compositeTexture, savePath);
+                PSDWriter.Save(_psdFile, _psdFile.Layers, _compositor, GetCompositeTextureForExport(), savePath);
 
                 Debug.Log($"[PSDSimpleEditor] PSD を保存しました: {savePath}");
                 SetStatus($"PSD を書き出しました: {Path.GetFileName(savePath)}", StatusType.Success);
@@ -240,7 +241,8 @@ namespace PSDSimpleEditor
 
         void ExportTGA()
         {
-            if (_compositeTexture == null)
+            var composite = GetCompositeTextureForExport();
+            if (composite == null)
             {
                 EditorUtility.DisplayDialog("エラー",
                     "合成結果がありません。先に PSD を読み込んでください。", "OK");
@@ -264,7 +266,7 @@ namespace PSDSimpleEditor
 
                 string savePath = GetUniqueExportPath(_exportDir, baseName, ".tga");
 
-                byte[] tga = EncodeToTGA(_compositeTexture);
+                byte[] tga = EncodeToTGA(composite);
                 File.WriteAllBytes(savePath, tga);
                 Debug.Log($"[PSDSimpleEditor] TGA を保存しました: {savePath}");
                 SetStatus($"TGA を書き出しました: {Path.GetFileName(savePath)}", StatusType.Success);

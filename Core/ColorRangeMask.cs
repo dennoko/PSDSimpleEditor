@@ -19,17 +19,20 @@ namespace PSDSimpleEditor
         /// グレースケール (rgb = 選択値, a = 255) の Color32[] として返す (ボトムアップ順のまま)。
         /// 透明画素 (a == 0) は常に非選択。閾値 0 = 完全一致のみ、大きいほど広く選択。
         /// 対象が走査不能 (テクスチャなし / サイズ 0) のときは null を返す。
+        /// cachedSrc に GetSourcePixels の結果を渡すと GetPixels32 (テクスチャ全体の読み出し)
+        /// を省略できる (スライダードラッグ中の連続更新用)。
         /// </summary>
         public static Color32[] BuildMaskPixels(PSDLayer layer, Color target, float threshold,
-                                                out int w, out int h)
+                                                out int w, out int h, Color32[] cachedSrc = null)
         {
-            if (!TryGetSource(layer, out var src, out w, out h)) return null;
+            if (!TryGetSource(layer, cachedSrc, out var src, out w, out h)) return null;
 
             float thSq = Sq(Mathf.Clamp01(threshold) * MaxDist);
             Color32 t  = target;
 
-            var dst = new Color32[w * h];
-            for (int i = 0; i < dst.Length; i++)
+            int n = w * h;
+            var dst = new Color32[n];
+            for (int i = 0; i < n; i++)
             {
                 byte v = IsSelected(src[i], t, thSq) ? (byte)255 : (byte)0;
                 dst[i] = new Color32(v, v, v, 255);
@@ -39,34 +42,48 @@ namespace PSDSimpleEditor
 
         /// <summary>
         /// プレビュー用: 選択画素を highlight 色、非選択画素を透明としたオーバーレイの
-        /// Color32[] を返す (ボトムアップ順のまま)。null 条件は BuildMaskPixels と同じ。
+        /// Color32[] を返す (ボトムアップ順のまま)。null 条件・cachedSrc は BuildMaskPixels と同じ。
         /// </summary>
         public static Color32[] BuildHighlightPixels(PSDLayer layer, Color target, float threshold,
-                                                     Color highlight, out int w, out int h)
+                                                     Color highlight, out int w, out int h,
+                                                     Color32[] cachedSrc = null)
         {
-            if (!TryGetSource(layer, out var src, out w, out h)) return null;
+            if (!TryGetSource(layer, cachedSrc, out var src, out w, out h)) return null;
 
             float thSq        = Sq(Mathf.Clamp01(threshold) * MaxDist);
             Color32 t         = target;
             Color32 hi        = highlight;
             Color32 clear     = new Color32(0, 0, 0, 0);
 
-            var dst = new Color32[w * h];
-            for (int i = 0; i < dst.Length; i++)
+            int n = w * h;
+            var dst = new Color32[n];
+            for (int i = 0; i < n; i++)
                 dst[i] = IsSelected(src[i], t, thSq) ? hi : clear;
             return dst;
         }
 
+        /// <summary>
+        /// レイヤーの走査元ピクセル (ボトムアップ) を取得する。呼び出し側でキャッシュして
+        /// cachedSrc へ渡すことで、パラメータ変更のたびの GetPixels32 を回避できる。
+        /// 走査不能のときは null。
+        /// </summary>
+        public static Color32[] GetSourcePixels(PSDLayer layer)
+        {
+            return TryGetSource(layer, null, out var src, out _, out _) ? src : null;
+        }
+
         // ── 内部 ──────────────────────────────────────────────────────────
 
-        static bool TryGetSource(PSDLayer layer, out Color32[] src, out int w, out int h)
+        static bool TryGetSource(PSDLayer layer, Color32[] cachedSrc, out Color32[] src, out int w, out int h)
         {
             src = null; w = 0; h = 0;
             if (layer == null || layer.Texture == null) return false;
             w = layer.Width;
             h = layer.Height;
             if (w <= 0 || h <= 0) return false;
-            src = layer.Texture.GetPixels32(); // ボトムアップ
+            src = cachedSrc != null && cachedSrc.Length >= w * h
+                ? cachedSrc
+                : layer.Texture.GetPixels32(); // ボトムアップ
             if (src == null || src.Length < w * h) { src = null; return false; }
             return true;
         }

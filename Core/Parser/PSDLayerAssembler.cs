@@ -14,18 +14,20 @@ namespace PSDSimpleEditor
         {
             foreach (var layer in flat)
             {
+                // _rawPixels / _rawMaskPixels は AssembleLayerPixels が既にボトムアップで
+                // 組み立て済みのため、反転せずそのままロードする
                 if (layer._rawPixels != null)
                 {
-                    layer.Texture    = CreateTexture(layer._rawPixels, layer.Width, layer.Height,
-                                                     TextureFormat.RGBA32, layer.Name);
+                    layer.Texture    = CreateTextureBottomUp(layer._rawPixels, layer.Width, layer.Height,
+                                                             TextureFormat.RGBA32, layer.Name);
                     layer._rawPixels = null; // メモリ解放
                 }
                 if (layer._rawMaskPixels != null)
                 {
                     int mw = layer.MaskRight - layer.MaskLeft;
                     int mh = layer.MaskBottom - layer.MaskTop;
-                    layer.MaskTexture    = CreateTexture(layer._rawMaskPixels, mw, mh,
-                                                         TextureFormat.R8, layer.Name + " (mask)");
+                    layer.MaskTexture    = CreateTextureBottomUp(layer._rawMaskPixels, mw, mh,
+                                                                 TextureFormat.R8, layer.Name + " (mask)");
                     layer._rawMaskPixels = null;
                 }
             }
@@ -44,13 +46,19 @@ namespace PSDSimpleEditor
             for (int y = 0; y < h; y++)
                 Buffer.BlockCopy(topDownPixels, y * rowBytes, flipped, (h - 1 - y) * rowBytes, rowBytes);
 
+            return CreateTextureBottomUp(flipped, w, h, format, name, linear);
+        }
+
+        /// <summary>ボトムアップ (Unity 標準向き) の生バッファをそのまま Texture2D へロードする。</summary>
+        internal static Texture2D CreateTextureBottomUp(byte[] bottomUpPixels, int w, int h, TextureFormat format, string name, bool linear = true)
+        {
             var tex = new Texture2D(w, h, format, false, linear)
             {
                 name      = name,
                 hideFlags = HideFlags.HideAndDontSave,
                 wrapMode  = TextureWrapMode.Clamp,
             };
-            tex.LoadRawTextureData(flipped);
+            tex.LoadRawTextureData(bottomUpPixels);
             tex.Apply(false);
             return tex;
         }

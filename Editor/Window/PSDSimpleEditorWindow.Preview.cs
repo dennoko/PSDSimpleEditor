@@ -7,7 +7,7 @@ namespace PSDSimpleEditor
     // ─── partial 見取り図 ───────────────────────────────────────────
     // 責務   : プレビューパネル (右側) の描画、チェッカー背景の表示、およびマージ参照小窓の描画
     // 宣言   : なし
-    // 参照   : _compositeTexture (R), _showMergedRef (RW), _checkerTexture (RW), _eyedropperTarget (RW)
+    // 参照   : _compositeRT (R), _showMergedRef (RW), _checkerTexture (RW), _eyedropperTarget (RW)
     // 依存   : HandleEyedropper (.ColorRangeMask.cs)
     // ────────────────────────────────────────────────────────────────
     public partial class PSDSimpleEditorWindow
@@ -30,13 +30,13 @@ namespace PSDSimpleEditor
             EditorGUILayout.EndHorizontal();
             GUILayout.Space(6);
 
-            bool hasPreview = _compositeTexture != null && area.width > 8f && area.height > 8f;
+            bool hasPreview = _compositeRT != null && area.width > 8f && area.height > 8f;
 
             // 描画矩形は全イベントフェーズで必要 (スポイトのヒット判定に使う)
             Rect drawRect = default;
             if (hasPreview)
             {
-                float aspect = (float)_compositeTexture.width / _compositeTexture.height;
+                float aspect = (float)_compositeRT.width / _compositeRT.height;
                 drawRect = FitRectKeepAspect(area, aspect);
             }
 
@@ -53,7 +53,7 @@ namespace PSDSimpleEditor
                 {
                     // 透明部可視化のチェッカー背景 → その上にアルファ合成で描画
                     DrawCheckerBackground(drawRect);
-                    GUI.DrawTexture(drawRect, _compositeTexture, ScaleMode.StretchToFill, true);
+                    GUI.DrawTexture(drawRect, _compositeRT, ScaleMode.StretchToFill, true);
 
                     // 色域選択ハイライト (対象レイヤーの選択範囲を色付きで重ね描き)
                     DrawColorRangeHighlight(drawRect);

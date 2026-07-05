@@ -43,6 +43,11 @@ namespace PSDSimpleEditor
         // トップレベルのピンポン RT
         RenderTexture _rtA, _rtB;
 
+        // プレビュー用の常駐結果 RT (CompositeToRT の返却先)。
+        // sRGB フラグ付きにすることで、従来の Texture2D (linear:false) と同じ見え方で
+        // GUI 描画・マテリアルバインドできる (バイト値は sRGBWrite=false の Blit でそのままコピー)。
+        RenderTexture _resultRT;
+
         // グループ合成・クリップマスク用の RT プール (全てキャンバスサイズ)
         readonly Stack<RenderTexture> _pool = new Stack<RenderTexture>();
 
@@ -105,6 +110,7 @@ namespace PSDSimpleEditor
             if (_mat != null) { Object.DestroyImmediate(_mat); _mat = null; }
             ReleaseRT(ref _rtA);
             ReleaseRT(ref _rtB);
+            ReleaseRT(ref _resultRT);
 
             while (_pool.Count > 0)
             {
@@ -123,6 +129,8 @@ namespace PSDSimpleEditor
 
         /// <summary>
         /// layers (index 0 = 最下層) を昇順に合成して Texture2D (RGBA32, linear) を返す。
+        /// GPU→CPU の同期読み戻し (ReadPixels) を伴うため、書き出しなど CPU 側で
+        /// ピクセルが必要な場合のみ使う。プレビュー表示には CompositeToRT を使うこと。
         /// 返却テクスチャの破棄は呼び出し側の責任。
         /// </summary>
         public Texture2D Composite(List<PSDLayer> layers)
@@ -136,11 +144,7 @@ namespace PSDSimpleEditor
 
             try
             {
-                ClearRT(_rtA);
-                RenderTexture cur = _rtA, next = _rtB;
-
-                if (layers != null)
-                    CompositeList(layers, ref cur, ref next);
+                RenderTexture cur = RunPipeline(layers);
 
                 // cur が最終結果 → Texture2D (sRGB) へ転写
                 var result = new Texture2D(_canvasW, _canvasH, TextureFormat.RGBA32, false, linear: false)
@@ -155,6 +159,54 @@ namespace PSDSimpleEditor
                 RenderTexture.active = prevActive;
                 GL.sRGBWrite = prevSRGBWrite;
             }
+        }
+
+        /// <summary>
+        /// layers を合成し、結果を常駐の結果 RT へ転写して返す (GPU 内で完結し、CPU への
+        /// 読み戻しが発生しないためプレビュー更新はこちらを使う)。
+        /// 返却 RT はコンポジターが所有する。内容は次回呼び出しで上書きされ、
+        /// Dispose で破棄される。呼び出し側で破棄しないこと。
+        /// </summary>
+        public RenderTexture CompositeToRT(List<PSDLayer> layers)
+        {
+            if (!IsValid) return null;
+
+            bool prevSRGBWrite = GL.sRGBWrite;
+            var  prevActive    = RenderTexture.active;
+            GL.sRGBWrite = false;
+
+            try
+            {
+                RenderTexture cur = RunPipeline(layers);
+
+                if (_resultRT == null)
+                {
+                    _resultRT = new RenderTexture(_canvasW, _canvasH, 0,
+                        RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB)
+                    { hideFlags = HideFlags.HideAndDontSave };
+                    _resultRT.Create();
+                }
+                // sRGBWrite=false のためバイト値そのままの転写になる
+                Graphics.Blit(cur, _resultRT);
+                return _resultRT;
+            }
+            finally
+            {
+                RenderTexture.active = prevActive;
+                GL.sRGBWrite = prevSRGBWrite;
+            }
+        }
+
+        /// <summary>合成パイプライン本体を実行し、最終結果を保持するピンポン RT を返す。</summary>
+        RenderTexture RunPipeline(List<PSDLayer> layers)
+        {
+            ClearRT(_rtA);
+            RenderTexture cur = _rtA, next = _rtB;
+
+            if (layers != null)
+                CompositeList(layers, ref cur, ref next);
+
+            return cur;
         }
 
         // ════════════════════════════════════════════════════════════════

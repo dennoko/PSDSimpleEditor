@@ -75,7 +75,8 @@ namespace PSDSimpleEditor
 
         [NonSerialized] PSDFile         _psdFile;            // 読み込み結果
         [NonSerialized] LayerCompositor _compositor;         // GPU 合成器
-        [NonSerialized] Texture2D       _compositeTexture;   // 最新の合成結果
+        [NonSerialized] RenderTexture   _compositeRT;        // 最新の合成結果 (コンポジター所有。GPU 内で完結)
+        [NonSerialized] Texture2D       _compositeTexture;   // 書き出し用の CPU 読み戻しキャッシュ (再合成で無効化)
         [NonSerialized] Texture2D       _checkerTexture;     // 透明部可視化用の市松テクスチャ
         [NonSerialized] bool            _needsRecomposite;   // 変更フラグ → Repaint 時に合成
 
@@ -132,14 +133,17 @@ namespace PSDSimpleEditor
         {
             RevertRealtimePreview(); // プレビューを解除して元に戻す
 
-            _compositor?.Dispose();
-            _compositor = null;
+            _compositor?.Dispose();  // _compositeRT (コンポジター所有) もここで破棄される
+            _compositor  = null;
+            _compositeRT = null;
 
             SafeDestroy(ref _compositeTexture);
             SafeDestroy(ref _checkerTexture);
             SafeDestroy(ref _colorRangePreviewTex);
             _colorRangePreviewLayer = null;
             _colorRangePreviewDirty = false;
+            _colorRangeSrcLayer     = null;
+            _colorRangeSrcPixels    = null;
             _eyedropperTarget       = null;
 
             if (_psdFile != null)
@@ -266,9 +270,9 @@ namespace PSDSimpleEditor
         void MarkDirty() => _needsRecomposite = true;
 
         /// <summary>
-        /// 現在の編集状態でマージ画像を再合成し _compositeTexture を更新する。
-        /// Repaint 待ちに依存せず即座に走る。プレビュー中なら破棄済みテクスチャを
-        /// 参照したままにならないようマテリアルへ再バインドする。
+        /// 現在の編集状態でマージ画像を再合成し _compositeRT を更新する。
+        /// 合成は GPU 内で完結する (CPU への読み戻しは行わない。書き出し時のみ
+        /// GetCompositeTextureForExport が読み戻す)。Repaint 待ちに依存せず即座に走る。
         /// 例外は握りつぶさず呼び出し側の文脈で処理する (プレビューは握って続行、
         /// 書き出しは中断してダイアログ表示、という差を保つため)。
         /// </summary>
@@ -277,10 +281,23 @@ namespace PSDSimpleEditor
             _needsRecomposite = false;
             if (_psdFile == null || _compositor == null || !_compositor.IsValid) return;
 
-            SafeDestroy(ref _compositeTexture);
-            _compositeTexture = _compositor.Composite(_psdFile.Layers);
+            SafeDestroy(ref _compositeTexture); // 読み戻しキャッシュは古くなったので無効化
+            _compositeRT = _compositor.CompositeToRT(_psdFile.Layers);
             if (_isRealtimePreviewEnabled)
                 ApplyRealtimePreview();
+        }
+
+        /// <summary>
+        /// 書き出し用に合成結果を Texture2D として取得する (GPU→CPU の同期読み戻しを伴うため
+        /// 書き出し時以外は呼ばないこと)。直近の読み戻し結果が有効ならそれを返す。
+        /// </summary>
+        Texture2D GetCompositeTextureForExport()
+        {
+            if (_psdFile == null || _compositor == null || !_compositor.IsValid) return null;
+            if (_needsRecomposite) RecompositeNow();
+            if (_compositeTexture == null)
+                _compositeTexture = _compositor.Composite(_psdFile.Layers);
+            return _compositeTexture;
         }
 
         /// <summary>Repaint イベント中に呼び出す。古い結果を破棄して再合成する。</summary>
@@ -325,7 +342,7 @@ namespace PSDSimpleEditor
         /// <summary>編集中のテクスチャ（RenderTexture）をマテリアルへリアルタイムに適用する。</summary>
         void ApplyRealtimePreview()
         {
-            if (_previewMaterial == null || string.IsNullOrEmpty(_previewSlotName) || _compositeTexture == null)
+            if (_previewMaterial == null || string.IsNullOrEmpty(_previewSlotName) || _compositeRT == null)
                 return;
 
             // 最初の一回だけ元のテクスチャを退避
@@ -336,7 +353,8 @@ namespace PSDSimpleEditor
                 PSDPreviewRecovery.SaveBackup(_previewMaterial, _previewSlotName, _originalTexture);
             }
 
-            _previewMaterial.SetTexture(_previewSlotName, _compositeTexture);
+            // RT は常駐で内容だけ更新されるため、バインド以降の再合成は自動的に反映される
+            _previewMaterial.SetTexture(_previewSlotName, _compositeRT);
         }
 
         /// <summary>リアルタイムプレビューを解除し、元のテクスチャを復元する。</summary>

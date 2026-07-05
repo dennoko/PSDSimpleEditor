@@ -488,7 +488,7 @@ namespace PSDSimpleEditor
             bool canExport = false;
             if (_exportFormat == ExportFormat.PNG || _exportFormat == ExportFormat.TGA)
             {
-                canExport = _compositeTexture != null;
+                canExport = _compositeRT != null;
             }
             else if (_exportFormat == ExportFormat.PSD)
             {

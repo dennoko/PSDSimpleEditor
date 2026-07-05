@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace PSDSimpleEditor
@@ -14,8 +15,10 @@ namespace PSDSimpleEditor
         /// <summary>
         /// Section 4 全体を読む。戻り値はファイル格納順 (最下層→最上層) のフラットなレイヤーリスト。
         /// どんな失敗があっても最後に必ず sectionEnd へ seek する。
+        /// fileData はパース対象ファイル全体のバッファ (null 可)。非 null のとき
+        /// チャンネル画像データの解凍をレイヤー単位で並列実行する。
         /// </summary>
-        internal static List<PSDLayer> ParseLayerAndMaskSection(BigEndianBinaryReader r, PSDFile psd, StringBuilder vlog)
+        internal static List<PSDLayer> ParseLayerAndMaskSection(BigEndianBinaryReader r, PSDFile psd, byte[] fileData, StringBuilder vlog)
         {
             var flat = new List<PSDLayer>();
 
@@ -32,7 +35,7 @@ namespace PSDSimpleEditor
                 try
                 {
                     if (layerInfoLen > 0)
-                        flat = ParseLayerInfo(r, psd, layerInfoEnd, vlog);
+                        flat = ParseLayerInfo(r, psd, layerInfoEnd, fileData, vlog);
                 }
                 finally { r.Seek(layerInfoEnd); }
 
@@ -60,7 +63,7 @@ namespace PSDSimpleEditor
                         if ((key == "Lr16" || key == "Lr32") && flat.Count == 0)
                         {
                             vlog?.AppendLine($"  セクション追加情報 '{key}' からレイヤーを読み取ります");
-                            flat = ParseLayerInfo(r, psd, dataEnd, vlog);
+                            flat = ParseLayerInfo(r, psd, dataEnd, fileData, vlog);
                         }
                     }
                     catch (Exception e)
@@ -105,7 +108,7 @@ namespace PSDSimpleEditor
         /// レコード解析の途中でストリーム同期を失った場合はレイヤーを破棄して空リストを返す
         /// (境界 seek は呼び出し側が行うため、マージ画像の表示は維持される)。
         /// </summary>
-        static List<PSDLayer> ParseLayerInfo(BigEndianBinaryReader r, PSDFile psd, long infoEnd, StringBuilder vlog)
+        static List<PSDLayer> ParseLayerInfo(BigEndianBinaryReader r, PSDFile psd, long infoEnd, byte[] fileData, StringBuilder vlog)
         {
             var flat = new List<PSDLayer>();
             if (r.Position + 2 > infoEnd) return flat;
@@ -125,8 +128,11 @@ namespace PSDSimpleEditor
                     flat.Add(ParseLayerRecord(r, i, vlog));
 
                 // ── チャンネル画像データ (レイヤー順 × チャンネル順に連続格納) ──
-                foreach (var layer in flat)
-                    PSDChannelDecoder.ReadLayerChannels(r, psd, layer);
+                if (fileData != null)
+                    ReadAllLayerChannelsParallel(r, psd, flat, fileData);
+                else
+                    foreach (var layer in flat)
+                        PSDChannelDecoder.ReadLayerChannels(r, psd, layer);
             }
             catch (Exception e)
             {
@@ -134,6 +140,43 @@ namespace PSDSimpleEditor
                 flat.Clear();
             }
             return flat;
+        }
+
+        /// <summary>
+        /// 全レイヤーのチャンネル画像データを並列に解凍する。
+        /// 各レイヤーのチャンネルブロックはファイル内に連続格納されており長さが既知のため、
+        /// 開始オフセットを積算してレイヤーごとに独立したリーダー (同一バッファ上の
+        /// MemoryStream) で読む。解凍 (RLE/ZIP) と RGBA 組み立てが CPU 時間の大半を占めるので
+        /// レイヤー数分の並列化がそのまま効く。書き込み先は各ワーカー自身のレイヤーのみ。
+        /// </summary>
+        static void ReadAllLayerChannelsParallel(BigEndianBinaryReader r, PSDFile psd, List<PSDLayer> flat, byte[] fileData)
+        {
+            var offsets = new long[flat.Count];
+            long pos = r.Position;
+            for (int i = 0; i < flat.Count; i++)
+            {
+                offsets[i] = pos;
+                foreach (var ch in flat[i].Channels)
+                    pos += (uint)ch.DataLength;
+            }
+            r.Seek(pos); // メインリーダーはチャンネルデータ末尾へ (以降のセクション読みを維持)
+
+            Parallel.For(0, flat.Count, i =>
+            {
+                try
+                {
+                    using (var ms = new MemoryStream(fileData, false))
+                    using (var lr = new BigEndianBinaryReader(ms))
+                    {
+                        lr.Seek(offsets[i]);
+                        PSDChannelDecoder.ReadLayerChannels(lr, psd, flat[i]);
+                    }
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"[PSDParser] レイヤー '{flat[i].Name}' のチャンネルデータ読み取りに失敗 (スキップ): {e.Message}");
+                }
+            });
         }
 
         // ────────────────────────────────────────────────────────────────

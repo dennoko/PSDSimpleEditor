@@ -88,6 +88,22 @@ namespace PSDSimpleEditor
             RowSpace();
         }
 
+        // 走査元ピクセルのキャッシュ (レイヤーテクスチャは読み込み後不変のため、
+        // 同一レイヤーのプレビュー更新中は GetPixels32 を繰り返さない)
+        [NonSerialized] Color32[] _colorRangeSrcPixels;
+        [NonSerialized] PSDLayer  _colorRangeSrcLayer;
+
+        /// <summary>走査元ピクセルを (レイヤー単位でキャッシュしつつ) 取得する。</summary>
+        Color32[] GetColorRangeSourcePixels(PSDLayer layer)
+        {
+            if (_colorRangeSrcLayer != layer)
+            {
+                _colorRangeSrcLayer  = layer;
+                _colorRangeSrcPixels = ColorRangeMask.GetSourcePixels(layer);
+            }
+            return _colorRangeSrcPixels;
+        }
+
         /// <summary>指定レイヤーの色域選択ハイライトプレビューを開始/更新する。</summary>
         void BeginColorRangePreview(PSDLayer layer)
         {
@@ -96,11 +112,13 @@ namespace PSDSimpleEditor
             Repaint();
         }
 
-        /// <summary>色域選択ハイライトプレビューを終了し、テクスチャを破棄する。</summary>
+        /// <summary>色域選択ハイライトプレビューを終了し、テクスチャ・キャッシュを破棄する。</summary>
         void EndColorRangePreview()
         {
             _colorRangePreviewLayer = null;
             _colorRangePreviewDirty = false;
+            _colorRangeSrcLayer     = null;
+            _colorRangeSrcPixels    = null;
             SafeDestroy(ref _colorRangePreviewTex);
             Repaint();
         }
@@ -129,24 +147,29 @@ namespace PSDSimpleEditor
             GUI.DrawTexture(r, _colorRangePreviewTex, ScaleMode.StretchToFill, true);
         }
 
-        /// <summary>ハイライト用テクスチャを (必要時のみ) 再生成する。</summary>
+        /// <summary>ハイライト用テクスチャを (必要時のみ) 再生成する。同サイズなら再利用する。</summary>
         void EnsureColorRangePreviewTex()
         {
             if (!_colorRangePreviewDirty) return;
             _colorRangePreviewDirty = false;
 
-            SafeDestroy(ref _colorRangePreviewTex);
-
             var layer = _colorRangePreviewLayer;
-            if (layer == null) return;
+            if (layer == null) { SafeDestroy(ref _colorRangePreviewTex); return; }
 
             var px = ColorRangeMask.BuildHighlightPixels(
                 layer, layer.UI.ColorRangeTarget, layer.UI.ColorRangeThreshold,
-                ColorRangeHighlightColor, out int w, out int h);
-            if (px == null) return;
+                ColorRangeHighlightColor, out int w, out int h,
+                GetColorRangeSourcePixels(layer));
+            if (px == null) { SafeDestroy(ref _colorRangePreviewTex); return; }
 
-            _colorRangePreviewTex = new Texture2D(w, h, TextureFormat.RGBA32, false, linear: false)
-            { hideFlags = HideFlags.HideAndDontSave };
+            // スライダードラッグ中の連続更新で毎回破棄・生成しない (サイズ一致時は書き換えのみ)
+            if (_colorRangePreviewTex == null ||
+                _colorRangePreviewTex.width != w || _colorRangePreviewTex.height != h)
+            {
+                SafeDestroy(ref _colorRangePreviewTex);
+                _colorRangePreviewTex = new Texture2D(w, h, TextureFormat.RGBA32, false, linear: false)
+                { hideFlags = HideFlags.HideAndDontSave };
+            }
             _colorRangePreviewTex.SetPixels32(px);
             _colorRangePreviewTex.Apply(false);
         }
@@ -214,7 +237,7 @@ namespace PSDSimpleEditor
             {
                 var layerPixels = ColorRangeMask.BuildMaskPixels(
                     layer, layer.UI.ColorRangeTarget, layer.UI.ColorRangeThreshold,
-                    out int lw, out int lh);
+                    out int lw, out int lh, GetColorRangeSourcePixels(layer));
                 if (layerPixels == null)
                 {
                     EditorUtility.DisplayDialog(PSDTranslation.Get("Error", "エラー"), PSDTranslation.Get("ColorRangeErrorFailed", "マスクの生成に失敗しました。"), "OK");

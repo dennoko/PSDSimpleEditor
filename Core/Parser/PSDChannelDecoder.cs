@@ -77,13 +77,21 @@ namespace PSDSimpleEditor
                 case 1: // RLE (行ごとの PackBits)
                 {
                     var rowLens = new int[h];
-                    for (int y = 0; y < h; y++)
-                        rowLens[y] = r.ReadUInt16();
-                    var dst = new byte[total];
+                    long srcTotal = 0;
                     for (int y = 0; y < h; y++)
                     {
-                        byte[] src = r.ReadBytesExact(rowLens[y]);
-                        DecodePackBitsRow(src, dst, y * rowBytes, rowBytes);
+                        rowLens[y] = r.ReadUInt16();
+                        srcTotal  += rowLens[y];
+                    }
+                    // 全行分を一括で読み、オフセット参照で行ごとに解凍する
+                    // (行ごとの ReadBytesExact は h 回の小さな alloc + read になり遅い)
+                    byte[] src = r.ReadBytesExact((int)srcTotal);
+                    var dst = new byte[total];
+                    int so = 0;
+                    for (int y = 0; y < h; y++)
+                    {
+                        DecodePackBitsRow(src, so, rowLens[y], dst, y * rowBytes, rowBytes);
+                        so += rowLens[y];
                     }
                     return dst;
                 }
@@ -107,17 +115,22 @@ namespace PSDSimpleEditor
 
         /// <summary>PackBits 1 行分を解凍する。境界を超える破損データはクランプして続行。</summary>
         internal static void DecodePackBitsRow(byte[] src, byte[] dst, int dstOffset, int rowBytes)
+            => DecodePackBitsRow(src, 0, src.Length, dst, dstOffset, rowBytes);
+
+        /// <summary>PackBits 1 行分を src の部分範囲 [srcOffset, srcOffset+srcLen) から解凍する。</summary>
+        internal static void DecodePackBitsRow(byte[] src, int srcOffset, int srcLen, byte[] dst, int dstOffset, int rowBytes)
         {
-            int si = 0, di = dstOffset, dEnd = dstOffset + rowBytes;
-            while (si < src.Length && di < dEnd)
+            int si = srcOffset, sEnd = srcOffset + srcLen;
+            int di = dstOffset,  dEnd = dstOffset + rowBytes;
+            while (si < sEnd && di < dEnd)
             {
                 sbyte n = (sbyte)src[si++];
                 if (n >= 0)
                 {
                     // リテラル: 続く (n+1) バイトをコピー
                     int count = n + 1;
-                    if (si + count > src.Length) count = src.Length - si;
-                    if (di + count > dEnd)       count = dEnd - di;
+                    if (si + count > sEnd) count = sEnd - si;
+                    if (di + count > dEnd) count = dEnd - di;
                     if (count <= 0) break;
                     Buffer.BlockCopy(src, si, dst, di, count);
                     si += count;
@@ -127,7 +140,7 @@ namespace PSDSimpleEditor
                 {
                     // ラン: 次の 1 バイトを (1-n) 回繰り返す
                     int count = 1 - n;
-                    if (si >= src.Length) break;
+                    if (si >= sEnd) break;
                     byte v = src[si++];
                     if (di + count > dEnd) count = dEnd - di;
                     for (int k = 0; k < count; k++) dst[di++] = v;
@@ -204,27 +217,36 @@ namespace PSDSimpleEditor
             return plane8;
         }
 
-        /// <summary>チャンネルプレーンから RGBA32 (トップダウン) の生バッファを組み立てる。</summary>
+        /// <summary>
+        /// チャンネルプレーン (トップダウン) から RGBA32 の生バッファを組み立てる。
+        /// テクスチャへそのまま LoadRawTextureData できるよう、書き込みは
+        /// ボトムアップ (Unity 標準向き、行 0 = 下端) で行う (メインスレッドでの反転コピーを省く)。
+        /// マスクプレーンも同様に反転して格納する。
+        /// </summary>
         static void AssembleLayerPixels(PSDFile psd, PSDLayer layer, Dictionary<int, byte[]> planes, byte[] maskPlane)
         {
             int w = layer.Width, h = layer.Height;
             if (w > 0 && h > 0 && planes.Count > 0)
             {
-                int n = w * h;
-                var rgba = new byte[n * 4];
+                var rgba = new byte[w * h * 4];
                 planes.TryGetValue(0,  out byte[] pr);
                 planes.TryGetValue(1,  out byte[] pg);
                 planes.TryGetValue(2,  out byte[] pb);
                 planes.TryGetValue(-1, out byte[] pa);
                 bool grayscale = psd.ColorMode == 1;
 
-                for (int i = 0, o = 0; i < n; i++, o += 4)
+                for (int y = 0; y < h; y++)
                 {
-                    byte cr = pr != null ? pr[i] : (byte)0;
-                    rgba[o]     = cr;
-                    rgba[o + 1] = grayscale ? cr : (pg != null ? pg[i] : (byte)0); // Grayscale は R を複製
-                    rgba[o + 2] = grayscale ? cr : (pb != null ? pb[i] : (byte)0);
-                    rgba[o + 3] = pa != null ? pa[i] : (byte)255; // α 無しは 255
+                    int i = y * w;                     // プレーン (トップダウン) の行先頭
+                    int o = (h - 1 - y) * w * 4;       // RGBA (ボトムアップ) の行先頭
+                    for (int x = 0; x < w; x++, i++, o += 4)
+                    {
+                        byte cr = pr != null ? pr[i] : (byte)0;
+                        rgba[o]     = cr;
+                        rgba[o + 1] = grayscale ? cr : (pg != null ? pg[i] : (byte)0); // Grayscale は R を複製
+                        rgba[o + 2] = grayscale ? cr : (pb != null ? pb[i] : (byte)0);
+                        rgba[o + 3] = pa != null ? pa[i] : (byte)255; // α 無しは 255
+                    }
                 }
                 layer._rawPixels = rgba;
             }
@@ -232,7 +254,16 @@ namespace PSDSimpleEditor
             int mw = layer.MaskRight - layer.MaskLeft;
             int mh = layer.MaskBottom - layer.MaskTop;
             if (maskPlane != null && mw > 0 && mh > 0 && maskPlane.Length >= mw * mh)
-                layer._rawMaskPixels = maskPlane;
+                layer._rawMaskPixels = FlipRows(maskPlane, mw, mh);
+        }
+
+        /// <summary>トップダウンのプレーンを上下反転した新しい配列を返す (1 バイト/px)。</summary>
+        static byte[] FlipRows(byte[] topDown, int w, int h)
+        {
+            var flipped = new byte[w * h];
+            for (int y = 0; y < h; y++)
+                Buffer.BlockCopy(topDown, y * w, flipped, (h - 1 - y) * w, w);
+            return flipped;
         }
     }
 }
