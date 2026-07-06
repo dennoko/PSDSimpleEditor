@@ -43,9 +43,14 @@ namespace PSDSimpleEditor
             }
         }
 
-        // ── PNG 書き出し ───────────────────────────────────────────────────
+        // ── PNG / TGA 書き出し (共通処理) ──────────────────────────────────
 
-        void ExportPNG()
+        void ExportPNG() => ExportComposite("PNG", ".png", tex => tex.EncodeToPNG());
+
+        void ExportTGA() => ExportComposite("TGA", ".tga", EncodeToTGA);
+
+        /// <summary>合成結果を指定フォーマットで出力先フォルダへ書き出す。</summary>
+        void ExportComposite(string label, string ext, Func<Texture2D, byte[]> encode)
         {
             var composite = GetCompositeTextureForExport();
             if (composite == null)
@@ -70,40 +75,44 @@ namespace PSDSimpleEditor
                     baseName = Path.GetFileNameWithoutExtension(_psdPath);
                 }
 
-                string savePath = GetUniqueExportPath(_exportDir, baseName, ".png");
+                string savePath = GetUniqueExportPath(_exportDir, baseName, ext);
 
-                byte[] png = composite.EncodeToPNG();
-                File.WriteAllBytes(savePath, png);
-                Debug.Log($"[PSDSimpleEditor] PNG を保存しました: {savePath}");
-                SetStatus($"PNG を書き出しました: {Path.GetFileName(savePath)}", StatusType.Success);
+                File.WriteAllBytes(savePath, encode(composite));
+                Debug.Log($"[PSDSimpleEditor] {label} を保存しました: {savePath}");
+                SetStatus($"{label} を書き出しました: {Path.GetFileName(savePath)}", StatusType.Success);
 
-                // プロジェクト内の出力ならAssetDatabaseをリフレッシュしてUnityエディタ上で見えるようにする
-                string normalizedSavePath = savePath.Replace('\\', '/');
-                int assetsIndex = normalizedSavePath.IndexOf("/Assets/", StringComparison.OrdinalIgnoreCase);
-                if (assetsIndex != -1)
-                {
-                    string assetPath = normalizedSavePath.Substring(assetsIndex + 1);
-                    AssetDatabase.Refresh();
-
-                    // プロジェクトビューで該当ファイルを選択してハイライト（Ping）する
-                    var obj = AssetDatabase.LoadMainAssetAtPath(assetPath);
-                    if (obj != null)
-                    {
-                        Selection.activeObject = obj;
-                        EditorGUIUtility.PingObject(obj);
-                    }
-                }
-                else
-                {
-                    EditorUtility.RevealInFinder(savePath);
-                }
+                RevealExportedFile(savePath);
             }
             catch (Exception e)
             {
-                Debug.LogError($"[PSDSimpleEditor] PNG 保存失敗: {e}");
-                SetStatus($"PNG の書き出しに失敗しました: {e.Message}", StatusType.Error);
+                Debug.LogError($"[PSDSimpleEditor] {label} 保存失敗: {e}");
+                SetStatus($"{label} の書き出しに失敗しました: {e.Message}", StatusType.Error);
                 EditorUtility.DisplayDialog("書き出しエラー",
-                    $"PNG の保存に失敗しました:\n{e.Message}", "OK");
+                    $"{label} の保存に失敗しました:\n{e.Message}", "OK");
+            }
+        }
+
+        /// <summary>保存したファイルをプロジェクト内なら AssetDatabase へ反映して Ping、
+        /// プロジェクト外ならエクスプローラーで表示する。</summary>
+        static void RevealExportedFile(string savePath)
+        {
+            string normalizedSavePath = savePath.Replace('\\', '/');
+            int assetsIndex = normalizedSavePath.IndexOf("/Assets/", StringComparison.OrdinalIgnoreCase);
+            if (assetsIndex != -1)
+            {
+                string assetPath = normalizedSavePath.Substring(assetsIndex + 1);
+                AssetDatabase.Refresh();
+
+                var obj = AssetDatabase.LoadMainAssetAtPath(assetPath);
+                if (obj != null)
+                {
+                    Selection.activeObject = obj;
+                    EditorGUIUtility.PingObject(obj);
+                }
+            }
+            else
+            {
+                EditorUtility.RevealInFinder(savePath);
             }
         }
 
@@ -204,25 +213,7 @@ namespace PSDSimpleEditor
                 // 新規 PSD として保存したパスを履歴へ記録
                 _history.Add(savePath.Replace('\\', '/'));
 
-                string normalizedSavePath = savePath.Replace('\\', '/');
-                int assetsIndex = normalizedSavePath.IndexOf("/Assets/", StringComparison.OrdinalIgnoreCase);
-                if (assetsIndex != -1)
-                {
-                    string assetPath = normalizedSavePath.Substring(assetsIndex + 1);
-                    AssetDatabase.Refresh();
-
-                    // プロジェクトビューで該当ファイルを選択してハイライト（Ping）する
-                    var obj = AssetDatabase.LoadMainAssetAtPath(assetPath);
-                    if (obj != null)
-                    {
-                        Selection.activeObject = obj;
-                        EditorGUIUtility.PingObject(obj);
-                    }
-                }
-                else
-                {
-                    EditorUtility.RevealInFinder(savePath);
-                }
+                RevealExportedFile(savePath);
             }
             catch (Exception e)
             {
@@ -237,72 +228,10 @@ namespace PSDSimpleEditor
             }
         }
 
-        // ── TGA 書き出し ───────────────────────────────────────────────────
-
-        void ExportTGA()
-        {
-            var composite = GetCompositeTextureForExport();
-            if (composite == null)
-            {
-                EditorUtility.DisplayDialog("エラー",
-                    "合成結果がありません。先に PSD を読み込んでください。", "OK");
-                return;
-            }
-
-            if (string.IsNullOrEmpty(_exportDir))
-            {
-                EditorUtility.DisplayDialog("エラー",
-                    "出力先フォルダが指定されていません。", "OK");
-                return;
-            }
-
-            try
-            {
-                string baseName = "composite";
-                if (!string.IsNullOrEmpty(_psdPath))
-                {
-                    baseName = Path.GetFileNameWithoutExtension(_psdPath);
-                }
-
-                string savePath = GetUniqueExportPath(_exportDir, baseName, ".tga");
-
-                byte[] tga = EncodeToTGA(composite);
-                File.WriteAllBytes(savePath, tga);
-                Debug.Log($"[PSDSimpleEditor] TGA を保存しました: {savePath}");
-                SetStatus($"TGA を書き出しました: {Path.GetFileName(savePath)}", StatusType.Success);
-
-                // プロジェクト内の出力ならAssetDatabaseをリフレッシュしてUnityエディタ上で見えるようにする
-                string normalizedSavePath = savePath.Replace('\\', '/');
-                int assetsIndex = normalizedSavePath.IndexOf("/Assets/", StringComparison.OrdinalIgnoreCase);
-                if (assetsIndex != -1)
-                {
-                    string assetPath = normalizedSavePath.Substring(assetsIndex + 1);
-                    AssetDatabase.Refresh();
-
-                    // プロジェクトビューで該当ファイルを選択してハイライト（Ping）する
-                    var obj = AssetDatabase.LoadMainAssetAtPath(assetPath);
-                    if (obj != null)
-                    {
-                        Selection.activeObject = obj;
-                        EditorGUIUtility.PingObject(obj);
-                    }
-                }
-                else
-                {
-                    EditorUtility.RevealInFinder(savePath);
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"[PSDSimpleEditor] TGA 保存失敗: {e}");
-                SetStatus($"TGA の書き出しに失敗しました: {e.Message}", StatusType.Error);
-                EditorUtility.DisplayDialog("書き出しエラー",
-                    $"TGA の保存に失敗しました:\n{e.Message}", "OK");
-            }
-        }
+        // ── TGA エンコード ─────────────────────────────────────────────────
 
         /// <summary>32bit 未圧縮 TGA にエンコードする。</summary>
-        byte[] EncodeToTGA(Texture2D tex)
+        static byte[] EncodeToTGA(Texture2D tex)
         {
             int width = tex.width;
             int height = tex.height;
