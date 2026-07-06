@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
@@ -38,7 +38,7 @@ namespace PSDSimpleEditor
     //          _colorRangePreviewLayer, _colorRangePreviewTex, _colorRangePreviewDirty,
     //          ColorRangeHighlightColor, _history
     // 参照   : なし (本体ファイル)
-    // 依存   : BakeImportedLuts (.Adjustments.cs), UpdateMainArea (.UIToolkit.cs), RevertRealtimePreview (.cs) 等
+    // 依存   : AdjustmentLutBaker (LUT ベイク処理), UpdateMainArea (.UIToolkit.cs), RevertRealtimePreview (.cs) 等
     // ────────────────────────────────────────────────────────────────
     public partial class PSDSimpleEditorWindow : EditorWindow
     {
@@ -228,7 +228,7 @@ namespace PSDSimpleEditor
                 _psdFile = PSDParser.Parse(_psdPath);
 
                 // グラデーションマップ (grdm) / トーンカーブ (curv) の LUT を焼く (Editor 側でしか焼けないため)
-                BakeImportedLuts(_psdFile.Layers);
+                AdjustmentLutBaker.BakeImportedLuts(_psdFile.Layers);
 
                 // 読み込みに成功したパスを履歴へ記録
                 _history.Add(resolved);

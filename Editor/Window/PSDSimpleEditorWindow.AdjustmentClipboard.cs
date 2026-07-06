@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 
@@ -9,7 +9,7 @@ namespace PSDSimpleEditor
     // 責務   : 補正パラメータ（色調補正/トーンカーブ等）のコピー＆ペーストクリップボード機能
     // 宣言   : ClipboardKind, 各種 Snapshot 構造体
     // 参照   : _needsRecomposite (RW)
-    // 依存   : RowSpace (.LayerPanel.cs), BakeCurveLut (.Adjustments.cs), BakeGradientLut (.Adjustments.cs)
+    // 依存   : RowSpace (.LayerPanel.cs), AdjustmentLutBaker (LUT ベイク処理)
     // ────────────────────────────────────────────────────────────────
     public partial class PSDSimpleEditorWindow
     {
@@ -90,13 +90,13 @@ namespace PSDSimpleEditor
         static bool HasClipboard(ClipboardKind kind) => _adjustmentClipboard.ContainsKey(kind);
 
         static AnimationCurve CloneCurve(AnimationCurve src) =>
-            src != null ? new AnimationCurve(src.keys) : CreateDefaultCurve();
+            src != null ? new AnimationCurve(src.keys) : AdjustmentLutBaker.CreateDefaultCurve();
 
         static Gradient CloneGradient(Gradient src)
         {
             var g = new Gradient();
             if (src != null) g.SetKeys(src.colorKeys, src.alphaKeys);
-            else             return CreateDefaultGradient();
+            else             return AdjustmentLutBaker.CreateDefaultGradient();
             return g;
         }
 
@@ -213,7 +213,7 @@ namespace PSDSimpleEditor
         {
             layer.UI.CurveEnabled = s.Enabled;
             layer.UI.Curve        = CloneCurve(s.Curve);
-            BakeCurveLut(layer);
+            AdjustmentLutBaker.BakeCurveLut(layer);
         }
 
         static void ApplyGradientMapSnapshot(PSDLayer layer, GradientMapSnapshot s)
@@ -222,8 +222,8 @@ namespace PSDSimpleEditor
             layer.UI.Gradient             = CloneGradient(s.Gradient);
             layer.UI.GradientMapOpacity   = s.Opacity;
             layer.UI.GradientMapNormalize = s.Normalize;
-            BakeGradientLut(layer);
-            if (s.Normalize) ComputeGradientLumRange(layer);
+            AdjustmentLutBaker.BakeGradientLut(layer);
+            if (s.Normalize) AdjustmentLutBaker.ComputeGradientLumRange(layer);
         }
 
         static void ApplyImageClipSnapshot(PSDLayer layer, ImageClipSnapshot s)
