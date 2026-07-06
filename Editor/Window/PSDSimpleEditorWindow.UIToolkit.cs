@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
@@ -9,11 +9,14 @@ using UnityEditor.UIElements;
 namespace PSDSimpleEditor
 {
     // ─── partial 見取り図 ───────────────────────────────────────────
-    // 責務   : UI Toolkit を使用したウィンドウ全体のレイアウト構築、データバインディング、表示の動的更新
+    // 責務   : UI Toolkit を使用したウィンドウ骨格のレイアウト構築 (ヘッダー/設定カード/
+    //          メインエリア/下部バー/ステータスバー)、データバインディング、表示の動的更新
+    //          (レイヤーツリー構築は .UIToolkit.LayerTree.cs)
     // 宣言   : _rootContainer などの UI 要素フィールド
     // 参照   : _psdPath (RW), _exportDir (RW), _previewMaterial (RW), _previewSlotName (RW),
     //          _isRealtimePreviewEnabled (RW), _exportFormat (RW), _statusMessage (R), _needsRecomposite (RW)
-    // 依存   : LoadPSD (本体), DoComposite (本体), RevertRealtimePreview (本体), ApplyRealtimePreview (本体)
+    // 依存   : LoadPSD (本体), DoComposite (本体), RevertRealtimePreview (本体), ApplyRealtimePreview (本体),
+    //          RebuildLayerTree (.UIToolkit.LayerTree.cs)
     // ────────────────────────────────────────────────────────────────
     public partial class PSDSimpleEditorWindow
     {
@@ -632,207 +635,5 @@ namespace PSDSimpleEditor
             }
         }
 
-        void RebuildLayerTree()
-        {
-            if (_layerTreeContainer == null) return;
-            _layerTreeContainer.Clear();
-
-            if (_psdFile == null || _psdFile.Layers == null) return;
-
-            // PSDFile.Layers is sorted index 0 = bottom layer. We draw top-down.
-            BuildLayerListTopDown(_layerTreeContainer, _psdFile.Layers, 0);
-        }
-
-        void BuildLayerListTopDown(VisualElement parent, List<PSDLayer> layers, int depth)
-        {
-            if (layers == null) return;
-            for (int i = layers.Count - 1; i >= 0; i--)
-            {
-                var layer = layers[i];
-                var nodeEl = BuildLayerNodeElement(layer, depth);
-                parent.Add(nodeEl);
-            }
-        }
-
-        VisualElement BuildLayerNodeElement(PSDLayer layer, int depth)
-        {
-            bool isGroup = layer.Children != null;
-            if (isGroup)
-            {
-                return BuildGroupNodeElement(layer, depth);
-            }
-            else
-            {
-                return BuildLeafNodeElement(layer, depth);
-            }
-        }
-
-        VisualElement BuildGroupNodeElement(PSDLayer layer, int depth)
-        {
-            var container = new VisualElement();
-            container.AddToClassList("layer-group-outer");
-
-            // Header row
-            var header = new VisualElement();
-            header.AddToClassList("layer-group-header");
-
-            // Foldout button
-            var foldoutBtn = new Button(() => {
-                layer.IsExpanded = !layer.IsExpanded;
-                RebuildLayerTree();
-            }) { text = layer.IsExpanded ? "▾" : "▸" };
-            foldoutBtn.AddToClassList("foldout-button");
-            header.Add(foldoutBtn);
-
-            // Visibility toggle
-            var visibilityToggle = new Toggle();
-            visibilityToggle.value = layer.UI.Visible;
-            visibilityToggle.RegisterValueChangedCallback(evt => {
-                layer.UI.Visible = evt.newValue;
-                MarkDirty();
-                RebuildLayerTree();
-            });
-            header.Add(visibilityToggle);
-
-            // Label
-            string labelText = BuildLayerLabel(layer, true);
-            var label = new Label(labelText);
-            label.AddToClassList("layer-name");
-            header.Add(label);
-
-            // Blend mode dropdown
-            var blendModeDropdown = BuildBlendModeDropdown(layer, true);
-            header.Add(blendModeDropdown);
-
-            container.Add(header);
-
-            // Body (shown when visible)
-            if (layer.UI.Visible)
-            {
-                var body = new VisualElement();
-                body.AddToClassList("layer-group-body");
-
-                // Opacity/Controls in IMGUI
-                var imguiContainer = new IMGUIContainer(() => {
-                    PSDEditorTheme.PushEditorTheme();
-                    try
-                    {
-                        bool isPassThrough = layer.GroupBlendMode == BlendMode.PassThrough;
-                        using (new EditorGUI.DisabledScope(isPassThrough))
-                        {
-                            DrawOpacitySlider(layer, 0);
-                        }
-                        if (isPassThrough)
-                        {
-                            EditorGUILayout.BeginHorizontal();
-                            GUILayout.Space(18f);
-                            GUILayout.Label(PSDTranslation.Get("PassThroughWarning", "※ パススルー時は不透明度は適用されません"), PSDEditorTheme.CaptionStyle);
-                            EditorGUILayout.EndHorizontal();
-                        }
-                    }
-                    finally
-                    {
-                        PSDEditorTheme.PopEditorTheme();
-                    }
-                });
-                body.Add(imguiContainer);
-
-                if (layer.IsExpanded)
-                {
-                    var childrenContainer = new VisualElement();
-                    BuildLayerListTopDown(childrenContainer, layer.Children, depth + 1);
-                    body.Add(childrenContainer);
-                }
-
-                container.Add(body);
-            }
-
-            return container;
-        }
-
-        VisualElement BuildLeafNodeElement(PSDLayer layer, int depth)
-        {
-            var container = new VisualElement();
-            container.AddToClassList("layer-leaf-card");
-
-            var header = new VisualElement();
-            header.AddToClassList("layer-leaf-header");
-
-            // Spacer for foldout alignment
-            var spacer = new VisualElement();
-            spacer.AddToClassList("foldout-spacer");
-            header.Add(spacer);
-
-            // Visibility toggle
-            var visibilityToggle = new Toggle();
-            visibilityToggle.value = layer.UI.Visible;
-            visibilityToggle.RegisterValueChangedCallback(evt => {
-                layer.UI.Visible = evt.newValue;
-                MarkDirty();
-                RebuildLayerTree();
-            });
-            header.Add(visibilityToggle);
-
-            // Label
-            string labelText = BuildLayerLabel(layer, false);
-            var label = new Label(labelText);
-            label.AddToClassList("layer-name");
-            header.Add(label);
-
-            // Blend mode dropdown
-            var blendModeDropdown = BuildBlendModeDropdown(layer, false);
-            header.Add(blendModeDropdown);
-
-            container.Add(header);
-
-            // Controls (shown when visible)
-            if (layer.UI.Visible)
-            {
-                var imguiContainer = new IMGUIContainer(() => {
-                    PSDEditorTheme.PushEditorTheme();
-                    try
-                    {
-                        DrawLayerControls(layer, 0);
-                    }
-                    finally
-                    {
-                        PSDEditorTheme.PopEditorTheme();
-                    }
-                });
-                imguiContainer.AddToClassList("layer-controls");
-                container.Add(imguiContainer);
-            }
-
-            return container;
-        }
-
-        VisualElement BuildBlendModeDropdown(PSDLayer layer, bool isGroup)
-        {
-            BlendMode[] modes = isGroup ? _blendModesGroup : _blendModesNormal;
-            string[] labels = isGroup
-                ? (_blendLabelsGroup ?? (_blendLabelsGroup = BuildBlendLabels(_blendModesGroup)))
-                : (_blendLabelsNormal ?? (_blendLabelsNormal = BuildBlendLabels(_blendModesNormal)));
-
-            BlendMode cur = isGroup ? layer.GroupBlendMode : layer.BlendMode;
-            int curIndex = Mathf.Max(0, Array.IndexOf(modes, cur));
-
-            var choices = new List<string>(labels);
-            var dropdown = new DropdownField();
-            dropdown.choices = choices;
-            dropdown.index = curIndex;
-            dropdown.AddToClassList("blend-dropdown");
-
-            dropdown.RegisterValueChangedCallback(evt => {
-                int index = dropdown.index;
-                if (index >= 0 && index < modes.Length)
-                {
-                    if (isGroup) layer.GroupBlendMode = modes[index];
-                    else layer.BlendMode = modes[index];
-                    MarkDirty();
-                }
-            });
-
-            return dropdown;
-        }
     }
 }
