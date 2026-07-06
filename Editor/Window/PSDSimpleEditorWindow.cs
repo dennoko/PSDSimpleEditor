@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
@@ -99,6 +99,7 @@ namespace PSDSimpleEditor
         void OnEnable()
         {
             wantsMouseMove = true;
+            Undo.undoRedoPerformed += OnUndoRedoPerformed;
 
             // ドメインリロード（コンパイル）や Unity 再起動をまたいで復帰したときの後始末。
             //
@@ -123,6 +124,11 @@ namespace PSDSimpleEditor
                     Repaint();
                 };
             }
+        }
+
+        void OnDisable()
+        {
+            Undo.undoRedoPerformed -= OnUndoRedoPerformed;
         }
 
 
@@ -239,6 +245,7 @@ namespace PSDSimpleEditor
                     Debug.LogWarning("[PSDSimpleEditor] コンポジターの初期化に失敗しました。" +
                                      "LayerBlend.shader を確認してください。");
 
+                InitializeSerializedStates();
                 MarkDirty();
                 SetStatus($"読み込み完了: {Path.GetFileName(resolved)}", StatusType.Success);
             }
@@ -366,6 +373,266 @@ namespace PSDSimpleEditor
                 _originalTexture = null;
                 PSDPreviewRecovery.ClearBackup();
             }
+        }
+
+        [SerializeField] List<SerializableLayerState> _serializedStates = new List<SerializableLayerState>();
+        [NonSerialized] Dictionary<string, PSDLayer> _layerByGuid;
+
+        [System.Serializable]
+        public class SerializableLayerState
+        {
+            public string LayerGuid;
+            public bool Visible;
+            public float Opacity;
+            public BlendMode BlendMode;
+            public BlendMode GroupBlendMode;
+            public bool IsExpanded;
+
+            public float Brightness;
+            public float Contrast;
+            public float Hue;
+            public float Saturation;
+            public float Lightness;
+            public bool Invert;
+            
+            public bool ThresholdEnabled;
+            public float ThresholdLevel;
+            public bool PosterizeEnabled;
+            public float PosterizeLevels;
+            
+            public bool LevelsEnabled;
+            public float LevelsInputBlack;
+            public float LevelsInputWhite;
+            public float LevelsGamma;
+            public float LevelsOutputBlack;
+            public float LevelsOutputWhite;
+            
+            public bool CurveEnabled;
+            public AnimationCurve Curve;
+            
+            public bool Colorize;
+            public bool ImageClipEnabled;
+            public Texture2D ImageClipTex;
+            public Vector2 ImageClipTile;
+            public BlendMode ImageClipBlend;
+            public float ImageClipOpacity;
+            
+            public bool GradientMapEnabled;
+            public Gradient Gradient;
+            public float GradientMapOpacity;
+            public bool GradientMapNormalize;
+            
+            public bool ColorBalanceEnabled;
+            public Vector3 CBShadows;
+            public Vector3 CBMidtones;
+            public Vector3 CBHighlights;
+            public bool CBPreserveLuminosity;
+            
+            public bool AdjustExpanded;
+            
+            public bool HasSolidColor;
+            public Color SolidColor;
+        }
+
+        void InitializeSerializedStates()
+        {
+            _serializedStates.Clear();
+            _layerByGuid = new Dictionary<string, PSDLayer>();
+            if (_psdFile == null || _psdFile.Layers == null) return;
+            SaveLayersRecursive(_psdFile.Layers);
+        }
+
+        void SaveLayersRecursive(List<PSDLayer> layers)
+        {
+            foreach (var layer in layers)
+            {
+                _layerByGuid[layer.Guid] = layer;
+
+                var state = new SerializableLayerState();
+                state.LayerGuid = layer.Guid;
+                CaptureLayerState(layer, state);
+                _serializedStates.Add(state);
+                
+                if (layer.Children != null)
+                {
+                    SaveLayersRecursive(layer.Children);
+                }
+            }
+        }
+
+        void SaveStatesToSerialized()
+        {
+            if (_psdFile == null || _psdFile.Layers == null || _serializedStates == null || _layerByGuid == null) return;
+            foreach (var state in _serializedStates)
+            {
+                if (_layerByGuid.TryGetValue(state.LayerGuid, out var layer))
+                {
+                    CaptureLayerState(layer, state);
+                }
+            }
+        }
+
+        void ApplySerializedStatesToLayers()
+        {
+            if (_psdFile == null || _psdFile.Layers == null || _serializedStates == null || _layerByGuid == null) return;
+            foreach (var state in _serializedStates)
+            {
+                if (_layerByGuid.TryGetValue(state.LayerGuid, out var layer))
+                {
+                    ApplyLayerState(state, layer);
+                }
+            }
+        }
+
+        // NOTE: 以下のフィールドは意図的に保存対象外としている:
+        //   - CurveChannels : PSD 読み込み時に設定される R/G/B 個別カーブ。UI 編集対象外のため Undo 不要。
+        //   - ColorRangeExpanded / ColorRangeTarget / ColorRangeThreshold : 色域選択の一時的な UI 状態。
+        // フィールドを LayerEditState に追加した場合は、SerializableLayerState と Capture/Apply の同期が必要。
+        // → 将来的に LayerEditState の [Serializable] 化による二重定義の解消を検討 (Docs/Impl/undo-refactor-plan.md)。
+        void CaptureLayerState(PSDLayer layer, SerializableLayerState state)
+        {
+            state.Visible = layer.UI.Visible;
+            state.Opacity = layer.UI.Opacity;
+            state.BlendMode = layer.BlendMode;
+            state.GroupBlendMode = layer.GroupBlendMode;
+            state.IsExpanded = layer.IsExpanded;
+            
+            state.Brightness = layer.UI.Brightness;
+            state.Contrast = layer.UI.Contrast;
+            state.Hue = layer.UI.Hue;
+            state.Saturation = layer.UI.Saturation;
+            state.Lightness = layer.UI.Lightness;
+            state.Invert = layer.UI.Invert;
+            
+            state.ThresholdEnabled = layer.UI.ThresholdEnabled;
+            state.ThresholdLevel = layer.UI.ThresholdLevel;
+            state.PosterizeEnabled = layer.UI.PosterizeEnabled;
+            state.PosterizeLevels = layer.UI.PosterizeLevels;
+            
+            state.LevelsEnabled = layer.UI.LevelsEnabled;
+            state.LevelsInputBlack = layer.UI.LevelsInputBlack;
+            state.LevelsInputWhite = layer.UI.LevelsInputWhite;
+            state.LevelsGamma = layer.UI.LevelsGamma;
+            state.LevelsOutputBlack = layer.UI.LevelsOutputBlack;
+            state.LevelsOutputWhite = layer.UI.LevelsOutputWhite;
+            
+            state.CurveEnabled = layer.UI.CurveEnabled;
+            state.Curve = CopyAnimationCurve(layer.UI.Curve);
+            
+            state.Colorize = layer.UI.Colorize;
+            state.ImageClipEnabled = layer.UI.ImageClipEnabled;
+            state.ImageClipTex = layer.UI.ImageClipTex;
+            state.ImageClipTile = layer.UI.ImageClipTile;
+            state.ImageClipBlend = layer.UI.ImageClipBlend;
+            state.ImageClipOpacity = layer.UI.ImageClipOpacity;
+            
+            state.GradientMapEnabled = layer.UI.GradientMapEnabled;
+            state.Gradient = CopyGradient(layer.UI.Gradient);
+            state.GradientMapOpacity = layer.UI.GradientMapOpacity;
+            state.GradientMapNormalize = layer.UI.GradientMapNormalize;
+            
+            state.ColorBalanceEnabled = layer.UI.ColorBalanceEnabled;
+            state.CBShadows = layer.UI.CBShadows;
+            state.CBMidtones = layer.UI.CBMidtones;
+            state.CBHighlights = layer.UI.CBHighlights;
+            state.CBPreserveLuminosity = layer.UI.CBPreserveLuminosity;
+            
+            state.AdjustExpanded = layer.UI.AdjustExpanded;
+            
+            state.HasSolidColor = layer.Adjustment != null && layer.Adjustment.HasSolidColor;
+            if (state.HasSolidColor)
+            {
+                state.SolidColor = layer.Adjustment.SolidColor;
+            }
+        }
+
+        void ApplyLayerState(SerializableLayerState state, PSDLayer layer)
+        {
+            layer.UI.Visible = state.Visible;
+            layer.UI.Opacity = state.Opacity;
+            layer.BlendMode = state.BlendMode;
+            layer.GroupBlendMode = state.GroupBlendMode;
+            layer.IsExpanded = state.IsExpanded;
+            
+            layer.UI.Brightness = state.Brightness;
+            layer.UI.Contrast = state.Contrast;
+            layer.UI.Hue = state.Hue;
+            layer.UI.Saturation = state.Saturation;
+            layer.UI.Lightness = state.Lightness;
+            layer.UI.Invert = state.Invert;
+            
+            layer.UI.ThresholdEnabled = state.ThresholdEnabled;
+            layer.UI.ThresholdLevel = state.ThresholdLevel;
+            layer.UI.PosterizeEnabled = state.PosterizeEnabled;
+            layer.UI.PosterizeLevels = state.PosterizeLevels;
+            
+            layer.UI.LevelsEnabled = state.LevelsEnabled;
+            layer.UI.LevelsInputBlack = state.LevelsInputBlack;
+            layer.UI.LevelsInputWhite = state.LevelsInputWhite;
+            layer.UI.LevelsGamma = state.LevelsGamma;
+            layer.UI.LevelsOutputBlack = state.LevelsOutputBlack;
+            layer.UI.LevelsOutputWhite = state.LevelsOutputWhite;
+            
+            layer.UI.CurveEnabled = state.CurveEnabled;
+            layer.UI.Curve = CopyAnimationCurve(state.Curve);
+            
+            layer.UI.Colorize = state.Colorize;
+            layer.UI.ImageClipEnabled = state.ImageClipEnabled;
+            layer.UI.ImageClipTex = state.ImageClipTex;
+            layer.UI.ImageClipTile = state.ImageClipTile;
+            layer.UI.ImageClipBlend = state.ImageClipBlend;
+            layer.UI.ImageClipOpacity = state.ImageClipOpacity;
+            
+            layer.UI.GradientMapEnabled = state.GradientMapEnabled;
+            layer.UI.Gradient = CopyGradient(state.Gradient);
+            layer.UI.GradientMapOpacity = state.GradientMapOpacity;
+            layer.UI.GradientMapNormalize = state.GradientMapNormalize;
+            
+            layer.UI.ColorBalanceEnabled = state.ColorBalanceEnabled;
+            layer.UI.CBShadows = state.CBShadows;
+            layer.UI.CBMidtones = state.CBMidtones;
+            layer.UI.CBHighlights = state.CBHighlights;
+            layer.UI.CBPreserveLuminosity = state.CBPreserveLuminosity;
+            
+            layer.UI.AdjustExpanded = state.AdjustExpanded;
+            
+            if (state.HasSolidColor && layer.Adjustment != null)
+            {
+                layer.Adjustment.SolidColor = state.SolidColor;
+            }
+        }
+
+        AnimationCurve CopyAnimationCurve(AnimationCurve src)
+        {
+            if (src == null) return null;
+            return new AnimationCurve(src.keys);
+        }
+
+        Gradient CopyGradient(Gradient src)
+        {
+            if (src == null) return null;
+            var dst = new Gradient();
+            dst.colorKeys = src.colorKeys;
+            dst.alphaKeys = src.alphaKeys;
+            dst.mode = src.mode;
+            return dst;
+        }
+
+        void RegisterUndo(string actionName)
+        {
+            SaveStatesToSerialized();
+            // RecordObject は差分ベースで記録するため、スライダードラッグ等の
+            // 連続変更を同一フレーム内で1つの Undo グループにまとめてくれる。
+            // RegisterCompleteObjectUndo だと毎フレーム完全スナップショットが積まれてしまう。
+            Undo.RecordObject(this, actionName);
+        }
+
+        void OnUndoRedoPerformed()
+        {
+            ApplySerializedStatesToLayers();
+            RebuildLayerTree();
+            MarkDirty();
+            Repaint();
         }
 
         public enum ExportFormat

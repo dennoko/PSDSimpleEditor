@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 
@@ -240,6 +240,8 @@ namespace PSDSimpleEditor
         {
             if (!_adjustmentClipboard.TryGetValue(kind, out object raw)) return false;
 
+            RegisterUndo($"Paste {kind}");
+
             switch (kind)
             {
                 case ClipboardKind.Colorize:
@@ -339,6 +341,7 @@ namespace PSDSimpleEditor
                     return false;
             }
 
+            SaveStatesToSerialized();
             MarkDirty();
             return true;
         }

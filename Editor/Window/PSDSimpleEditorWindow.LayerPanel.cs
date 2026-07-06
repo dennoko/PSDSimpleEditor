@@ -101,8 +101,10 @@ namespace PSDSimpleEditor
                 if (!Mathf.Approximately(nb, layer.UI.Brightness) ||
                     !Mathf.Approximately(nc, layer.UI.Contrast))
                 {
+                    RegisterUndo("Modify Brightness/Contrast");
                     layer.UI.Brightness = nb;
                     layer.UI.Contrast   = nc;
+                    SaveStatesToSerialized();
                     MarkDirty();
                 }
             }
@@ -117,9 +119,11 @@ namespace PSDSimpleEditor
                     !Mathf.Approximately(ns, layer.UI.Saturation) ||
                     !Mathf.Approximately(nl, layer.UI.Lightness))
                 {
+                    RegisterUndo("Modify Hue/Saturation/Lightness");
                     layer.UI.Hue        = nh;
                     layer.UI.Saturation = ns;
                     layer.UI.Lightness  = nl;
+                    SaveStatesToSerialized();
                     MarkDirty();
                 }
                 DrawColorizeToggle(layer, indent);
@@ -167,7 +171,9 @@ namespace PSDSimpleEditor
                 RowSpace();
                 if (nc != layer.Adjustment.SolidColor)
                 {
+                    RegisterUndo("Modify Solid Color");
                     layer.Adjustment.SolidColor = nc;
+                    SaveStatesToSerialized();
                     MarkDirty();
                 }
             }
@@ -198,7 +204,9 @@ namespace PSDSimpleEditor
             float newOpacity = IndentedSlider(new GUIContent(PSDTranslation.Get("Opacity", "不透明度"), PSDTranslation.Get("OpacityTooltip", "レイヤーの不透明度（アルファ）を 0.0（完全透明）から 1.0（完全不透明）の間で調整します。")), layer.UI.Opacity, 0f, 1f, indent);
             if (!Mathf.Approximately(newOpacity, layer.UI.Opacity))
             {
+                RegisterUndo("Change Opacity");
                 layer.UI.Opacity   = newOpacity;
+                SaveStatesToSerialized();
                 MarkDirty();
             }
         }

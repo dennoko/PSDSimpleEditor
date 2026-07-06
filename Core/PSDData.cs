@@ -211,6 +211,20 @@ namespace PSDSimpleEditor
     // ─── PSD レイヤー ────────────────────────────────────────────────────────
     public class PSDLayer
     {
+        // Undo 用のレイヤー識別子。初回アクセス時に自動生成される (遅延初期化)。
+        // PSD パース後にアクセスされた時点で一意な ID が割り当てられ、以降は不変。
+        private string _guid;
+        public string Guid
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(_guid))
+                    _guid = System.Guid.NewGuid().ToString();
+                return _guid;
+            }
+            set => _guid = value;
+        }
+
         // ── バウンディングボックス (PSD 左上原点・キャンバス絶対座標) ──
         public int Top, Left, Bottom, Right;
         public int Width  => Right  - Left;

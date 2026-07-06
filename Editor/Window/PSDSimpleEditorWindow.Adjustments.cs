@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 using UnityEditor;
 
@@ -35,11 +35,13 @@ namespace PSDSimpleEditor
                 !Mathf.Approximately(ns, layer.UI.Saturation) ||
                 !Mathf.Approximately(nl, layer.UI.Lightness))
             {
+                RegisterUndo("Modify Color Adjustments");
                 layer.UI.Brightness = nb;
                 layer.UI.Contrast   = nc;
                 layer.UI.Hue        = nh;
                 layer.UI.Saturation = ns;
                 layer.UI.Lightness  = nl;
+                SaveStatesToSerialized();
                 MarkDirty();
             }
             DrawColorizeToggle(layer, ci);
@@ -67,7 +69,9 @@ namespace PSDSimpleEditor
             RowSpace();
             if (en != layer.UI.Colorize)
             {
+                RegisterUndo("Toggle Colorize");
                 layer.UI.Colorize  = en;
+                SaveStatesToSerialized();
                 MarkDirty();
             }
         }
@@ -84,7 +88,9 @@ namespace PSDSimpleEditor
             RowSpace();
             if (en != layer.UI.Invert)
             {
+                RegisterUndo("Toggle Invert");
                 layer.UI.Invert    = en;
+                SaveStatesToSerialized();
                 MarkDirty();
             }
         }
@@ -101,7 +107,9 @@ namespace PSDSimpleEditor
             RowSpace();
             if (en != layer.UI.ThresholdEnabled)
             {
+                RegisterUndo("Toggle Threshold");
                 layer.UI.ThresholdEnabled = en;
+                SaveStatesToSerialized();
                 MarkDirty();
             }
             if (!en) return;
@@ -109,7 +117,9 @@ namespace PSDSimpleEditor
             float nl = IndentedSlider(new GUIContent(PSDTranslation.Get("ThresholdLevel", "レベル"), PSDTranslation.Get("ThresholdLevelTooltip", "2階調に分ける基準値（0 〜 255）を設定します。")), layer.UI.ThresholdLevel, 0f, 255f, indent);
             if (!Mathf.Approximately(nl, layer.UI.ThresholdLevel))
             {
+                RegisterUndo("Modify Threshold Level");
                 layer.UI.ThresholdLevel = nl;
+                SaveStatesToSerialized();
                 MarkDirty();
             }
         }
@@ -127,7 +137,9 @@ namespace PSDSimpleEditor
             RowSpace();
             if (en != layer.UI.PosterizeEnabled)
             {
+                RegisterUndo("Toggle Posterize");
                 layer.UI.PosterizeEnabled = en;
+                SaveStatesToSerialized();
                 MarkDirty();
             }
             if (!en) return;
@@ -135,7 +147,9 @@ namespace PSDSimpleEditor
             float nl = IndentedSlider(new GUIContent(PSDTranslation.Get("PosterizeLevels", "階調数"), PSDTranslation.Get("PosterizeLevelsTooltip", "表現する階調数（2 〜 255）を設定します。")), layer.UI.PosterizeLevels, 2f, 255f, indent);
             if (!Mathf.Approximately(nl, layer.UI.PosterizeLevels))
             {
+                RegisterUndo("Modify Posterize Levels");
                 layer.UI.PosterizeLevels = nl;
+                SaveStatesToSerialized();
                 MarkDirty();
             }
         }
@@ -152,7 +166,9 @@ namespace PSDSimpleEditor
             RowSpace();
             if (en != layer.UI.LevelsEnabled)
             {
+                RegisterUndo("Toggle Levels");
                 layer.UI.LevelsEnabled = en;
+                SaveStatesToSerialized();
                 MarkDirty();
             }
             if (!en) return;
@@ -169,11 +185,13 @@ namespace PSDSimpleEditor
                 !Mathf.Approximately(nob, layer.UI.LevelsOutputBlack) ||
                 !Mathf.Approximately(now, layer.UI.LevelsOutputWhite))
             {
+                RegisterUndo("Modify Levels");
                 layer.UI.LevelsInputBlack  = nib;
                 layer.UI.LevelsInputWhite  = niw;
                 layer.UI.LevelsGamma       = ng;
                 layer.UI.LevelsOutputBlack = nob;
                 layer.UI.LevelsOutputWhite = now;
+                SaveStatesToSerialized();
                 MarkDirty();
             }
         }
@@ -192,7 +210,9 @@ namespace PSDSimpleEditor
             RowSpace();
             if (en != layer.UI.ColorBalanceEnabled)
             {
+                RegisterUndo("Toggle Color Balance");
                 layer.UI.ColorBalanceEnabled = en;
+                SaveStatesToSerialized();
                 MarkDirty();
             }
             if (!en) return;
@@ -227,10 +247,12 @@ namespace PSDSimpleEditor
 
             if (changed || pl != layer.UI.CBPreserveLuminosity)
             {
+                RegisterUndo("Modify Color Balance");
                 layer.UI.CBShadows            = s;
                 layer.UI.CBMidtones           = m;
                 layer.UI.CBHighlights         = h;
                 layer.UI.CBPreserveLuminosity = pl;
+                SaveStatesToSerialized();
                 MarkDirty();
             }
         }
@@ -247,7 +269,9 @@ namespace PSDSimpleEditor
             RowSpace();
             if (en != layer.UI.CurveEnabled)
             {
+                RegisterUndo("Toggle Tone Curve");
                 layer.UI.CurveEnabled = en;
+                SaveStatesToSerialized();
                 MarkDirty();
             }
             if (!en) return;
@@ -266,8 +290,10 @@ namespace PSDSimpleEditor
             RowSpace();
             if (curveChanged)
             {
+                RegisterUndo("Modify Tone Curve");
                 layer.UI.Curve = nc;
                 AdjustmentLutBaker.BakeCurveLut(layer);
+                SaveStatesToSerialized();
                 MarkDirty();
             }
         }
@@ -285,7 +311,9 @@ namespace PSDSimpleEditor
             RowSpace();
             if (en != layer.UI.ImageClipEnabled)
             {
+                RegisterUndo("Toggle Image Clip");
                 layer.UI.ImageClipEnabled = en;
+                SaveStatesToSerialized();
                 MarkDirty();
             }
             if (!en) return;
@@ -302,7 +330,9 @@ namespace PSDSimpleEditor
             RowSpace();
             if (tex != layer.UI.ImageClipTex)
             {
+                RegisterUndo("Change Image Clip Texture");
                 layer.UI.ImageClipTex = tex;
+                SaveStatesToSerialized();
                 MarkDirty();
             }
 
@@ -318,8 +348,10 @@ namespace PSDSimpleEditor
             RowSpace();
             if (nt != layer.UI.ImageClipTile)
             {
+                RegisterUndo("Change Image Clip Tiling");
                 // 0 / 負値はタイリングが破綻するため下限でクランプ
                 layer.UI.ImageClipTile = new Vector2(Mathf.Max(0.01f, nt.x), Mathf.Max(0.01f, nt.y));
+                SaveStatesToSerialized();
                 MarkDirty();
             }
 
@@ -337,7 +369,9 @@ namespace PSDSimpleEditor
             RowSpace();
             if (newIndex != curIndex)
             {
+                RegisterUndo("Change Image Clip Blend Mode");
                 layer.UI.ImageClipBlend = modes[newIndex];
+                SaveStatesToSerialized();
                 MarkDirty();
             }
 
@@ -345,7 +379,9 @@ namespace PSDSimpleEditor
             float no = IndentedSlider(new GUIContent(PSDTranslation.Get("Opacity", "不透明度"), PSDTranslation.Get("OpacityTooltip", "合成するクリップ画像の重ね合わせ不透明度を調整します。")), layer.UI.ImageClipOpacity, 0f, 1f, indent);
             if (!Mathf.Approximately(no, layer.UI.ImageClipOpacity))
             {
+                RegisterUndo("Change Image Clip Opacity");
                 layer.UI.ImageClipOpacity = no;
+                SaveStatesToSerialized();
                 MarkDirty();
             }
         }
@@ -363,8 +399,10 @@ namespace PSDSimpleEditor
             RowSpace();
             if (en != layer.UI.GradientMapEnabled)
             {
+                RegisterUndo("Toggle Gradient Map");
                 layer.UI.GradientMapEnabled = en;
                 if (en) AdjustmentLutBaker.EnsureGradientLut(layer);   // 初回有効化時に LUT を焼く
+                SaveStatesToSerialized();
                 MarkDirty();
             }
             if (!en) return;
@@ -380,8 +418,10 @@ namespace PSDSimpleEditor
             RowSpace();
             if (normalize != layer.UI.GradientMapNormalize)
             {
+                RegisterUndo("Toggle Gradient Map Normalization");
                 layer.UI.GradientMapNormalize = normalize;
                 if (normalize) AdjustmentLutBaker.ComputeGradientLumRange(layer);
+                SaveStatesToSerialized();
                 MarkDirty();
             }
 
@@ -397,15 +437,19 @@ namespace PSDSimpleEditor
             RowSpace();
             if (gradientChanged)
             {
+                RegisterUndo("Change Gradient Map Gradient");
                 layer.UI.Gradient = ng;
                 AdjustmentLutBaker.BakeGradientLut(layer);
+                SaveStatesToSerialized();
                 MarkDirty();
             }
 
             float no = IndentedSlider(new GUIContent(PSDTranslation.Get("GradientMapOpacity", "適用率"), PSDTranslation.Get("GradientMapOpacityTooltip", "グラデーションマップを適用する強度（0.0 〜 1.0）を設定します。")), layer.UI.GradientMapOpacity, 0f, 1f, indent);
             if (!Mathf.Approximately(no, layer.UI.GradientMapOpacity))
             {
+                RegisterUndo("Change Gradient Map Opacity");
                 layer.UI.GradientMapOpacity = no;
+                SaveStatesToSerialized();
                 MarkDirty();
             }
         }

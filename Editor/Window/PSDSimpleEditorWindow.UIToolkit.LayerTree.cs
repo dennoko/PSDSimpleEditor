@@ -74,7 +74,9 @@ namespace PSDSimpleEditor
             var visibilityToggle = new Toggle();
             visibilityToggle.value = layer.UI.Visible;
             visibilityToggle.RegisterValueChangedCallback(evt => {
+                RegisterUndo("Toggle Visibility");
                 layer.UI.Visible = evt.newValue;
+                SaveStatesToSerialized();
                 MarkDirty();
                 RebuildLayerTree();
             });
@@ -153,7 +155,9 @@ namespace PSDSimpleEditor
             var visibilityToggle = new Toggle();
             visibilityToggle.value = layer.UI.Visible;
             visibilityToggle.RegisterValueChangedCallback(evt => {
+                RegisterUndo("Toggle Visibility");
                 layer.UI.Visible = evt.newValue;
+                SaveStatesToSerialized();
                 MarkDirty();
                 RebuildLayerTree();
             });
@@ -212,8 +216,10 @@ namespace PSDSimpleEditor
                 int index = dropdown.index;
                 if (index >= 0 && index < modes.Length)
                 {
+                    RegisterUndo("Change Blend Mode");
                     if (isGroup) layer.GroupBlendMode = modes[index];
                     else layer.BlendMode = modes[index];
+                    SaveStatesToSerialized();
                     MarkDirty();
                 }
             });
