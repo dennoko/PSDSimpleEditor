@@ -126,7 +126,31 @@
 /* ヘッダー (タイトル行) */
 .header {
     flex-direction: row;
+    align-items: center;
     padding: 8px 12px;
+}
+
+/* ヘッダー左側: タイトル + バージョンをまとめる行 */
+.header-titlegroup {
+    flex-direction: row;
+    align-items: center;
+}
+
+/* バージョン表記 (タイトル横の小さな補足テキスト) */
+.version-label {
+    font-size: 10px;
+    margin-left: 6px;
+    color: var(--text-tertiary);
+    -unity-text-align: middle-left;
+}
+/* 更新あり (目立たせるため鮮やかな緑) */
+.version-label--update {
+    color: var(--semantic-success);
+    -unity-font-style: bold;
+}
+/* 最新版の取得に失敗 */
+.version-label--error {
+    color: var(--semantic-error);
 }
 
 /* 設定カード内の 1 行 (ラベル + 入力 + ボタン) */

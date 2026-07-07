@@ -164,6 +164,9 @@
     { "key": "BlendSaturation", "value": "Saturation" },
     { "key": "BlendColor", "value": "Color" },
     { "key": "BlendLuminosity", "value": "Luminosity" },
-    { "key": "BlendPassThrough", "value": "Pass Through" }
+    { "key": "BlendPassThrough", "value": "Pass Through" },
+    { "key": "VersionUpdateAvailable", "value": "Update available {0}" },
+    { "key": "VersionCheckFailed", "value": "Could not check latest version" },
+    { "key": "VersionChecking", "value": "Checking..." }
   ]
 }

@@ -73,6 +73,9 @@ namespace PSDSimpleEditor
             UpdateBottomBar();
             UpdateStatusBar();
             UpdateSettingsFields();
+
+            // バージョン表記 + アップデートチェック起動
+            StartVersionCheck();
         }
 
         void RebuildUI()
@@ -91,9 +94,19 @@ namespace PSDSimpleEditor
             var header = new VisualElement();
             header.AddToClassList("header");
 
+            // タイトル + バージョンラベルを左グループにまとめる
+            var titleGroup = new VisualElement();
+            titleGroup.AddToClassList("header-titlegroup");
+
             var titleLabel = new Label(PSDTranslation.Get("WindowTitle", "Dennoko PSD Editor"));
             titleLabel.AddToClassList("title");
-            header.Add(titleLabel);
+            titleGroup.Add(titleLabel);
+
+            _versionLabel = new Label();
+            _versionLabel.AddToClassList("version-label");
+            titleGroup.Add(_versionLabel);
+
+            header.Add(titleGroup);
 
             // Spacer to push the toggle to the right
             var spacer = new VisualElement();
