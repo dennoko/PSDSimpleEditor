@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -38,6 +39,9 @@ namespace PSDSimpleEditor
         /// <summary>
         /// version.json を非同期取得して結果を onResult に渡す。例外は投げず、失敗時は
         /// State.Error を返す。onResult は Unity のメインスレッド上で呼ばれる。
+        ///
+        /// 指定 branch で取得できなかった場合は "main" にフォールバックして再取得する
+        /// (デフォルトブランチが master / main のどちらでも動くように)。
         /// </summary>
         public static void CheckAsync(
             string owner, string repo, string branch, string filePath,
@@ -45,14 +49,34 @@ namespace PSDSimpleEditor
         {
             if (onResult == null) return;
 
+            // 候補ブランチ: 指定ブランチ → "main" (重複は除外)
+            var branches = new List<string>();
+            if (!string.IsNullOrEmpty(branch)) branches.Add(branch);
+            if (!branches.Contains("main", StringComparer.OrdinalIgnoreCase)) branches.Add("main");
+
+            TryBranch(owner, repo, branches, 0, filePath, localVersion, onResult);
+        }
+
+        /// <summary>候補ブランチを index から順に試す。エラーなら次の候補へフォールバックする。</summary>
+        private static void TryBranch(
+            string owner, string repo, List<string> branches, int index,
+            string filePath, string localVersion, Action<Result> onResult)
+        {
+            if (index >= branches.Count)
+            {
+                onResult(Error(localVersion));
+                return;
+            }
+
             UnityWebRequest req;
             try
             {
-                var url = $"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{filePath}";
+                var url = $"https://raw.githubusercontent.com/{owner}/{repo}/{branches[index]}/{filePath}";
                 req = UnityWebRequest.Get(url);
             }
             catch (Exception e)
             {
+                // URL 組み立て自体の失敗はブランチを変えても直らないため即エラー
                 Debug.LogWarning($"[DennokoVersionChecker] request build failed: {e.Message}");
                 onResult(Error(localVersion));
                 return;
@@ -61,18 +85,29 @@ namespace PSDSimpleEditor
             var op = req.SendWebRequest();
             op.completed += _ =>
             {
+                Result result;
                 try
                 {
-                    onResult(BuildResult(req, localVersion));
+                    result = BuildResult(req, localVersion);
                 }
                 catch (Exception e)
                 {
                     Debug.LogWarning($"[DennokoVersionChecker] callback failed: {e.Message}");
-                    onResult(Error(localVersion));
+                    result = Error(localVersion);
                 }
                 finally
                 {
                     req.Dispose();
+                }
+
+                if (result.State == State.Error && index + 1 < branches.Count)
+                {
+                    // 次の候補ブランチへフォールバック
+                    TryBranch(owner, repo, branches, index + 1, filePath, localVersion, onResult);
+                }
+                else
+                {
+                    onResult(result);
                 }
             };
         }
