@@ -32,8 +32,8 @@ PSDSimpleEditor/
 │   ├── PSDEditorTheme.cs          — テーマ定義 (パレット定数 + GUIStyle 構築、partial)
 │   ├── PSDEditorTheme.Override.cs — EditorStyles 一時上書き機構 (Push/PopEditorTheme)
 │   ├── PSDTranslation.cs          — UI 文言の日英ローカライズ
-│   ├── PSDEditorVersion.cs        — 現行バージョン定数 + アップデートチェック先リポジトリ
-│   ├── DennokoVersionChecker.cs   — GitHub version.json 取得 → ローカル版比較 (自己完結・例外を投げず State のみ返す)
+│   ├── PSDEditorVersion.cs        — ローカル version.json から現行版を取得 (InitializeOnLoad で起動時に自動チェック、GUID+スクリプト相対でパス解決、SessionState 保存)
+│   ├── DennokoVersionChecker.cs   — GitHub version.json 取得 → ローカル版比較 (自己完結・例外を投げず State のみ返す、branch は main へフォールバック、SemVer 正規化)
 │   ├── Compositor/                — LayerCompositor の実装分割 (partial class、共有状態あり)
 │   │   ├── LayerCompositor.cs         — 合成パイプライン本体 (Composite/CompositeList/CompositeGroup/DrawLayer)
 │   │   ├── LayerCompositor.Params.cs  — シェーダー uniform 設定 (DrawParams, ApplyParams)
@@ -50,7 +50,7 @@ PSDSimpleEditor/
 │   │   ├── PSDSimpleEditorWindow.AdjustmentClipboard.cs — 調整パラメーターのコピー&ペースト (歯車メニュー + クリップボード)
 │   │   ├── PSDSimpleEditorWindow.UIToolkit.cs      — UI Toolkit 用ウィンドウ骨格レイアウト構築・制御
 │   │   ├── PSDSimpleEditorWindow.UIToolkit.LayerTree.cs — UI Toolkit レイヤーツリーの VisualElement 構築
-│   │   ├── PSDSimpleEditorWindow.Version.cs         — ヘッダーのバージョン表記 + アップデートチェック配線 (SessionState でセッション内キャッシュ)
+│   │   ├── PSDSimpleEditorWindow.Version.cs         — ヘッダーのバージョン表記 + リロードボタン (State は保存せず「現在のローカル版 vs 取得済み最新版」で都度再計算)
 │   │   └── PSDPathHistory.cs                       — PSD 読み込み履歴 (EditorPrefs 永続化、独立クラス)
 │   └── Writer/                     — PSDWriter の実装分割 (責務ごとの独立 static クラス)
 │       ├── PSDWriter.cs               — 公開 API (`Save`) + ヘッダ/マージ画像セクション書き込み

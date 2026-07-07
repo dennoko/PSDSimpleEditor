@@ -153,6 +153,19 @@
     color: var(--semantic-error);
 }
 
+/* 手動リロードボタン (バージョン表記の右) */
+.version-reload-button {
+    width: 18px;
+    height: 18px;
+    margin-left: 4px;
+    padding: 0;
+    font-size: 12px;
+    color: var(--text-tertiary);
+}
+.version-reload-button:hover {
+    color: var(--text-primary);
+}
+
 /* 設定カード内の 1 行 (ラベル + 入力 + ボタン) */
 .settings-row {
     flex-direction: row;

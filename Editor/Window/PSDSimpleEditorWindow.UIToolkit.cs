@@ -106,6 +106,17 @@ namespace PSDSimpleEditor
             _versionLabel.AddToClassList("version-label");
             titleGroup.Add(_versionLabel);
 
+            // 手動リロードボタン (取得失敗時にその場で再取得を試せる)
+            _versionReloadButton = new Button(() => {
+                // 明示的に再取得。結果を破棄して再チェックし、即座に「確認中...」表示へ。
+                // 完了時に PSDEditorVersion.OnVersionChecked → LoadVersionResultFromSessionState で再描画される。
+                PSDEditorVersion.ForceRecheck();
+                LoadVersionResultFromSessionState();
+            }) { text = "↻" };
+            _versionReloadButton.AddToClassList("version-reload-button");
+            _versionReloadButton.tooltip = PSDTranslation.Get("VersionRecheck", "アップデートを再確認");
+            titleGroup.Add(_versionReloadButton);
+
             header.Add(titleGroup);
 
             // Spacer to push the toggle to the right

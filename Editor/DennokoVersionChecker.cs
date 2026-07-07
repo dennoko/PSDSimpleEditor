@@ -115,21 +115,36 @@ namespace PSDSimpleEditor
 
         private static Result BuildResult(UnityWebRequest req, string localVersion)
         {
+            string url = req != null ? req.url : "(null)";
 #if UNITY_2020_2_OR_NEWER
             bool hasError = req.result != UnityWebRequest.Result.Success;
 #else
             bool hasError = req.isNetworkError || req.isHttpError;
 #endif
-            if (hasError) return Error(localVersion);
+            // 失敗は必ず一度警告する (チェックはセッション1回のみ)。URL・httpCode・error が
+            // 「最新情報を取得できません」の切り分け材料になる (owner/repo/branch・push 有無・回線)。
+            if (hasError)
+            {
+                Debug.LogWarning($"[DennokoVersionChecker] 取得失敗: url={url} httpCode={req.responseCode} error={req.error}");
+                return Error(localVersion);
+            }
 
             var json = req.downloadHandler != null ? req.downloadHandler.text : null;
-            if (string.IsNullOrEmpty(json)) return Error(localVersion);
+            if (string.IsNullOrEmpty(json))
+            {
+                Debug.LogWarning($"[DennokoVersionChecker] 取得失敗: レスポンスが空。url={url} httpCode={req.responseCode}");
+                return Error(localVersion);
+            }
 
             VersionInfo info;
             try { info = JsonUtility.FromJson<VersionInfo>(json); }
-            catch { return Error(localVersion); }
+            catch (Exception e) { Debug.LogWarning($"[DennokoVersionChecker] 取得失敗: JSON パース失敗: {e.Message} url={url}"); return Error(localVersion); }
 
-            if (info == null || string.IsNullOrEmpty(info.version)) return Error(localVersion);
+            if (info == null || string.IsNullOrEmpty(info.version))
+            {
+                Debug.LogWarning($"[DennokoVersionChecker] 取得失敗: version フィールドが空。url={url}");
+                return Error(localVersion);
+            }
 
             var state = IsNewer(info.version, localVersion) ? State.UpdateAvailable : State.UpToDate;
             return new Result
@@ -151,7 +166,13 @@ namespace PSDSimpleEditor
             Message = null,
         };
 
-        /// <summary>latest がローカル版より新しいか。SemVer 優先、パース不能時は文字列不一致で判定。</summary>
+        /// <summary>
+        /// latest がローカル版より新しいか (＝更新あり)。State をキャッシュせず、表示側が
+        /// 「保存した最新版 vs 現在のローカル版」で都度再計算できるよう公開する。
+        /// </summary>
+        public static bool IsUpdateAvailable(string latestVersion, string localVersion)
+            => IsNewer(latestVersion, localVersion);
+
         private static bool IsNewer(string latest, string local)
         {
             var l = Normalize(latest);
@@ -161,12 +182,27 @@ namespace PSDSimpleEditor
             return !string.Equals(l, c, StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// 比較用に正規化する。BOM / 先頭 v / プレリリース・ビルドメタデータを除去し、
+        /// 2 桁以下 ("3", "3.0") は 3 桁 ("3.0.0") へゼロ埋めする。
+        /// ゼロ埋めしないと Version 型で Build=-1 となり "3.0" &lt; "3.0.0" の誤判定が出る。
+        /// </summary>
         private static string Normalize(string v)
         {
-            if (string.IsNullOrEmpty(v)) return "0";
-            v = v.Trim();
-            if (v.StartsWith("v") || v.StartsWith("V")) v = v.Substring(1);
-            return v;
+            if (string.IsNullOrEmpty(v)) return "0.0.0";
+            v = v.Trim().Trim('﻿').Trim(); // 空白と BOM を除去
+            if (v.Length > 0 && (v[0] == 'v' || v[0] == 'V')) v = v.Substring(1);
+            // "1.2.0-beta" / "1.2.0+build" などのサフィックスは比較対象外
+            int cut = v.IndexOfAny(new[] { '-', '+', ' ' });
+            if (cut >= 0) v = v.Substring(0, cut);
+            if (string.IsNullOrEmpty(v)) return "0.0.0";
+
+            var parts = v.Split('.');
+            if (parts.Length >= 3) return v;
+            var padded = new string[3];
+            for (int i = 0; i < 3; i++)
+                padded[i] = (i < parts.Length && !string.IsNullOrEmpty(parts[i])) ? parts[i] : "0";
+            return string.Join(".", padded);
         }
     }
 }

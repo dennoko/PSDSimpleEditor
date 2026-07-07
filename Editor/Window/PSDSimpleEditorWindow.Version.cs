@@ -4,52 +4,61 @@ using UnityEngine.UIElements;
 namespace PSDSimpleEditor
 {
     // ─── partial 見取り図 ───────────────────────────────────────────
-    // 責務   : ヘッダーのバージョン表記 + GitHub version.json を用いたアップデートチェック配線。
-    //          チェッカー本体は DennokoVersionChecker (自己完結) / 版数定数は PSDEditorVersion。
-    // 宣言   : _versionLabel, _versionResult
-    // 参照   : PSDTranslation (状態→文言化), SessionState (同一セッション中の再フェッチ抑制)
-    // 依存   : BuildHeader (.UIToolkit.cs) が _versionLabel を生成し StartVersionCheck を呼ぶ
+    // 責務   : ヘッダーのバージョン表記 + アップデートチェック結果の表示。取得と SessionState への
+    //          保存は PSDEditorVersion (自己完結・InitializeOnLoad) が担い、ここは表示専任。
+    //          State はキャッシュせず「現在のローカル版 vs 取得済みの最新版」で都度再計算する。
+    // 宣言   : _versionLabel, _versionReloadButton, _versionResult
+    // 参照   : PSDTranslation (状態→文言化), SessionState (PSDEditorVersion が保存した結果)
+    // 依存   : BuildHeader (.UIToolkit.cs) が _versionLabel/_versionReloadButton を生成し
+    //          StartVersionCheck を呼ぶ。PSDEditorVersion.OnVersionChecked が
+    //          LoadVersionResultFromSessionState を呼んで再描画する。
     // ────────────────────────────────────────────────────────────────
     public partial class PSDSimpleEditorWindow
     {
         private Label _versionLabel;
+        private Button _versionReloadButton;
         private DennokoVersionChecker.Result _versionResult = new DennokoVersionChecker.Result
         {
             State = DennokoVersionChecker.State.Checking,
             LocalVersion = PSDEditorVersion.Current,
         };
 
-        const string VerCheckDoneKey   = "DennokoPSDEditor_VerCheck_Done";
-        const string VerCheckStateKey  = "DennokoPSDEditor_VerCheck_State";
-        const string VerCheckLatestKey = "DennokoPSDEditor_VerCheck_Latest";
-
         void StartVersionCheck()
         {
-            // 同一 Unity セッション中はキャッシュ結果を再利用し、ウィンドウ開閉のたびに叩かない
-            if (SessionState.GetBool(VerCheckDoneKey, false))
-            {
-                _versionResult = new DennokoVersionChecker.Result
-                {
-                    State = (DennokoVersionChecker.State)SessionState.GetInt(VerCheckStateKey, 0),
-                    LocalVersion = PSDEditorVersion.Current,
-                    LatestVersion = SessionState.GetString(VerCheckLatestKey, string.Empty),
-                };
-                ApplyVersionLabel();
-                return;
-            }
-
-            ApplyVersionLabel(); // Checking 状態を先に反映
-            DennokoVersionChecker.CheckAsync(
-                PSDEditorVersion.RepoOwner, PSDEditorVersion.RepoName, PSDEditorVersion.RepoBranch,
-                PSDEditorVersion.VersionFilePath, PSDEditorVersion.Current, OnVersionChecked);
+            LoadVersionResultFromSessionState();
+            // 取得の要否は StartCheckBackgroundTask 内で判定する (成功済みなら何もしない／
+            // 前回エラーなら再試行)。ウィンドウを開き直すたびに一時的な失敗から自己回復できる。
+            PSDEditorVersion.StartCheckBackgroundTask();
         }
 
-        void OnVersionChecked(DennokoVersionChecker.Result result)
+        internal void LoadVersionResultFromSessionState()
         {
-            _versionResult = result;
-            SessionState.SetBool(VerCheckDoneKey, true);
-            SessionState.SetInt(VerCheckStateKey, (int)result.State);
-            SessionState.SetString(VerCheckLatestKey, result.LatestVersion ?? string.Empty);
+            // State (更新有無) はキャッシュせず、常に「現在のローカル版 vs 取得済みの最新版」で
+            // 再計算する。こうしないと、取得時のローカル版が後から正しく解決された場合に
+            // 「v1.0.0 更新あり 1.0.0」のような矛盾表示が残ってしまう。
+            string local  = PSDEditorVersion.Current;
+            string latest = SessionState.GetString(PSDEditorVersion.VerCheckLatestKey, string.Empty);
+            bool   done   = SessionState.GetBool(PSDEditorVersion.VerCheckDoneKey, false);
+            bool   error  = SessionState.GetBool(PSDEditorVersion.VerCheckErrorKey, false);
+
+            DennokoVersionChecker.State state;
+            if (!done)
+                state = DennokoVersionChecker.State.Checking;
+            else if (error || string.IsNullOrEmpty(latest))
+                state = DennokoVersionChecker.State.Error;
+            else if (DennokoVersionChecker.IsUpdateAvailable(latest, local))
+                state = DennokoVersionChecker.State.UpdateAvailable;
+            else
+                state = DennokoVersionChecker.State.UpToDate;
+
+            _versionResult = new DennokoVersionChecker.Result
+            {
+                State = state,
+                LocalVersion = local,
+                LatestVersion = latest,
+                Url = SessionState.GetString(PSDEditorVersion.VerCheckUrlKey, string.Empty),
+                Message = SessionState.GetString(PSDEditorVersion.VerCheckMessageKey, string.Empty),
+            };
             ApplyVersionLabel();
         }
 

@@ -167,6 +167,7 @@
     { "key": "BlendPassThrough", "value": "Pass Through" },
     { "key": "VersionUpdateAvailable", "value": "Update available {0}" },
     { "key": "VersionCheckFailed", "value": "Could not check latest version" },
-    { "key": "VersionChecking", "value": "Checking..." }
+    { "key": "VersionChecking", "value": "Checking..." },
+    { "key": "VersionRecheck", "value": "Recheck for updates" }
   ]
 }
