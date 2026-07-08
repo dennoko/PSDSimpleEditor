@@ -17,10 +17,14 @@ namespace PSDSimpleEditor
     {
         private Label _versionLabel;
         private Button _versionReloadButton;
+        // LocalVersion はここでは解決しない: PSDEditorVersion.Current は AssetDatabase を
+        // 呼ぶため、ScriptableObject のコンストラクタ (フィールド初期化子はここに展開される) から
+        // 呼ぶと "GUIDToAssetPath_Internal is not allowed to be called from a ScriptableObject
+        // constructor" 例外になる。実際の値は CreateGUI → StartVersionCheck →
+        // LoadVersionResultFromSessionState (OnEnable 後、AssetDatabase 使用可) で解決される。
         private DennokoVersionChecker.Result _versionResult = new DennokoVersionChecker.Result
         {
             State = DennokoVersionChecker.State.Checking,
-            LocalVersion = PSDEditorVersion.Current,
         };
 
         void StartVersionCheck()

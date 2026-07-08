@@ -154,7 +154,9 @@
 }
 
 /* 手動リロードボタン (バージョン表記の右) */
-.version-reload-button {
+.root .version-reload-button {
+    background-color: transparent;
+    border-width: 0;
     width: 18px;
     height: 18px;
     margin-left: 4px;
@@ -162,7 +164,7 @@
     font-size: 12px;
     color: var(--text-tertiary);
 }
-.version-reload-button:hover {
+.root .version-reload-button:hover {
     color: var(--text-primary);
 }
 
@@ -284,7 +286,27 @@
 
 /* ── Buttons ────────────────────────────────────────────────────── */
 
-.button-primary {
+/* Unity ビルトインテーマ (Personal Light 等) のボタン装飾を遮断するベースリセット。
+   以下の .button-* は .root 起点の子孫セレクタとして詳細度を確保し、確実にこちらを勝たせる。 */
+.root .unity-button {
+    background-color: var(--surface-2);
+    border-color: var(--outline);
+    border-width: 1px;
+    border-radius: 2px;
+    color: var(--text-primary);
+}
+.root .unity-button:hover {
+    background-color: var(--surface-hover);
+}
+.root .unity-button:active {
+    background-color: var(--surface-active);
+}
+.root .unity-button:disabled {
+    background-color: var(--surface-1);
+    color: var(--text-disabled);
+}
+
+.root .button-primary {
     background-color: var(--surface-2);
     border-color: var(--outline);
     border-width: 1px;
@@ -295,14 +317,14 @@
     padding: 4px 10px;
     -unity-text-align: middle-center;
 }
-.button-primary:hover {
+.root .button-primary:hover {
     background-color: var(--surface-hover);
 }
-.button-primary:active {
+.root .button-primary:active {
     background-color: var(--surface-active);
 }
 
-.button-secondary {
+.root .button-secondary {
     background-color: var(--surface-1);
     border-color: var(--outline);
     border-width: 1px;
@@ -312,16 +334,16 @@
     padding: 4px 10px;
     -unity-text-align: middle-center;
 }
-.button-secondary:hover {
+.root .button-secondary:hover {
     background-color: var(--surface-2);
     color: var(--text-primary);
 }
-.button-secondary:active {
+.root .button-secondary:active {
     background-color: var(--surface-hover);
     color: var(--text-primary);
 }
 
-.button-tool {
+.root .button-tool {
     background-color: var(--surface-2);
     border-color: var(--outline);
     border-width: 1px;
@@ -331,25 +353,25 @@
     padding: 2px 8px;
     -unity-text-align: middle-center;
 }
-.button-tool:hover {
+.root .button-tool:hover {
     background-color: var(--surface-hover);
     color: var(--text-primary);
 }
-.button-tool:active {
+.root .button-tool:active {
     background-color: var(--surface-active);
     color: var(--text-primary);
 }
 
-.button-tool-active {
+.root .button-tool-active {
     background-color: var(--surface-hover) !important;
     color: var(--text-primary) !important;
     -unity-font-style: bold;
 }
-.button-tool-active:hover {
+.root .button-tool-active:hover {
     background-color: var(--surface-active) !important;
 }
 
-.button-mini {
+.root .button-mini {
     background-color: var(--surface-2);
     border-color: var(--outline);
     border-width: 1px;
@@ -360,16 +382,16 @@
     font-size: 10px;
     -unity-text-align: middle-center;
 }
-.button-mini:hover {
+.root .button-mini:hover {
     background-color: var(--surface-hover);
     color: var(--text-secondary);
 }
-.button-mini:active {
+.root .button-mini:active {
     background-color: var(--surface-active);
     color: var(--text-primary);
 }
 
-.foldout-button {
+.root .foldout-button {
     background-color: transparent;
     border-width: 0;
     color: var(--text-primary);
@@ -380,7 +402,7 @@
     height: 20px;
 }
 
-.foldout-label {
+.root .foldout-label {
     background-color: transparent;
     border-width: 0;
     color: var(--text-primary);
@@ -479,60 +501,65 @@
 
 /* ── Built-in UI Toolkit Controls Styling ────────────────────────── */
 
+/* テキスト要素全般のライトテーマ黒文字化を遮断 (.root 起点で優先度を確保) */
+.root .unity-text-element {
+    color: var(--text-secondary);
+}
+
 /* Text Fields */
-.unity-text-field__input,
-.unity-text-field__input .unity-text-element {
+.root .unity-text-field__input,
+.root .unity-text-field__input .unity-text-element {
     background-color: var(--surface-2);
     border-color: var(--input-outline);
     border-width: 1px;
     border-radius: 3px;
-    color: var(--text-primary) !important;
+    color: var(--text-primary);
     padding: 2px 4px;
     selection-color: rgba(255, 255, 255, 0.25);
     cursor: text;
 }
-.unity-text-field__input:hover {
+.root .unity-text-field__input:hover {
     border-color: var(--outline);
 }
-.unity-text-field__input:focus {
+.root .unity-text-field__input:focus {
     border-color: var(--accent);
 }
 
 /* Object Fields */
-.unity-object-field__input,
-.unity-object-field__input .unity-label,
-.unity-object-field__input .unity-object-field-display__label,
-.unity-object-field__input .unity-text-element {
+.root .unity-object-field__input,
+.root .unity-object-field__input .unity-label,
+.root .unity-object-field__input .unity-object-field-display__label,
+.root .unity-object-field__input .unity-text-element {
     background-color: var(--surface-2);
     border-color: var(--input-outline);
     border-width: 1px;
     border-radius: 3px;
-    color: var(--text-primary) !important;
+    color: var(--text-primary);
     padding: 2px 4px;
 }
-.unity-object-field__selector {
+.root .unity-object-field__selector {
     background-color: var(--surface-1);
     border-left-color: var(--input-outline);
     border-left-width: 1px;
 }
 
 /* Dropdowns / Popups */
-.unity-base-popup-field__input,
-.unity-base-popup-field__input .unity-base-popup-field__text,
-.unity-base-popup-field__input .unity-text-element {
+.root .unity-base-popup-field__input,
+.root .unity-base-popup-field__input .unity-base-popup-field__text,
+.root .unity-base-popup-field__input .unity-text-element {
     background-color: var(--surface-2);
     border-color: var(--input-outline);
     border-width: 1px;
     border-radius: 3px;
-    color: var(--text-primary) !important;
+    color: var(--text-primary);
     padding: 2px 6px;
 }
-.unity-base-popup-field__arrow {
+.root .unity-base-popup-field__arrow {
     -unity-background-image-tint-color: var(--text-primary);
 }
 
 /* Toggles */
-.unity-toggle__checkmark {
+.root .unity-toggle__checkmark {
     background-color: var(--surface-2);
     border-color: var(--input-outline);
     border-width: 1px;
@@ -540,10 +567,10 @@
     width: 16px;
     height: 16px;
 }
-.unity-toggle__checkmark:hover {
+.root .unity-toggle__checkmark:hover {
     border-color: var(--outline);
 }
-.unity-toggle__checkmark:checked {
+.root .unity-toggle__checkmark:checked {
     background-color: var(--surface-1);
     border-color: var(--accent);
 }
