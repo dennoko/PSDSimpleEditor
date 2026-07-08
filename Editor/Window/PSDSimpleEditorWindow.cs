@@ -311,7 +311,9 @@ namespace PSDSimpleEditor
         {
             if (rt == null) return null;
             var prevActive = RenderTexture.active;
-            var tex = new Texture2D(rt.width, rt.height, TextureFormat.RGBA32, false, linear: false)
+            // ミップマップ付きで生成する。3Dビューで縮小・斜め表示される際に元アセット
+            // (通常ミップ生成 ON) と挙動を揃え、細線のジャギ / チラつきを防ぐ。
+            var tex = new Texture2D(rt.width, rt.height, TextureFormat.RGBA32, mipChain: true, linear: false)
             {
                 hideFlags = HideFlags.HideAndDontSave
             };
@@ -319,7 +321,7 @@ namespace PSDSimpleEditor
             {
                 RenderTexture.active = rt;
                 tex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
-                tex.Apply(false, false);
+                tex.Apply(updateMipmaps: true, makeNoLongerReadable: false);
             }
             finally
             {
@@ -397,6 +399,15 @@ namespace PSDSimpleEditor
                 _originalTexture = _previewMaterial.GetTexture(_previewSlotName);
                 // 異常終了に備えてバックアップを保存
                 PSDPreviewRecovery.SaveBackup(_previewMaterial, _previewSlotName, _originalTexture);
+            }
+
+            // 元テクスチャのフィルタ設定を引き継ぎ、3Dビューでの見た目 (ジャギ / チラつき) を
+            // 元アセットに近づける。_compositeTexture は再合成ごとに作り直されるため毎回適用する。
+            if (_originalTexture != null)
+            {
+                _compositeTexture.filterMode = _originalTexture.filterMode;
+                _compositeTexture.wrapMode   = _originalTexture.wrapMode;
+                _compositeTexture.anisoLevel = _originalTexture.anisoLevel;
             }
 
             // 再合成ごとに新しい Texture2D 参照を割り当てることで、マテリアル変更が
