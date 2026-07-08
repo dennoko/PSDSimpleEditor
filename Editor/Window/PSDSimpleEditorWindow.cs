@@ -291,7 +291,41 @@ namespace PSDSimpleEditor
             SafeDestroy(ref _compositeTexture); // 読み戻しキャッシュは古くなったので無効化
             _compositeRT = _compositor.CompositeToRT(_psdFile.Layers);
             if (_isRealtimePreviewEnabled)
+            {
+                // マテリアルへは CPU 読み戻しした Texture2D をバインドする。RenderTexture を
+                // 直接バインドすると、参照が毎回同一のため Unity がマテリアル変更を検知せず、
+                // 内容更新が Scene ビュー / マテリアルインスペクタへ伝播しない (ツール内
+                // プレビューは RT を毎フレーム再サンプルするので反映される差が出る)。
+                // 再合成をもう一度回さず、生成済み _compositeRT から読み戻す (バイト値一致)。
+                _compositeTexture = ReadbackRTToTexture(_compositeRT);
                 ApplyRealtimePreview();
+            }
+        }
+
+        /// <summary>
+        /// 合成結果 RT を Texture2D (RGBA32, linear:false) へ読み戻す。_resultRT は sRGB フラグ +
+        /// sRGBWrite=false の Blit で従来 Texture2D とバイト値が一致する設計のため、そのまま等価。
+        /// リアルタイムプレビューのマテリアルバインド用 (毎回新しい参照を渡して変更を伝播させる)。
+        /// </summary>
+        Texture2D ReadbackRTToTexture(RenderTexture rt)
+        {
+            if (rt == null) return null;
+            var prevActive = RenderTexture.active;
+            var tex = new Texture2D(rt.width, rt.height, TextureFormat.RGBA32, false, linear: false)
+            {
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            try
+            {
+                RenderTexture.active = rt;
+                tex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+                tex.Apply(false, false);
+            }
+            finally
+            {
+                RenderTexture.active = prevActive;
+            }
+            return tex;
         }
 
         /// <summary>
@@ -346,10 +380,15 @@ namespace PSDSimpleEditor
 
         // ── リアルタイムプレビュー制御 ──────────────────────────────────────
 
-        /// <summary>編集中のテクスチャ（RenderTexture）をマテリアルへリアルタイムに適用する。</summary>
+        /// <summary>編集中の合成結果 (読み戻し Texture2D) をマテリアルへリアルタイムに適用する。</summary>
         void ApplyRealtimePreview()
         {
-            if (_previewMaterial == null || string.IsNullOrEmpty(_previewSlotName) || _compositeRT == null)
+            if (_previewMaterial == null || string.IsNullOrEmpty(_previewSlotName))
+                return;
+
+            // マテリアルへは読み戻し済みの Texture2D をバインドする (RecompositeNow が生成)。
+            // 未生成なら次回の再合成でバインドされる (MarkDirty 済みが前提)。
+            if (_compositeTexture == null)
                 return;
 
             // 最初の一回だけ元のテクスチャを退避
@@ -360,8 +399,11 @@ namespace PSDSimpleEditor
                 PSDPreviewRecovery.SaveBackup(_previewMaterial, _previewSlotName, _originalTexture);
             }
 
-            // RT は常駐で内容だけ更新されるため、バインド以降の再合成は自動的に反映される
-            _previewMaterial.SetTexture(_previewSlotName, _compositeRT);
+            // 再合成ごとに新しい Texture2D 参照を割り当てることで、マテリアル変更が
+            // Scene ビュー / マテリアルインスペクタへ伝播しリアルタイムに反映される。
+            _previewMaterial.SetTexture(_previewSlotName, _compositeTexture);
+            // マテリアルインスペクタのプレビューや Scene ビューへ即時反映を要求する
+            SceneView.RepaintAll();
         }
 
         /// <summary>リアルタイムプレビューを解除し、元のテクスチャを復元する。</summary>
