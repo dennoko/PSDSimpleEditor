@@ -12,9 +12,11 @@ namespace PSDSimpleEditor
     //          Dropdown、IMGUIContainer 経由のレイヤーコントロール埋め込み)
     // 宣言   : なし
     // 参照   : _layerTreeContainer (R), _psdFile (R), _blendModesGroup/Normal (R),
-    //          _blendLabelsGroup/Normal (RW)
+    //          _blendLabelsGroup/Normal (RW), _visibleLeafOrder/_leafRowByGuid (W),
+    //          _selectedLayerGuids (R)
     // 依存   : DrawLayerControls / DrawOpacitySlider / BuildLayerLabel / BuildBlendLabels
-    //          (.LayerPanel.cs), MarkDirty (本体)
+    //          (.LayerPanel.cs), MarkDirty (本体),
+    //          OnLeafRowPointerDown / PruneSelectionToVisibleRows / IsInteractiveTarget (.Selection.cs)
     // ────────────────────────────────────────────────────────────────
     public partial class PSDSimpleEditorWindow
     {
@@ -22,11 +24,22 @@ namespace PSDSimpleEditor
         {
             if (_layerTreeContainer == null) return;
             _layerTreeContainer.Clear();
+            _visibleLeafOrder.Clear();
+            _leafRowByGuid.Clear();
+            _visibleGroups.Clear();
+            _groupRowByGuid.Clear();
 
-            if (_psdFile == null || _psdFile.Layers == null) return;
+            if (_psdFile == null || _psdFile.Layers == null)
+            {
+                PruneSelectionToVisibleRows();
+                return;
+            }
 
             // PSDFile.Layers is sorted index 0 = bottom layer. We draw top-down.
             BuildLayerListTopDown(_layerTreeContainer, _psdFile.Layers, 0);
+
+            // 折りたたみ / 非表示化で行が消えたレイヤーを選択から外す
+            PruneSelectionToVisibleRows();
         }
 
         void BuildLayerListTopDown(VisualElement parent, List<PSDLayer> layers, int depth)
@@ -93,6 +106,22 @@ namespace PSDSimpleEditor
             header.Add(blendModeDropdown);
 
             container.Add(header);
+
+            // 複数選択: グループハイライト追随用レジストリへ登録 (選択状態の復元は
+            // RebuildLayerTree 末尾の PruneSelectionToVisibleRows → UpdateGroupHighlights が行う)
+            _visibleGroups.Add(layer);
+            _groupRowByGuid[layer.Guid] = container;
+
+            // グループヘッダ (タイトル〜ブレンドモード左までの余白) のクリック:
+            // 折りたたみ中は展開+配下選択 / 展開中は折りたたみ / 修飾キーで配下選択トグル
+            // (▾/▸ ボタン・Toggle・Dropdown のクリックは IsInteractiveTarget の遡り判定で除外)
+            header.RegisterCallback<PointerDownEvent>(evt =>
+            {
+                if (evt.button != 0) return; // 左クリックのみ
+                if (IsInteractiveTarget(evt.target as VisualElement, header)) return;
+                OnGroupRowPointerDown(evt, layer);
+                evt.StopPropagation();
+            });
 
             // Body (shown when visible)
             if (layer.UI.Visible)
@@ -174,6 +203,22 @@ namespace PSDSimpleEditor
             header.Add(blendModeDropdown);
 
             container.Add(header);
+
+            // 複数選択: 表示順リスト / ハイライト付け替え用レジストリへ登録 + 選択状態の復元
+            _visibleLeafOrder.Add(layer);
+            _leafRowByGuid[layer.Guid] = container;
+            if (_selectedLayerGuids.Contains(layer.Guid))
+                container.AddToClassList(SelectedRowClass);
+
+            // 行ヘッダのクリックで選択 (Ctrl=トグル / Shift=範囲)。バブルアップ登録のため
+            // Toggle/Dropdown 側が処理したクリックとは IsInteractiveTarget の遡り判定で衝突しない。
+            header.RegisterCallback<PointerDownEvent>(evt =>
+            {
+                if (evt.button != 0) return; // 左クリックのみ
+                if (IsInteractiveTarget(evt.target as VisualElement, header)) return;
+                OnLeafRowPointerDown(evt, layer);
+                evt.StopPropagation();
+            });
 
             // Controls (shown when visible)
             if (layer.UI.Visible)

@@ -21,7 +21,7 @@
     { "key": "PsdNotLoaded", "value": "PSD が読み込まれていません" },
     { "key": "PsdLoadPrompt", "value": "上部の「PSD」欄でファイルを指定し、「読み込み」を押してください。\n履歴からの再読み込みも可能です。" },
     { "key": "Layers", "value": "レイヤー" },
-    { "key": "LayersTooltip", "value": "PSD内のレイヤー構造を表示します。\n・左の目のトグル: 表示/非表示\n・右のドロップダウン: ブレンドモード\n・フォルダやレイヤーを展開すると詳細パラメータが表示されます。" },
+    { "key": "LayersTooltip", "value": "PSD内のレイヤー構造を表示します。\n・左の目のトグル: 表示/非表示\n・右のドロップダウン: ブレンドモード\n・フォルダやレイヤーを展開すると詳細パラメータが表示されます。\n・Ctrl+クリック / Shift+クリックで複数レイヤーを選択し、色調補正をまとめて編集できます。" },
     { "key": "Preview", "value": "プレビュー" },
     { "key": "MergedRefActive", "value": "マージ参照中" },
     { "key": "MergedRef", "value": "マージ参照" },
@@ -168,6 +168,12 @@
     { "key": "VersionUpdateAvailable", "value": "更新あり {0}" },
     { "key": "VersionCheckFailed", "value": "最新版を取得できません" },
     { "key": "VersionChecking", "value": "確認中..." },
-    { "key": "VersionRecheck", "value": "アップデートを再確認" }
+    { "key": "VersionRecheck", "value": "アップデートを再確認" },
+    { "key": "SelectionCountFormat", "value": "選択中: {0}" },
+    { "key": "SelectionHint", "value": "[Shiftを押しながら複数選択]" },
+    { "key": "SelectionClear", "value": "選択解除" },
+    { "key": "SelectionClearTooltip", "value": "レイヤーの複数選択を解除します。" },
+    { "key": "PasteToSelectionFormat", "value": "選択中の全レイヤーにペースト ({0})" },
+    { "key": "PasteToSelection", "value": "選択中の全レイヤーにペースト" }
   ]
 }

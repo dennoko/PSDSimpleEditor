@@ -62,6 +62,16 @@ namespace PSDSimpleEditor
             _rootContainer.AddToClassList("root");
             rootVisualElement.Add(_rootContainer);
 
+            // Esc でレイヤーの複数選択を解除 (KeyDown はフォーカス依存のため best-effort。
+            // 確実な解除手段は余白クリックと「選択解除」ボタンが担う)
+            _rootContainer.RegisterCallback<KeyDownEvent>(evt => {
+                if (evt.keyCode == KeyCode.Escape && _selectedLayerGuids.Count > 0)
+                {
+                    ClearSelection();
+                    evt.StopPropagation();
+                }
+            }, TrickleDown.TrickleDown);
+
             // Build layout
             BuildHeader();
             BuildSettingsCard();
@@ -362,16 +372,45 @@ namespace PSDSimpleEditor
                 
                 var layerTitle = new Label(PSDTranslation.Get("Layers", "レイヤー"));
                 layerTitle.AddToClassList("section-header");
-                layerTitle.tooltip = PSDTranslation.Get("LayersTooltip", "PSD内のレイヤー構造を表示します。\n・左の目のトグル: 表示/非表示\n・右のドロップダウン: ブレンドモード\n・フォルダやレイヤーを展開すると詳細パラメータが表示されます。");
+                layerTitle.tooltip = PSDTranslation.Get("LayersTooltip", "PSD内のレイヤー構造を表示します。\n・左の目のトグル: 表示/非表示\n・右のドロップダウン: ブレンドモード\n・フォルダやレイヤーを展開すると詳細パラメータが表示されます。\n・Ctrl+クリック / Shift+クリックで複数レイヤーを選択し、色調補正をまとめて編集できます。");
                 layerHeader.Add(layerTitle);
+
+                // 複数選択の選択数表示 + 操作補助文 + 全解除ボタン (選択が無い間は非表示)
+                var layerHeaderSpacer = new VisualElement();
+                layerHeaderSpacer.AddToClassList("grow");
+                layerHeader.Add(layerHeaderSpacer);
+
+                _selectionHintLabel = new Label(PSDTranslation.Get("SelectionHint", "[Shiftを押しながら複数選択]"));
+                _selectionHintLabel.AddToClassList("selection-hint");
+                layerHeader.Add(_selectionHintLabel);
+
+                _selectionCountLabel = new Label();
+                _selectionCountLabel.AddToClassList("selection-count");
+                layerHeader.Add(_selectionCountLabel);
+
+                _selectionClearButton = new Button(ClearSelection) { text = PSDTranslation.Get("SelectionClear", "選択解除") };
+                _selectionClearButton.AddToClassList("button-mini");
+                _selectionClearButton.tooltip = PSDTranslation.Get("SelectionClearTooltip", "レイヤーの複数選択を解除します。");
+                layerHeader.Add(_selectionClearButton);
+                UpdateSelectionUI();
+
                 layerPanel.Add(layerHeader);
 
                 _layerTreeScrollView = new ScrollView();
                 _layerTreeScrollView.AddToClassList("layer-tree-scroll");
+                _layerTreeScrollView.focusable = true; // Esc での選択解除をツリーへのフォーカスで受けるため
                 _layerTreeContainer = new VisualElement();
                 _layerTreeContainer.AddToClassList("layer-tree-container");
                 _layerTreeScrollView.Add(_layerTreeContainer);
                 layerPanel.Add(_layerTreeScrollView);
+
+                // 行の外の余白クリックで選択解除 (行内クリックは target が行要素になるため発火しない)
+                _layerTreeContainer.RegisterCallback<PointerDownEvent>(evt => {
+                    if (evt.button == 0 && evt.target == _layerTreeContainer) ClearSelection();
+                });
+                _layerTreeScrollView.contentContainer.RegisterCallback<PointerDownEvent>(evt => {
+                    if (evt.button == 0 && evt.target == _layerTreeScrollView.contentContainer) ClearSelection();
+                });
 
                 // Right Pane: Preview Panel
                 var previewPanel = new VisualElement();

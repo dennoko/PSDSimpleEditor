@@ -241,7 +241,32 @@ namespace PSDSimpleEditor
             if (!_adjustmentClipboard.TryGetValue(kind, out object raw)) return false;
 
             RegisterUndo($"Paste {kind}");
+            bool ok = PasteAdjustmentCore(kind, layer, raw, allowPreview: true);
+            SaveStatesToSerialized();
+            MarkDirty();
+            return ok;
+        }
 
+        /// <summary>
+        /// クリップボード内容を選択中の全リーフレイヤーへ貼り付ける (1 回の RegisterUndo で
+        /// 全レイヤー分が 1 Undo グループにまとまる)。
+        /// </summary>
+        void PasteAdjustmentToSelection(ClipboardKind kind)
+        {
+            if (!_adjustmentClipboard.TryGetValue(kind, out object raw)) return;
+            var targets = EnumerateSelectedLeaves();
+            if (targets.Count == 0) return;
+
+            RegisterUndo($"Paste {kind} (Multi)");
+            foreach (var t in targets)
+                PasteAdjustmentCore(kind, t, raw, allowPreview: false); // 色域プレビューは単一スロットのため一括時は抑止
+            SaveStatesToSerialized();
+            MarkDirty();
+        }
+
+        /// <summary>ペーストの適用本体 (Undo 登録・シリアライズ保存・再合成トリガは呼び出し側の責務)。</summary>
+        bool PasteAdjustmentCore(ClipboardKind kind, PSDLayer layer, object raw, bool allowPreview)
+        {
             switch (kind)
             {
                 case ClipboardKind.Colorize:
@@ -299,7 +324,7 @@ namespace PSDSimpleEditor
                     var s = (ColorRangeMaskSnapshot)raw;
                     layer.UI.ColorRangeTarget    = s.Target;
                     layer.UI.ColorRangeThreshold = s.Threshold;
-                    BeginColorRangePreview(layer);
+                    if (allowPreview) BeginColorRangePreview(layer);
                     break;
                 }
                 case ClipboardKind.FullAdjustmentSection:
@@ -341,8 +366,6 @@ namespace PSDSimpleEditor
                     return false;
             }
 
-            SaveStatesToSerialized();
-            MarkDirty();
             return true;
         }
 
@@ -366,6 +389,21 @@ namespace PSDSimpleEditor
             else
             {
                 menu.AddDisabledItem(new GUIContent("ペースト"));
+            }
+
+            // 複数選択中への一括ペースト (歯車の行が選択外でも選択集合に適用する)
+            int selCount = _selectedLayerGuids.Count;
+            if (HasClipboard(kind) && selCount > 0)
+            {
+                menu.AddItem(new GUIContent(PSDTranslation.GetFormat("PasteToSelectionFormat", selCount)), false, () =>
+                {
+                    PasteAdjustmentToSelection(kind);
+                    Repaint();
+                });
+            }
+            else
+            {
+                menu.AddDisabledItem(new GUIContent(PSDTranslation.Get("PasteToSelection", "選択中の全レイヤーにペースト")));
             }
             menu.ShowAsContext();
         }

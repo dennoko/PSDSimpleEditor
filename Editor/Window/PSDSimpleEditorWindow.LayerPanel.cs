@@ -12,7 +12,7 @@ namespace PSDSimpleEditor
     // 参照   : _needsRecomposite (RW), _blendModesNormal (R), _blendModesGroup (R),
     //          _blendLabelsNormal (R), _blendLabelsGroup (R), _eyedropperTarget (RW)
     // 依存   : DrawAdjustmentGearMenu (.AdjustmentClipboard.cs), IndentedSlider (.Adjustments.cs),
-    //          DrawColorizeToggle (.Adjustments.cs) 等
+    //          DrawColorizeToggle (.Adjustments.cs), ForEachCoTarget/AddClamped (.Selection.cs) 等
     // ────────────────────────────────────────────────────────────────
     public partial class PSDSimpleEditorWindow
     {
@@ -101,9 +101,15 @@ namespace PSDSimpleEditor
                 if (!Mathf.Approximately(nb, layer.UI.Brightness) ||
                     !Mathf.Approximately(nc, layer.UI.Contrast))
                 {
+                    float db = nb - layer.UI.Brightness;
+                    float dc = nc - layer.UI.Contrast;
                     RegisterUndo("Modify Brightness/Contrast");
                     layer.UI.Brightness = nb;
                     layer.UI.Contrast   = nc;
+                    ForEachCoTarget(layer, t => {
+                        t.UI.Brightness = AddClamped(t.UI.Brightness, db, -150f, 150f);
+                        t.UI.Contrast   = AddClamped(t.UI.Contrast,   dc,  -50f, 100f);
+                    });
                     SaveStatesToSerialized();
                     MarkDirty();
                 }
@@ -119,10 +125,18 @@ namespace PSDSimpleEditor
                     !Mathf.Approximately(ns, layer.UI.Saturation) ||
                     !Mathf.Approximately(nl, layer.UI.Lightness))
                 {
+                    float dh = nh - layer.UI.Hue;
+                    float ds = ns - layer.UI.Saturation;
+                    float dl = nl - layer.UI.Lightness;
                     RegisterUndo("Modify Hue/Saturation/Lightness");
                     layer.UI.Hue        = nh;
                     layer.UI.Saturation = ns;
                     layer.UI.Lightness  = nl;
+                    ForEachCoTarget(layer, t => {
+                        t.UI.Hue        = AddClamped(t.UI.Hue,        dh, -180f, 180f);
+                        t.UI.Saturation = AddClamped(t.UI.Saturation, ds, -100f, 100f);
+                        t.UI.Lightness  = AddClamped(t.UI.Lightness,  dl, -100f, 100f);
+                    });
                     SaveStatesToSerialized();
                     MarkDirty();
                 }

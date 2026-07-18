@@ -20,7 +20,7 @@ namespace PSDSimpleEditor
     /// </summary>
     // ─── partial 見取り図 ───────────────────────────────────────────
     // 責務   : メインウィンドウの定義、ライフサイクル管理、PSD 読み込みと GPU 合成の実行
-    //          ※ 本クラスは以下の 9 ファイルに分割されています:
+    //          ※ 本クラスは以下の 10 ファイルに分割されています:
     //             - PSDSimpleEditorWindow.cs (本体、ライフサイクルと読み込み/合成)
     //             - PSDSimpleEditorWindow.Toolbar.cs (履歴メニュー)
     //             - PSDSimpleEditorWindow.LayerPanel.cs (レイヤーパネル UI の描画)
@@ -30,6 +30,7 @@ namespace PSDSimpleEditor
     //             - PSDSimpleEditorWindow.Export.cs (下部バー描画・PNG/PSD書き出し)
     //             - PSDSimpleEditorWindow.AdjustmentClipboard.cs (補正パラメータのコピー&ペースト)
     //             - PSDSimpleEditorWindow.UIToolkit.cs (UI Toolkit を使用したレイアウト構築・制御)
+    //             - PSDSimpleEditorWindow.Selection.cs (レイヤー複数選択 + 一括編集の伝播)
     // 宣言   : IndentWidth, CheckerCellPx, StatusType, _statusMessage, _statusType,
     //          _statusResetTime, _layerPanelWidth, _exportDir, _exportFormat, _psdPath,
     //          _showMergedRef, _previewMaterial, _previewSlotName, _isRealtimePreviewEnabled,
@@ -160,6 +161,8 @@ namespace PSDSimpleEditor
             }
 
             _needsRecomposite = false;
+
+            ClearSelection(); // 旧 PSD の GUID が選択に残らないようにする
 
             UpdateMainArea();
             UpdateBottomBar();

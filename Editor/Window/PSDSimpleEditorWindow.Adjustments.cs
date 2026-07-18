@@ -10,7 +10,8 @@ namespace PSDSimpleEditor
     // 宣言   : なし
     // 参照   : _needsRecomposite (RW), _blendModesNormal (R), _blendLabelsNormal (R)
     // 依存   : DrawSectionFoldout (.LayerPanel.cs), DrawAdjustmentGearMenu (.AdjustmentClipboard.cs),
-    //          RowSpace (.LayerPanel.cs), AdjustmentLutBaker (LUT ベイク処理)
+    //          RowSpace (.LayerPanel.cs), AdjustmentLutBaker (LUT ベイク処理),
+    //          ForEachCoTarget/AddClamped/ApplyGradientToLayer (.Selection.cs)
     // ────────────────────────────────────────────────────────────────
     public partial class PSDSimpleEditorWindow
     {
@@ -35,12 +36,25 @@ namespace PSDSimpleEditor
                 !Mathf.Approximately(ns, layer.UI.Saturation) ||
                 !Mathf.Approximately(nl, layer.UI.Lightness))
             {
+                // 複数選択中の一括編集は相対値 (差分) 適用のため、代入前に delta を捕捉する
+                float db = nb - layer.UI.Brightness;
+                float dc = nc - layer.UI.Contrast;
+                float dh = nh - layer.UI.Hue;
+                float ds = ns - layer.UI.Saturation;
+                float dl = nl - layer.UI.Lightness;
                 RegisterUndo("Modify Color Adjustments");
                 layer.UI.Brightness = nb;
                 layer.UI.Contrast   = nc;
                 layer.UI.Hue        = nh;
                 layer.UI.Saturation = ns;
                 layer.UI.Lightness  = nl;
+                ForEachCoTarget(layer, t => {
+                    t.UI.Brightness = AddClamped(t.UI.Brightness, db, -150f, 150f);
+                    t.UI.Contrast   = AddClamped(t.UI.Contrast,   dc,  -50f, 100f);
+                    t.UI.Hue        = AddClamped(t.UI.Hue,        dh, -180f, 180f);
+                    t.UI.Saturation = AddClamped(t.UI.Saturation, ds, -100f, 100f);
+                    t.UI.Lightness  = AddClamped(t.UI.Lightness,  dl, -100f, 100f);
+                });
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -71,6 +85,7 @@ namespace PSDSimpleEditor
             {
                 RegisterUndo("Toggle Colorize");
                 layer.UI.Colorize  = en;
+                ForEachCoTarget(layer, t => t.UI.Colorize = en);
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -90,6 +105,7 @@ namespace PSDSimpleEditor
             {
                 RegisterUndo("Toggle Invert");
                 layer.UI.Invert    = en;
+                ForEachCoTarget(layer, t => t.UI.Invert = en);
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -109,6 +125,7 @@ namespace PSDSimpleEditor
             {
                 RegisterUndo("Toggle Threshold");
                 layer.UI.ThresholdEnabled = en;
+                ForEachCoTarget(layer, t => t.UI.ThresholdEnabled = en);
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -117,8 +134,10 @@ namespace PSDSimpleEditor
             float nl = IndentedSlider(new GUIContent(PSDTranslation.Get("ThresholdLevel", "レベル"), PSDTranslation.Get("ThresholdLevelTooltip", "2階調に分ける基準値（0 〜 255）を設定します。")), layer.UI.ThresholdLevel, 0f, 255f, indent);
             if (!Mathf.Approximately(nl, layer.UI.ThresholdLevel))
             {
+                float dLevel = nl - layer.UI.ThresholdLevel;
                 RegisterUndo("Modify Threshold Level");
                 layer.UI.ThresholdLevel = nl;
+                ForEachCoTarget(layer, t => t.UI.ThresholdLevel = AddClamped(t.UI.ThresholdLevel, dLevel, 0f, 255f));
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -139,6 +158,7 @@ namespace PSDSimpleEditor
             {
                 RegisterUndo("Toggle Posterize");
                 layer.UI.PosterizeEnabled = en;
+                ForEachCoTarget(layer, t => t.UI.PosterizeEnabled = en);
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -147,8 +167,10 @@ namespace PSDSimpleEditor
             float nl = IndentedSlider(new GUIContent(PSDTranslation.Get("PosterizeLevels", "階調数"), PSDTranslation.Get("PosterizeLevelsTooltip", "表現する階調数（2 〜 255）を設定します。")), layer.UI.PosterizeLevels, 2f, 255f, indent);
             if (!Mathf.Approximately(nl, layer.UI.PosterizeLevels))
             {
+                float dLevels = nl - layer.UI.PosterizeLevels;
                 RegisterUndo("Modify Posterize Levels");
                 layer.UI.PosterizeLevels = nl;
+                ForEachCoTarget(layer, t => t.UI.PosterizeLevels = AddClamped(t.UI.PosterizeLevels, dLevels, 2f, 255f));
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -168,6 +190,7 @@ namespace PSDSimpleEditor
             {
                 RegisterUndo("Toggle Levels");
                 layer.UI.LevelsEnabled = en;
+                ForEachCoTarget(layer, t => t.UI.LevelsEnabled = en);
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -185,12 +208,24 @@ namespace PSDSimpleEditor
                 !Mathf.Approximately(nob, layer.UI.LevelsOutputBlack) ||
                 !Mathf.Approximately(now, layer.UI.LevelsOutputWhite))
             {
+                float dib = nib - layer.UI.LevelsInputBlack;
+                float diw = niw - layer.UI.LevelsInputWhite;
+                float dg  = ng  - layer.UI.LevelsGamma;
+                float dob = nob - layer.UI.LevelsOutputBlack;
+                float dow = now - layer.UI.LevelsOutputWhite;
                 RegisterUndo("Modify Levels");
                 layer.UI.LevelsInputBlack  = nib;
                 layer.UI.LevelsInputWhite  = niw;
                 layer.UI.LevelsGamma       = ng;
                 layer.UI.LevelsOutputBlack = nob;
                 layer.UI.LevelsOutputWhite = now;
+                ForEachCoTarget(layer, t => {
+                    t.UI.LevelsInputBlack  = AddClamped(t.UI.LevelsInputBlack,  dib, 0f, 255f);
+                    t.UI.LevelsInputWhite  = AddClamped(t.UI.LevelsInputWhite,  diw, 0f, 255f);
+                    t.UI.LevelsGamma       = AddClamped(t.UI.LevelsGamma,       dg,  0.01f, 9.99f);
+                    t.UI.LevelsOutputBlack = AddClamped(t.UI.LevelsOutputBlack, dob, 0f, 255f);
+                    t.UI.LevelsOutputWhite = AddClamped(t.UI.LevelsOutputWhite, dow, 0f, 255f);
+                });
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -212,6 +247,7 @@ namespace PSDSimpleEditor
             {
                 RegisterUndo("Toggle Color Balance");
                 layer.UI.ColorBalanceEnabled = en;
+                ForEachCoTarget(layer, t => t.UI.ColorBalanceEnabled = en);
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -247,11 +283,20 @@ namespace PSDSimpleEditor
 
             if (changed || pl != layer.UI.CBPreserveLuminosity)
             {
+                Vector3 dSh  = s - layer.UI.CBShadows;
+                Vector3 dMid = m - layer.UI.CBMidtones;
+                Vector3 dHi  = h - layer.UI.CBHighlights;
                 RegisterUndo("Modify Color Balance");
                 layer.UI.CBShadows            = s;
                 layer.UI.CBMidtones           = m;
                 layer.UI.CBHighlights         = h;
                 layer.UI.CBPreserveLuminosity = pl;
+                ForEachCoTarget(layer, t => {
+                    t.UI.CBShadows            = AddClamped(t.UI.CBShadows,    dSh,  -100f, 100f);
+                    t.UI.CBMidtones           = AddClamped(t.UI.CBMidtones,   dMid, -100f, 100f);
+                    t.UI.CBHighlights         = AddClamped(t.UI.CBHighlights, dHi,  -100f, 100f);
+                    t.UI.CBPreserveLuminosity = pl;
+                });
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -271,6 +316,10 @@ namespace PSDSimpleEditor
             {
                 RegisterUndo("Toggle Tone Curve");
                 layer.UI.CurveEnabled = en;
+                ForEachCoTarget(layer, t => {
+                    t.UI.CurveEnabled = en;
+                    if (en) AdjustmentLutBaker.EnsureCurveLut(t);
+                });
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -293,6 +342,11 @@ namespace PSDSimpleEditor
                 RegisterUndo("Modify Tone Curve");
                 layer.UI.Curve = nc;
                 AdjustmentLutBaker.BakeCurveLut(layer);
+                // カーブは delta が定義できないためディープコピーで絶対適用 + LUT 再ベイク
+                ForEachCoTarget(layer, t => {
+                    t.UI.Curve = CloneCurve(nc);
+                    AdjustmentLutBaker.BakeCurveLut(t);
+                });
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -313,6 +367,7 @@ namespace PSDSimpleEditor
             {
                 RegisterUndo("Toggle Image Clip");
                 layer.UI.ImageClipEnabled = en;
+                ForEachCoTarget(layer, t => t.UI.ImageClipEnabled = en);
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -332,6 +387,7 @@ namespace PSDSimpleEditor
             {
                 RegisterUndo("Change Image Clip Texture");
                 layer.UI.ImageClipTex = tex;
+                ForEachCoTarget(layer, t => t.UI.ImageClipTex = tex); // アセット参照は共有で可
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -350,7 +406,9 @@ namespace PSDSimpleEditor
             {
                 RegisterUndo("Change Image Clip Tiling");
                 // 0 / 負値はタイリングが破綻するため下限でクランプ
-                layer.UI.ImageClipTile = new Vector2(Mathf.Max(0.01f, nt.x), Mathf.Max(0.01f, nt.y));
+                var clampedTile = new Vector2(Mathf.Max(0.01f, nt.x), Mathf.Max(0.01f, nt.y));
+                layer.UI.ImageClipTile = clampedTile;
+                ForEachCoTarget(layer, t => t.UI.ImageClipTile = clampedTile);
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -371,6 +429,7 @@ namespace PSDSimpleEditor
             {
                 RegisterUndo("Change Image Clip Blend Mode");
                 layer.UI.ImageClipBlend = modes[newIndex];
+                ForEachCoTarget(layer, t => t.UI.ImageClipBlend = modes[newIndex]);
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -379,8 +438,10 @@ namespace PSDSimpleEditor
             float no = IndentedSlider(new GUIContent(PSDTranslation.Get("Opacity", "不透明度"), PSDTranslation.Get("OpacityTooltip", "合成するクリップ画像の重ね合わせ不透明度を調整します。")), layer.UI.ImageClipOpacity, 0f, 1f, indent);
             if (!Mathf.Approximately(no, layer.UI.ImageClipOpacity))
             {
+                float dOpacity = no - layer.UI.ImageClipOpacity;
                 RegisterUndo("Change Image Clip Opacity");
                 layer.UI.ImageClipOpacity = no;
+                ForEachCoTarget(layer, t => t.UI.ImageClipOpacity = AddClamped(t.UI.ImageClipOpacity, dOpacity, 0f, 1f));
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -402,6 +463,10 @@ namespace PSDSimpleEditor
                 RegisterUndo("Toggle Gradient Map");
                 layer.UI.GradientMapEnabled = en;
                 if (en) AdjustmentLutBaker.EnsureGradientLut(layer);   // 初回有効化時に LUT を焼く
+                ForEachCoTarget(layer, t => {
+                    t.UI.GradientMapEnabled = en;
+                    if (en) AdjustmentLutBaker.EnsureGradientLut(t);
+                });
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -421,6 +486,10 @@ namespace PSDSimpleEditor
                 RegisterUndo("Toggle Gradient Map Normalization");
                 layer.UI.GradientMapNormalize = normalize;
                 if (normalize) AdjustmentLutBaker.ComputeGradientLumRange(layer);
+                ForEachCoTarget(layer, t => {
+                    t.UI.GradientMapNormalize = normalize;
+                    if (normalize) AdjustmentLutBaker.ComputeGradientLumRange(t);
+                });
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -440,6 +509,8 @@ namespace PSDSimpleEditor
                 RegisterUndo("Change Gradient Map Gradient");
                 layer.UI.Gradient = ng;
                 AdjustmentLutBaker.BakeGradientLut(layer);
+                // グラデーションは delta が定義できないためディープコピーで絶対適用 + LUT 再ベイク
+                ForEachCoTarget(layer, t => ApplyGradientToLayer(t, ng));
                 SaveStatesToSerialized();
                 MarkDirty();
             }
@@ -447,8 +518,10 @@ namespace PSDSimpleEditor
             float no = IndentedSlider(new GUIContent(PSDTranslation.Get("GradientMapOpacity", "適用率"), PSDTranslation.Get("GradientMapOpacityTooltip", "グラデーションマップを適用する強度（0.0 〜 1.0）を設定します。")), layer.UI.GradientMapOpacity, 0f, 1f, indent);
             if (!Mathf.Approximately(no, layer.UI.GradientMapOpacity))
             {
+                float dOpacity = no - layer.UI.GradientMapOpacity;
                 RegisterUndo("Change Gradient Map Opacity");
                 layer.UI.GradientMapOpacity = no;
+                ForEachCoTarget(layer, t => t.UI.GradientMapOpacity = AddClamped(t.UI.GradientMapOpacity, dOpacity, 0f, 1f));
                 SaveStatesToSerialized();
                 MarkDirty();
             }

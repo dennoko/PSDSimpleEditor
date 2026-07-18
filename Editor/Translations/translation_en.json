@@ -21,7 +21,7 @@
     { "key": "PsdNotLoaded", "value": "PSD is not loaded" },
     { "key": "PsdLoadPrompt", "value": "Please specify a file in the 'PSD' field above and press 'Load'.\nReloading from history is also possible." },
     { "key": "Layers", "value": "Layers" },
-    { "key": "LayersTooltip", "value": "Displays the layer structure inside the PSD.\n- Left eye toggle: Show/Hide\n- Right dropdown: Blend Mode\n- Expand folders or layers to display detailed parameters." },
+    { "key": "LayersTooltip", "value": "Displays the layer structure inside the PSD.\n- Left eye toggle: Show/Hide\n- Right dropdown: Blend Mode\n- Expand folders or layers to display detailed parameters.\n- Ctrl+Click / Shift+Click to select multiple layers and edit adjustments together." },
     { "key": "Preview", "value": "Preview" },
     { "key": "MergedRefActive", "value": "Comparing Merged" },
     { "key": "MergedRef", "value": "Compare Merged" },
@@ -168,6 +168,12 @@
     { "key": "VersionUpdateAvailable", "value": "Update available {0}" },
     { "key": "VersionCheckFailed", "value": "Could not check latest version" },
     { "key": "VersionChecking", "value": "Checking..." },
-    { "key": "VersionRecheck", "value": "Recheck for updates" }
+    { "key": "VersionRecheck", "value": "Recheck for updates" },
+    { "key": "SelectionCountFormat", "value": "Selected: {0}" },
+    { "key": "SelectionHint", "value": "[Shift+Click to multi-select]" },
+    { "key": "SelectionClear", "value": "Deselect" },
+    { "key": "SelectionClearTooltip", "value": "Clears the multi-layer selection." },
+    { "key": "PasteToSelectionFormat", "value": "Paste to All Selected Layers ({0})" },
+    { "key": "PasteToSelection", "value": "Paste to All Selected Layers" }
   ]
 }
