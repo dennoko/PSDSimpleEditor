@@ -23,7 +23,7 @@
 |---|---|
 | 通常クリック | 単一選択 (唯一の選択行を再クリックで解除) |
 | Ctrl (Cmd) + クリック | トグル選択。追加時はアンカーを更新 |
-| Shift + クリック | アンカー〜クリック行を表示順リストの区間で置換選択。アンカー不変 |
+| Shift + クリック | アンカー〜クリック行を表示順リストの区間で置換選択 (対象が選択済みの場合は選択解除)。アンカー不変 |
 | 余白クリック / Esc / 選択解除ボタン | 全解除 (Esc はフォーカス依存の best-effort) |
 
 選択行は `.layer-leaf-card.layer-selected` (USS) でカード全体がハイライトされる。
@@ -112,9 +112,9 @@
 `UpdateGroupHighlights` で復元する。
 
 ```css
-.layer-leaf-card.layer-selected  { background-color: var(--surface-active); border-color: var(--accent); }
+.layer-leaf-card.layer-selected  { background-color: var(--surface-2); border-color: var(--accent); }
 .layer-group-outer.layer-selected { border-color: var(--accent); }
-.layer-group-outer.layer-selected > .layer-group-header { background-color: var(--surface-active); }
+.layer-group-outer.layer-selected > .layer-group-header { background-color: var(--surface-2); }
 ```
 
 ### 編集の伝播機構

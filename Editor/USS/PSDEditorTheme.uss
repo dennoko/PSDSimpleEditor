@@ -444,7 +444,7 @@
 
 /* 複数選択中のレイヤー行 (カード全体 = ヘッダ + IMGUI コントロール部をハイライト) */
 .layer-leaf-card.layer-selected {
-    background-color: var(--surface-active);
+    background-color: var(--surface-2);
     border-color: var(--accent);
 }
 
@@ -453,7 +453,7 @@
     border-color: var(--accent);
 }
 .layer-group-outer.layer-selected > .layer-group-header {
-    background-color: var(--surface-active);
+    background-color: var(--surface-2);
 }
 
 /* レイヤーパネルヘッダの選択数表示 */

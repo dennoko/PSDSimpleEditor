@@ -39,15 +39,29 @@ namespace PSDSimpleEditor
 
         // ── 選択操作 ────────────────────────────────────────────────────────
 
-        /// <summary>リーフ行ヘッダのクリック。Shift=範囲選択 / Ctrl(Cmd)=トグル / 通常=単一選択。</summary>
+        /// <summary>リーフ行ヘッダのクリック。Shift=範囲選択 (選択済みの場合は解除) / Ctrl(Cmd)=トグル / 通常=単一選択。</summary>
         void OnLeafRowPointerDown(PointerDownEvent evt, PSDLayer layer)
         {
-            if (evt.shiftKey)                        SelectRange(layer);
+            if (evt.shiftKey)
+            {
+                if (_selectedLayerGuids.Contains(layer.Guid)) DeselectLeaf(layer);
+                else                                         SelectRange(layer);
+            }
             else if (evt.ctrlKey || evt.commandKey)  ToggleSelect(layer);
             else                                     SelectSingle(layer);
 
             // Esc での解除がツリーにフォーカスがある間は効くようにする (best-effort)
             _layerTreeScrollView?.Focus();
+        }
+
+        void DeselectLeaf(PSDLayer layer)
+        {
+            if (_selectedLayerGuids.Remove(layer.Guid))
+            {
+                SetRowHighlight(layer.Guid, false);
+                if (_selectionAnchorGuid == layer.Guid) _selectionAnchorGuid = null;
+                UpdateSelectionUI();
+            }
         }
 
         void SelectSingle(PSDLayer layer)
