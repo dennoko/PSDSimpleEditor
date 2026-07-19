@@ -1,23 +1,42 @@
 # Dennoko PSD Editor User Guide
 
 Dennoko PSD Editor is a tool that allows you to load PSD files directly in the Unity Editor, configure layer visibility and adjust color corrections, and export the final merged results as PNG, TGA, or PSD files.
+Additionally, you can temporarily apply the compositing results in real-time to materials on 3D objects in the scene to inspect the visual output as you edit.
 
 ---
 
-## How to Open the Window
+## Opening the Window & Header Features
 
 From the Unity menu bar, select:
 
 > **dennokoworks → Dennoko PSD Editor**
 
+### Window Header Features
+
+- **Title & Version Display**: Displays the window title and current version (e.g., `v1.x.x`) in the top left corner.
+- **Manual Update Check Button (`↻`)**: Click the "`↻`" button next to the version label to manually re-check for the latest updates.
+- **Language Toggle (`English`)**: Toggle the "English" checkbox in the top right corner to instantly switch between English and Japanese interfaces (saved in EditorPrefs).
+
 ---
 
-## Loading PSD Files
+## Loading PSD Files & History
 
+There are several ways to load a PSD file into the editor.
+
+### 1. Path Field & "Load" Button
 1. Enter the path of the PSD file you want to load into the "PSD:" field at the top of the window.
    - Paths copied from Windows File Explorer (even with surrounding `"` quotes) will be automatically trimmed.
-   - You can also click the "Browse..." button to select a file using the file dialog.
-2. Click the "Load" button to analyze the PSD, displaying the layer list and preview.
+   - You can also click the "Browse..." button to select a file using the file selection dialog.
+2. Click the "Load" button to analyze the PSD and display the layer list and preview.
+
+### 2. Drag and Drop PSD Files
+You can drag and drop a PSD file directly from Unity's Project view or Windows File Explorer into the window area to automatically populate the path and load the file.
+
+### 3. History Menu (`History ▾` / `履歴 ▾`)
+Clicking the "History ▾" button next to the "PSD:" label opens a dropdown list of recently loaded PSD file paths.
+- Selecting any file from the list will instantly load that PSD.
+- Missing/deleted files will be grayed out in the list.
+- Select "Clear History" (履歴をクリア) at the bottom of the dropdown to reset the history list.
 
 ---
 
@@ -27,7 +46,22 @@ Specify the export destination folder in the "Export Dir:" field at the top of t
 
 - By default, it is set to `Assets/DennokoPSDEditor_exported`.
 - You can specify either a relative path starting with `Assets/...` or an absolute PC path.
-- You can also click the "Browse..." button to specify a folder using the folder selection dialog.
+- You can also click the "Browse..." button to select a folder via dialog (selecting a folder inside the project automatically converts it to an `Assets/...` relative path).
+
+---
+
+## Material Preview (Real-Time 3D Reflection)
+
+You can temporarily apply the live PSD composition result to a material assigned to a 3D object in the scene or an asset in your project. This allows you to inspect color adjustments and layer changes on a 3D model in real-time.
+
+- **Material Preview**: Drag and drop or assign a target material (from a Scene object or Project asset) to the object field.
+- **Texture (Slot Name)**: Specify the texture property name on the material to replace (default: `_MainTex`).
+  - Clicking the "`▾`" dropdown button on the right lists all available texture properties on the selected material's shader (e.g., `_MainTex`, `_BumpMap`).
+- **Preview / Previewing Button**: 
+  - Assigning a material automatically enables real-time preview, changing the button label to "Previewing".
+  - Click the button to toggle live preview ON or OFF at any time.
+  - Disabling preview or clearing the material field automatically restores the material to its original texture.
+  - Closing the window or triggering a domain reload (e.g., script recompilation) will also safely restore the original texture.
 
 ---
 
@@ -40,20 +74,56 @@ The PSD file's layers and groups are displayed in a tree structure. The topmost 
 | Action | Description |
 |------|------|
 | Checkbox | Toggle layer/group visibility |
-| Foldout Arrow | Expand or collapse the layers inside a group |
+| Foldout Arrow | Expand or collapse group contents (clicking the arrow toggles expand/collapse without changing selection) |
+| Row Click | Select a layer or group |
 | Dropdown (Far Right) | Change blend mode (PassThrough is also available for groups) |
+
+### Multi-Selection & Batch Editing
+
+Using keyboard modifiers, you can select multiple layers or groups simultaneously and edit them in batches.
+
+- **Individual Toggle Selection**: Hold `Ctrl` (Mac: `Cmd`) and click layers to toggle individual selection state on/off.
+- **Range Selection**: Hold `Shift` and click another layer to select all layers between the initial selection and the clicked layer.
+- **Deselect All**: Press the `Escape` key or click anywhere on the empty workspace area in the layer panel to clear selection.
+
+#### Batch Editing Features
+When multiple layers are selected, performing any of the following operations will **apply the change simultaneously across all selected layers**:
+- Toggling visibility checkboxes
+- Adjusting Opacity sliders
+- Changing Blend Mode dropdowns
+- Modifying Color Correction parameters (Brightness/Contrast, Hue/Saturation, Tone Curves, Gradient Maps, etc.)
+
+---
+
+### Color Correction Context Menu (Right-Click)
+
+Right-clicking the "Color Correction" header or any of the adjustment control areas on a layer or group opens a context menu.
+
+- **Copy Adjustment**: Copies all current color correction parameters of that layer/group to the internal clipboard.
+- **Paste Adjustment**: Pastes the copied color correction parameters onto the selected layer or group (applies to all selected layers if multiple layers are selected).
+- **Reset Adjustment**: Resets all color correction parameters on that layer/group back to their default values (no effect).
+
+---
 
 ### Common Controls (Displayed when expanding visible layers/groups)
 
 #### Opacity
-Adjust within the range of 0.0 to 1.0 using the slider.
+Adjust within the range of 0.0 to 1.0 using the slider (supports batch editing for multi-selections).
+
+#### Group (Folder) Color Corrections & Masks
+Folders also feature "Color Correction" and "Mask Generation" foldouts, allowing you to apply adjustments or export masks to the flattened result of the folder's contents.
+
+* Color correction options for folders are identical to pixel layers (except Image Clip Blend and Luminance Normalization).
+* Applying adjustments to a PassThrough folder switches its blending to Isolated Blend (equivalent to Normal) while adjustments are active.
+* When exporting to PSD format, folder adjustments are saved as an **unclipped adjustment layer at the top of the folder** (with `dPSE` metadata). Re-importing into this tool automatically restores them as folder adjustment parameters.
+* PassThrough folders containing active adjustments will be **exported as Normal blend folders** to prevent adjustments from bleeding outside the group (the export confirmation dialog will notify you of the count).
 
 ---
 
 ### Pixel Layer Controls
 
 #### Color Correction Foldout
-Expanding "Color Correction" (色調補正) displays various sliders and functions for adjusting brightness and color tones. Modifications made here are "non-destructive" and do not affect the original PSD, allowing you to freely experiment and adjust them as many times as you like (available for any pixel layer).
+Expanding "Color Correction" displays various sliders and functions for adjusting brightness and color tones. Modifications made here are "non-destructive" and do not affect the original PSD, allowing you to freely experiment and adjust them as many times as you like (available for any pixel layer).
 
 Adjusting the sliders will reflect the changes in the preview in real-time. Returning the values to their default states (center or default value) will disable the corresponding effect.
 
@@ -88,134 +158,87 @@ Enabling "Image Clip Blend" allows you to blend any texture/image using the alph
 - **Blend Mode**: Select the blend mode used to combine the image.
 - **Opacity**: Adjust the blend intensity from 0.0 to 1.0.
 
-#### Color Range Mask
-Expanding the "Color Range Mask" foldout lets you create a selection area based on a specified color and threshold, which can then be exported as a mask image (PNG). This functions similarly to Photoshop's "Color Range" command.
+#### Mask Generation
+Expanding the "Mask Generation" foldout lets you export mask PNG images based on the pixels of this layer or folder.
 
-- **Target Color**: Specify directly using the color picker, or turn on the "Eyedropper" button and click on the preview area to pick a color.
-  - The eyedropper picks the color directly from **this layer's raw pixels**, not from the final merged/composited preview.
-  - Clicking outside the boundary of this layer will not register a color. Once a color is picked, the eyedropper is automatically deactivated.
-- **Fuzziness (Threshold)**: Set from 0.0 to 1.0. This determines how close colors must be to the Target Color to be selected. A value of 0 requires an exact match, while higher values select a wider range.
-- **Highlight Preview**: Changing the Target Color or Fuzziness dynamically highlights the selected area in red on the preview. This highlight also appears automatically when picking a color with the eyedropper.
-- **"Stop Preview" Button**: Turns off the red highlight preview (only clickable while the highlight preview is active).
-- **"Export Mask as PNG" Button**: Exports a grayscale PNG where the selected area is white and all other areas (including transparent pixels) are black. The output file is saved to the "Export Dir" folder with the name format `<PSD Name>_<Layer Name>_mask.png`. If saved inside the Assets folder, it will be automatically highlighted in Unity's Project window.
+##### Color Range Mask
+Expanding "Color Range Mask" creates a selection area based on a specified target color and fuzziness threshold, exporting it as a grayscale PNG (similar to Photoshop's Color Range feature).
+
+- **Target Color**: Set directly via the color picker, or turn on the "Eyedropper" button and click the preview to pick a color.
+  - The eyedropper picks directly from **this layer's raw pixels** (or the flattened folder contents), not from the final composited image.
+  - Clicking outside the layer boundaries will not pick a color. Picking a color automatically deactivates the eyedropper.
+- **Fuzziness (Threshold)**: Set from 0.0 to 1.0 to determine how close colors must be to the Target Color to be selected.
+- **Highlight Preview**: Modifying the Target Color or Fuzziness dynamically highlights the selected area in red on the preview.
+- **"Stop Preview" Button**: Turns off the red highlight preview.
+- **"Export Mask as PNG" Button**: Exports a grayscale PNG where selected areas are white and unselected/transparent areas are black. Saved to the "Export Dir" as `<PSD Name>_<Layer Name>_mask.png`.
+
+##### Opacity Range Mask
+- **"Export Opacity Mask as PNG" Button**: Exports a grayscale PNG where opaque areas are white and transparent areas are black. Saved as `<PSD Name>_<Layer Name>_opacity_mask.png`.
 
 ---
 
 ### Adjustment Layer and Solid Color Layer Controls
 
-Adjustment layers and Solid Color (Fill) layers created in Photoshop are automatically recognized when importing a PSD file. Selecting one of these layers displays its dedicated controls in the panel, allowing you to edit the settings non-destructively. The values configured in Photoshop are carried over.
+Adjustment layers and Solid Color (Fill) layers created in Photoshop are automatically recognized when importing a PSD file. Selecting one of these layers displays its dedicated controls in the panel, allowing you to edit the settings non-destructively.
 
-The following adjustment layers are automatically recognized:
-
-- **Brightness & Contrast / Hue, Saturation & Lightness**: Adjust using the sliders and the "Colorize" checkbox.
-- **Invert / Threshold / Posterization / Color Balance / Levels / Curves**: The respective sliders and curve editors will be displayed in the panel for editing.
-- **Gradient Map**: The gradient settings set in Photoshop are imported, and you can edit the gradient keys and blending factor (see the "Gradient Map" section above for details).
-- **Solid Color (SoCo)**: Directly change the fill color using the color picker field.
+Supported adjustment layer types include:
+- **Brightness & Contrast / Hue, Saturation & Lightness**
+- **Invert / Threshold / Posterization / Color Balance / Levels / Curves**
+- **Gradient Map**
+- **Solid Color (SoCo)**
 
 ---
 
 ### Panel Width Adjustment
 
-You can adjust the width of the panels by dragging the vertical line (splitter) between the layer panel and the preview panel to the left or right.
+You can adjust panel widths by dragging the vertical splitter line between the layer panel and preview panel left or right.
 
 ---
 
 ## Preview (Right Side of the Screen)
 
-- Changes made in the layer panel (visibility, opacity, blend modes, color corrections, etc.) are merged and reflected in the preview area in real-time.
+- Changes made in the layer panel are composited and displayed in real-time.
 - Transparent areas are represented by a checkerboard pattern.
-- Turning on the "Merged Ref" toggle displays the merged image stored when the PSD was saved in Photoshop as a small thumbnail overlay in the bottom right of the preview. This is useful for comparing the real-time composition results with the original Photoshop export.
+- Turning on the "Merged Ref" toggle displays Photoshop's original saved merged image as a thumbnail overlay in the bottom right of the preview for comparison.
 
 ---
 
 ## Status Bar and Exporting (Bottom of the Screen)
 
-At the very bottom of the window, the loaded PSD file's metadata is displayed: "Width × Height", "Number of Layers", "Bit Depth", and "Color Mode".
+At the very bottom of the window, metadata for the loaded PSD is displayed ("Width × Height", "Layer Count", "Bit Depth", "Color Mode"), alongside status messages.
 
 ### Exporting Images and PSDs
 
-Select the output format (PNG / PSD / TGA) on the right side of the bottom bar and click the "Export" button to save it to the specified "Export Dir" folder.
+Select the output format (PNG / PSD / TGA) on the right side of the bottom bar and click the "Export" button.
 
 * **PNG**: Exports the current preview composition as a PNG image.
-* **PSD**: Exports a new PSD file with the current layer visibility and adjustment parameters preserved. A file save dialog will open.
+* **PSD**: Exports a new PSD file preserving layer visibility and non-destructive adjustments.
 * **TGA**: Exports the current preview composition as a 32-bit TGA image (with alpha).
 
 #### How Adjustments are Saved in PSD Exports
 
-Non-destructive color corrections applied to pixel layers (Brightness & Contrast, Hue & Saturation (including colorize), Invert, Threshold, Posterization, Levels, Curves, Color Balance, and Gradient Maps) are not baked into the pixels. Instead, they are written as **Adjustment Layers** clipped to the target layer. As a result:
+Non-destructive color corrections applied to pixel layers are written as **Adjustment Layers** clipped to the target layer (embedding internal identification key `dPSE`).
 
-* The original layer images are preserved without modifications.
-* Re-importing the exported PSD in this tool automatically restores the adjustment parameters to the layer's properties, allowing you to continue editing where you left off.
-* External editors like Photoshop or Clip Studio Paint will recognize and let you edit them as standard clipped adjustment layers (visual output might differ slightly as different editors use slightly different rendering formulas).
-
-The following exceptions are baked into the pixels as before (the count of baked adjustments will be displayed upon export):
-
-* Adjustments applied to layers that are already clipping masks.
-* Adjustments on layers where "Blend Clipped Layers as Group" is disabled.
-* Gradient maps with "Normalize Luminance" enabled (as there is no native equivalent in standard PSD files).
-
-Additionally, layers with a "Color Overlay" effect are converted and written as solid color clipping layers (any color overlays applied to clipping layers will be lost). Image clip blends are written as independent clipping layers as before.
-
-#### Note on Re-importing PSDs in This Tool
-
-* Exported PSDs contain identification metadata (internal key `dPSE`) indicating they were created by this tool. Upon re-import, this metadata is detected, and the adjustment layers are **not shown** in the layer list; instead, they are automatically restored as adjustment parameters on their respective base layers. It is expected that the state returns to exactly how it was before exporting.
-* However, if the exported PSD is **edited and saved in other software** before loading it back:
-  * Adjustment layers will not be merged back into the base layer properties if they had masks added, were hidden, or had their blend modes/opacity changed in the external software (this is a safety mechanism to prevent losing those edits). They will appear as standard clipped adjustment layers.
-  * **Generally any PSD overwritten in Photoshop or other editors** will lose the `dPSE` metadata, as external tools discard unknown metadata keys. The visual appearance and parameters are preserved, but they will load as independent adjustment layers instead of being absorbed back into the base layer's properties.
-* Layers that were baked (e.g., adjustments on clipping layers) have had their pixels permanently altered, so their settings cannot be reverted or changed after re-importing.
-* Curves are simplified to the PSD spec limit (maximum 19 points), and gradients are simplified to Unity's limit (maximum 8 color keys, 8 alpha keys). Configurations with many control points may be slightly simplified after round-tripping.
-
-#### Note on Opening Exports in External Software
-
-* Exported adjustments are recognized as standard **clipped adjustment layers** in Photoshop, Clip Studio Paint, Krita, etc., and can be edited. They are given fixed names such as "Brightness/Contrast" or "Hue/Saturation".
-* Since external software uses different blending and correction math compared to this tool's shader implementation, **the visual appearance may differ slightly**. This is particularly common with Brightness/Contrast, Hue/Saturation, and Gradient Maps (they will match perfectly when re-imported back into this tool).
-* The "Factor (Apply Ratio)" of a Gradient Map is exported as the adjustment layer's **Opacity** in the PSD. You can adjust the intensity in external software by changing the layer's opacity.
-* Selective color range adjustments within Hue/Saturation (e.g., modifying only Reds or Yellows) are not exported (only the master adjustments are written).
-* The `dPSE` metadata key is ignored by external software but complies with PSD specifications, so it will not cause file errors.
-* Because adjustment layers are exported clipped to the base layer, releasing the clipping mask in external software will apply the adjustments to all layers below it (changing the visual appearance from how it looked in this tool).
-
-* If saved inside the Unity project (under `Assets`), the file is automatically detected and highlighted in the Project view.
-* If saved outside the project, the target folder will open in Windows File Explorer.
+* The original layer pixel data remains intact.
+* Re-importing the exported PSD in this tool automatically restores adjustment parameters onto the base layers.
+* External editors like Photoshop or Clip Studio Paint recognize them as standard clipped adjustment layers.
 
 ---
 
 ## Limitations & Known Issues when Importing PSDs
 
-This tool imports PSD files using a custom, high-speed binary parser rather than relying on external Photoshop libraries. As a result, certain Photoshop features and data may not be perfectly recreated or may have limitations during preview or re-export.
+This tool uses a custom high-speed binary parser rather than external Photoshop libraries. Certain Photoshop features may have limitations:
 
 ### 1. Supported File Formats & Versions
-- **PSB Format (Large Document Format) Not Supported**: PSB files (used for images larger than 30,000 pixels or exceeding 2GB) cannot be loaded and will cause an error. Please save the file in PSD format.
-- **32-bit/Channel Not Supported**: PSD files with 32-bit depth per channel (e.g., HDR) cannot be loaded. Convert the image to 8-bit or 16-bit before saving.
-- **Color Modes**: Layers can only be parsed and recreated for **RGB** and **Grayscale** modes. Importing PSDs saved in CMYK, Lab, or other color modes will trigger a warning, and only the pre-merged "Composite Image" (flattened image) will be loaded for preview without individual layers.
+- **PSB Format Not Supported**: PSB files (>30,000 px or >2GB) cannot be loaded. Save as PSD format instead.
+- **32-bit/Channel Not Supported**: Convert 32-bit HDR PSD files to 8-bit or 16-bit before loading.
+- **Color Modes**: Individual layer parsing is supported for **RGB** and **Grayscale** modes. CMYK or Lab files will show a warning and load only the merged composite image.
 
 ### 2. Rendering Accuracy & Color Spaces
-- **16-bit Channel Downsampling**: 16-bit PSD files are automatically downsampled (converted) to 8-bit when loaded. This may lead to slight precision loss in fine gradients or color depth.
-- **Color Profiles Ignored**: Embedded color profiles (such as Adobe RGB or Display P3) are ignored, and the raw pixel values are interpreted as sRGB-equivalent. The colors may not exactly match the original appearance in Photoshop.
-- **CMYK Composite Approximation**: When loading the merged composite image of a CMYK PSD, a simple RGB conversion formula is applied. The colors may differ slightly from Photoshop's native RGB conversion.
+- **16-bit Channel Downsampling**: 16-bit PSD files are automatically downsampled to 8-bit upon loading.
+- **Color Profiles Ignored**: Embedded color profiles are ignored and raw pixel data is treated as sRGB-equivalent.
 
 ### 3. Unsupported Features
-- **Adjustment Layer Limitations**:
-  - The following adjustment layers are supported for import (the text in parentheses refers to internal PSD keys for reference):
-    - Brightness/Contrast (`brit` / `CgEd`)
-    - Hue/Saturation/Lightness (`hue2`)
-    - Invert (`nvrt` / `invr`)
-    - Threshold (`thrs`)
-    - Posterize (`post`)
-    - Color Balance (`blnc`)
-    - Levels (`levl`)
-    - Curves (`curv`)
-    - Gradient Map (`grdm`)
-    - Solid Color (`SoCo` *RGB only)
-  - Other adjustment layers (e.g., Exposure, Black & White, Photo Filter, Color Lookup, etc.) are not supported. Their settings will be ignored, and they will load as empty transparent layers.
-- **Layer Effects (Layer Styles)**:
-  - Only "Color Overlay" is supported.
-  - Drop Shadow, Stroke, Gradient Overlay, Outer Glow, and all other layer styles are ignored.
-- **Mask Limitations**:
-  - "Vector Masks" and "Global Layer Masks" on layers are skipped (only standard "Layer Masks" are supported).
-- **PassThrough Groups Simplification**:
-  - If a group's blend mode is set to "PassThrough", any masks or opacity settings applied to the group folder itself are ignored.
-  - Clipping layers positioned directly above a PassThrough group will be displayed without clipping because a precise clipping mask shape cannot be generated for PassThrough groups.
-- **Rasterization of Special Layers**:
-  - Text layers, Shape layers, and Smart Objects do not have their vector/text edit data parsed. Instead, they are loaded statically using the "rasterized pixel image" cached inside the PSD when saved (requires the "Maximize Compatibility" option to be enabled when saving the PSD in Photoshop).
-- **Dissolve Blend Mode Approximation**:
-  - The "Dissolve" blend mode is approximated using screen-resolution-dependent hash noise. The noise pattern may look different from Photoshop depending on the zoom level.
+- Unsupported adjustment layer types (Exposure, Black & White, Photo Filter, etc.) load as empty transparent layers.
+- Layer Styles: Only "Color Overlay" is supported; others are ignored.
+- PassThrough groups ignore folder-level masks and opacity settings.
