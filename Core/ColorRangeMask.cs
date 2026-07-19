@@ -26,6 +26,16 @@ namespace PSDSimpleEditor
                                                 out int w, out int h, Color32[] cachedSrc = null)
         {
             if (!TryGetSource(layer, cachedSrc, out var src, out w, out h)) return null;
+            return BuildMaskPixels(src, w, h, target, threshold);
+        }
+
+        /// <summary>
+        /// 走査元ピクセル配列 (ボトムアップ) 版。グループの平坦化結果など
+        /// PSDLayer.Texture 以外のソースからマスクを作る場合に使う。
+        /// </summary>
+        public static Color32[] BuildMaskPixels(Color32[] src, int w, int h, Color target, float threshold)
+        {
+            if (src == null || w <= 0 || h <= 0 || src.Length < w * h) return null;
 
             float thSq = Sq(Mathf.Clamp01(threshold) * MaxDist);
             Color32 t  = target;
@@ -41,6 +51,24 @@ namespace PSDSimpleEditor
         }
 
         /// <summary>
+        /// 不透明範囲マスク: 走査元ピクセル (ボトムアップ) の α 値をそのままグレースケール
+        /// (rgb = α, a = 255) にした Color32[] を返す。半透明はグレーとして保持される。
+        /// </summary>
+        public static Color32[] BuildOpacityMaskPixels(Color32[] src, int w, int h)
+        {
+            if (src == null || w <= 0 || h <= 0 || src.Length < w * h) return null;
+
+            int n = w * h;
+            var dst = new Color32[n];
+            for (int i = 0; i < n; i++)
+            {
+                byte v = src[i].a;
+                dst[i] = new Color32(v, v, v, 255);
+            }
+            return dst;
+        }
+
+        /// <summary>
         /// プレビュー用: 選択画素を highlight 色、非選択画素を透明としたオーバーレイの
         /// Color32[] を返す (ボトムアップ順のまま)。null 条件・cachedSrc は BuildMaskPixels と同じ。
         /// </summary>
@@ -49,6 +77,14 @@ namespace PSDSimpleEditor
                                                      Color32[] cachedSrc = null)
         {
             if (!TryGetSource(layer, cachedSrc, out var src, out w, out h)) return null;
+            return BuildHighlightPixels(src, w, h, target, threshold, highlight);
+        }
+
+        /// <summary>走査元ピクセル配列 (ボトムアップ) 版のハイライト生成。</summary>
+        public static Color32[] BuildHighlightPixels(Color32[] src, int w, int h,
+                                                     Color target, float threshold, Color highlight)
+        {
+            if (src == null || w <= 0 || h <= 0 || src.Length < w * h) return null;
 
             float thSq        = Sq(Mathf.Clamp01(threshold) * MaxDist);
             Color32 t         = target;

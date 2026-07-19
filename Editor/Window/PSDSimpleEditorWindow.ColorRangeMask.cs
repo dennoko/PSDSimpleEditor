@@ -5,28 +5,59 @@ using UnityEditor;
 
 namespace PSDSimpleEditor
 {
-    // ── 色域選択マスク: 対象色 ± 閾値でレイヤー自身の画素から選択範囲を作り PNG 出力 ──
+    // ── マスク生成: 色域選択マスク + 不透明範囲マスクの PNG 出力 ──
     // ─── partial 見取り図 ───────────────────────────────────────────
-    // 責務   : 色域選択マスクのパラメータ UI、プレビュー上でのスポイト色抽出、ハイライトプレビュー生成、PNG 書き出し
+    // 責務   : 「マスク生成」セクション UI (色域選択マスク / 不透明範囲マスク)、
+    //          プレビュー上でのスポイト色抽出、ハイライトプレビュー生成、PNG 書き出し。
+    //          レイヤー・グループ (フォルダ) の両方を対象にする (グループは配下の平坦化結果を走査)。
     // 宣言   : なし
     // 参照   : _eyedropperTarget (RW), _colorRangePreviewLayer (RW), _colorRangePreviewTex (RW),
-    //          _colorRangePreviewDirty (RW), _exportDir (R)
+    //          _colorRangePreviewDirty (RW), _exportDir (R), _compositor (R)
     // 依存   : DrawSectionFoldout (.LayerPanel.cs), RowSpace (.LayerPanel.cs), SetStatus (本体)
     // ────────────────────────────────────────────────────────────────
     public partial class PSDSimpleEditorWindow
     {
         /// <summary>
-        /// 色域選択マスク: このレイヤー自身の画素から、対象色 ± 閾値で選択範囲を作り PNG 出力する。
-        /// スポイトはプレビューをクリックして「対象レイヤー自身の画素」を拾う (合成結果ではない)。
+        /// 「マスク生成」フォールドアウト。色域選択マスクと不透明範囲マスクをまとめる。
+        /// グループ (フォルダ) の場合は配下を平坦化した画素を走査対象にする。
         /// </summary>
-        void DrawColorRangeMaskControls(PSDLayer layer, int indent)
+        void DrawMaskGenControls(PSDLayer layer, int indent)
+        {
+            layer.UI.MaskGenExpanded = DrawSectionFoldout(
+                new GUIContent(PSDTranslation.Get("MaskGeneration", "マスク生成"),
+                               PSDTranslation.Get("MaskGenerationTooltip", "このレイヤーの画素からマスク画像 (PNG) を生成します。色域選択マスクと不透明範囲マスクを出力できます。")),
+                layer.UI.MaskGenExpanded, indent);
+            if (!layer.UI.MaskGenExpanded)
+            {
+                // フォールドアウトを閉じたら、このレイヤーのスポイト待機・ハイライトを解除する
+                CancelColorRangeUIFor(layer);
+                RowSpace();
+                return;
+            }
+            RowSpace();
+
+            int ci = indent + 1;
+            DrawColorRangeMaskSection(layer, ci);
+            DrawOpacityMaskSection(layer, ci);
+        }
+
+        /// <summary>このレイヤーが対象のスポイト待機・ハイライトプレビューを解除する。</summary>
+        void CancelColorRangeUIFor(PSDLayer layer)
+        {
+            if (_eyedropperTarget == layer)        _eyedropperTarget = null;
+            if (_colorRangePreviewLayer == layer)  EndColorRangePreview();
+        }
+
+        /// <summary>
+        /// 色域選択マスク: 対象画素から、対象色 ± 閾値で選択範囲を作り PNG 出力する。
+        /// スポイトはプレビューをクリックして「走査対象の画素」を拾う (背景との合成結果ではない)。
+        /// </summary>
+        void DrawColorRangeMaskSection(PSDLayer layer, int indent)
         {
             layer.UI.ColorRangeExpanded = DrawSectionFoldout(new GUIContent(PSDTranslation.Get("ColorRangeMask", "色域選択マスク"), PSDTranslation.Get("ColorRangeMaskTooltip", "特定の色とその周辺色を抽出した選択範囲マスクを生成します。スポイトで色を選択し、閾値で範囲を広げられます。")), layer.UI.ColorRangeExpanded, indent, layer, ClipboardKind.ColorRangeMask);
             if (!layer.UI.ColorRangeExpanded)
             {
-                // フォールドアウトを閉じたら、このレイヤーのスポイト待機・ハイライトを解除する
-                if (_eyedropperTarget == layer)        _eyedropperTarget = null;
-                if (_colorRangePreviewLayer == layer)  EndColorRangePreview();
+                CancelColorRangeUIFor(layer);
                 RowSpace();
                 return;
             }
@@ -88,20 +119,71 @@ namespace PSDSimpleEditor
             RowSpace();
         }
 
+        /// <summary>不透明範囲マスク: 色のある (不透明な) 範囲の α をグレースケールマスクとして PNG 出力する。</summary>
+        void DrawOpacityMaskSection(PSDLayer layer, int indent)
+        {
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(indent * IndentWidth + 18f);
+            if (GUILayout.Button(new GUIContent(PSDTranslation.Get("ExportOpacityMaskPng", "不透明範囲マスクを PNG 出力"),
+                                                PSDTranslation.Get("ExportOpacityMaskPngTooltip", "色のある範囲（不透明部分）を白、透明部分を黒としたグレースケールのマスク画像（PNG）を出力先フォルダへ書き出します。半透明部分はグレーになります。")),
+                                 PSDEditorTheme.ToolButtonStyle, GUILayout.ExpandWidth(true)))
+                ExportOpacityMask(layer);
+            EditorGUILayout.EndHorizontal();
+            RowSpace();
+        }
+
         // 走査元ピクセルのキャッシュ (レイヤーテクスチャは読み込み後不変のため、
-        // 同一レイヤーのプレビュー更新中は GetPixels32 を繰り返さない)
+        // 同一レイヤーのプレビュー更新中は GetPixels32 を繰り返さない。
+        // グループの平坦化結果は内容が変わるため、再合成時に InvalidateGroupMaskSourceCache で破棄する)
         [NonSerialized] Color32[] _colorRangeSrcPixels;
         [NonSerialized] PSDLayer  _colorRangeSrcLayer;
 
-        /// <summary>走査元ピクセルを (レイヤー単位でキャッシュしつつ) 取得する。</summary>
+        /// <summary>
+        /// 走査元ピクセル (ボトムアップ) を (レイヤー単位でキャッシュしつつ) 取得する。
+        /// グループはコンポジターで配下を平坦化したキャンバスサイズの画素を返す。
+        /// </summary>
         Color32[] GetColorRangeSourcePixels(PSDLayer layer)
         {
-            if (_colorRangeSrcLayer != layer)
+            if (_colorRangeSrcLayer != layer || _colorRangeSrcPixels == null)
             {
                 _colorRangeSrcLayer  = layer;
-                _colorRangeSrcPixels = ColorRangeMask.GetSourcePixels(layer);
+                _colorRangeSrcPixels = layer.Children != null
+                    ? _compositor?.RenderGroupPixels(layer)
+                    : ColorRangeMask.GetSourcePixels(layer);
             }
             return _colorRangeSrcPixels;
+        }
+
+        /// <summary>
+        /// 走査対象のキャンバス上の矩形 (PSD 左上原点)。
+        /// グループはキャンバス全面、レイヤーは自身のバウンディングボックス。
+        /// </summary>
+        void GetMaskSourceRect(PSDLayer layer, out int left, out int top, out int w, out int h)
+        {
+            if (layer.Children != null)
+            {
+                left = 0; top = 0;
+                w = _psdFile != null ? _psdFile.Width  : 0;
+                h = _psdFile != null ? _psdFile.Height : 0;
+            }
+            else
+            {
+                left = layer.Left; top = layer.Top;
+                w = layer.Width; h = layer.Height;
+            }
+        }
+
+        /// <summary>
+        /// 再合成でグループの内容が変わった可能性があるため、グループ由来の走査元キャッシュを破棄し、
+        /// 表示中のハイライトプレビューがあれば作り直しを予約する。RecompositeNow から呼ぶ。
+        /// </summary>
+        void InvalidateGroupMaskSourceCache()
+        {
+            if (_colorRangeSrcLayer == null || _colorRangeSrcLayer.Children == null) return;
+            _colorRangeSrcLayer  = null;
+            _colorRangeSrcPixels = null;
+            if (_colorRangePreviewLayer != null && _colorRangePreviewLayer.Children != null)
+                _colorRangePreviewDirty = true;
         }
 
         /// <summary>指定レイヤーの色域選択ハイライトプレビューを開始/更新する。</summary>
@@ -124,8 +206,8 @@ namespace PSDSimpleEditor
         }
 
         /// <summary>
-        /// 色域選択ハイライト: 対象レイヤーの選択範囲を色付きテクスチャでプレビューへ重ね描きする。
-        /// レイヤーのキャンバス矩形をプレビュー描画矩形へ写像して配置する。
+        /// 色域選択ハイライト: 対象の選択範囲を色付きテクスチャでプレビューへ重ね描きする。
+        /// 走査対象の矩形 (レイヤー矩形 / グループはキャンバス全面) をプレビュー描画矩形へ写像して配置する。
         /// </summary>
         void DrawColorRangeHighlight(Rect drawRect)
         {
@@ -135,15 +217,16 @@ namespace PSDSimpleEditor
             if (_colorRangePreviewTex == null) return;
 
             var layer = _colorRangePreviewLayer;
-            if (layer.Width <= 0 || layer.Height <= 0) return;
+            GetMaskSourceRect(layer, out int left, out int top, out int w, out int h);
+            if (w <= 0 || h <= 0) return;
 
             float fw = _psdFile.Width;
             float fh = _psdFile.Height;
             var r = new Rect(
-                drawRect.x + (layer.Left / fw) * drawRect.width,
-                drawRect.y + (layer.Top  / fh) * drawRect.height,
-                (layer.Width  / fw) * drawRect.width,
-                (layer.Height / fh) * drawRect.height);
+                drawRect.x + (left / fw) * drawRect.width,
+                drawRect.y + (top  / fh) * drawRect.height,
+                (w / fw) * drawRect.width,
+                (h / fh) * drawRect.height);
             GUI.DrawTexture(r, _colorRangePreviewTex, ScaleMode.StretchToFill, true);
         }
 
@@ -156,10 +239,11 @@ namespace PSDSimpleEditor
             var layer = _colorRangePreviewLayer;
             if (layer == null) { SafeDestroy(ref _colorRangePreviewTex); return; }
 
+            var src = GetColorRangeSourcePixels(layer);
+            GetMaskSourceRect(layer, out _, out _, out int w, out int h);
             var px = ColorRangeMask.BuildHighlightPixels(
-                layer, layer.UI.ColorRangeTarget, layer.UI.ColorRangeThreshold,
-                ColorRangeHighlightColor, out int w, out int h,
-                GetColorRangeSourcePixels(layer));
+                src, w, h, layer.UI.ColorRangeTarget, layer.UI.ColorRangeThreshold,
+                ColorRangeHighlightColor);
             if (px == null) { SafeDestroy(ref _colorRangePreviewTex); return; }
 
             // スライダードラッグ中の連続更新で毎回破棄・生成しない (サイズ一致時は書き換えのみ)
@@ -175,13 +259,14 @@ namespace PSDSimpleEditor
         }
 
         /// <summary>
-        /// 色域選択スポイト: プレビュー描画矩形上のクリックを対象レイヤーのローカル画素へ写像し、
-        /// そのレイヤー自身の色を対象色として取得する (合成結果ではなくレイヤー画素を拾う)。
+        /// 色域選択スポイト: プレビュー描画矩形上のクリックを走査対象のローカル画素へ写像し、
+        /// その画素の色を対象色として取得する (背景との合成結果ではなく走査対象の画素を拾う)。
         /// </summary>
         void HandleEyedropper(Rect drawRect)
         {
             var layer = _eyedropperTarget;
-            if (layer == null || layer.Texture == null) return;
+            if (layer == null) return;
+            if (layer.Children == null && layer.Texture == null) return;
 
             // armed の視覚化 (カーソル変更)
             EditorGUIUtility.AddCursorRect(drawRect, MouseCursor.Link);
@@ -196,19 +281,23 @@ namespace PSDSimpleEditor
             int cx = Mathf.FloorToInt(u * _psdFile.Width);
             int cy = Mathf.FloorToInt(v * _psdFile.Height);
 
-            // レイヤーローカル (左上原点)
-            int lx = cx - layer.Left;
-            int ly = cy - layer.Top;
-            if (lx < 0 || ly < 0 || lx >= layer.Width || ly >= layer.Height)
+            // 走査対象ローカル (左上原点)
+            GetMaskSourceRect(layer, out int left, out int top, out int w, out int h);
+            int lx = cx - left;
+            int ly = cy - top;
+            if (lx < 0 || ly < 0 || lx >= w || ly >= h)
             {
-                // 対象レイヤーの外をクリック → 取得しない (待機は継続)
+                // 対象領域の外をクリック → 取得しない (待機は継続)
                 e.Use();
                 return;
             }
 
-            // layer.Texture はボトムアップ。トップダウン ly を反転して取得。
-            int by = layer.Height - 1 - ly;
-            Color picked = layer.Texture.GetPixel(lx, by);
+            var src = GetColorRangeSourcePixels(layer);
+            if (src == null || src.Length < w * h) { e.Use(); return; }
+
+            // 走査元はボトムアップ。トップダウン ly を反転して取得。
+            int by = h - 1 - ly;
+            Color picked = src[by * w + lx];
             picked.a = 1f;
             layer.UI.ColorRangeTarget = picked;
 
@@ -220,49 +309,86 @@ namespace PSDSimpleEditor
         /// <summary>色域選択マスクを生成し、Export Dir へグレースケール PNG として書き出す。</summary>
         void ExportColorRangeMask(PSDLayer layer)
         {
-            if (layer == null || layer.Texture == null)
+            if (!ValidateMaskExportTarget(layer)) return;
+
+            GetMaskSourceRect(layer, out int left, out int top, out int w, out int h);
+            var maskPixels = ColorRangeMask.BuildMaskPixels(
+                GetColorRangeSourcePixels(layer), w, h,
+                layer.UI.ColorRangeTarget, layer.UI.ColorRangeThreshold);
+            if (maskPixels == null)
+            {
+                EditorUtility.DisplayDialog(PSDTranslation.Get("Error", "エラー"), PSDTranslation.Get("ColorRangeErrorFailed", "マスクの生成に失敗しました。"), "OK");
+                return;
+            }
+
+            SaveMaskPng(layer, maskPixels, left, top, w, h, "mask",
+                path => PSDTranslation.GetFormat("ColorRangeSuccessFormat", path));
+        }
+
+        /// <summary>不透明範囲マスク (α のグレースケール) を生成し、Export Dir へ PNG として書き出す。</summary>
+        void ExportOpacityMask(PSDLayer layer)
+        {
+            if (!ValidateMaskExportTarget(layer)) return;
+
+            GetMaskSourceRect(layer, out int left, out int top, out int w, out int h);
+            var maskPixels = ColorRangeMask.BuildOpacityMaskPixels(GetColorRangeSourcePixels(layer), w, h);
+            if (maskPixels == null)
+            {
+                EditorUtility.DisplayDialog(PSDTranslation.Get("Error", "エラー"), PSDTranslation.Get("ColorRangeErrorFailed", "マスクの生成に失敗しました。"), "OK");
+                return;
+            }
+
+            SaveMaskPng(layer, maskPixels, left, top, w, h, "opacity_mask",
+                path => PSDTranslation.GetFormat("OpacityMaskSuccessFormat", path));
+        }
+
+        /// <summary>マスク書き出しの共通事前チェック (走査対象の有無 / 出力先フォルダ)。</summary>
+        bool ValidateMaskExportTarget(PSDLayer layer)
+        {
+            bool hasPixels = layer != null && (layer.Children != null ? _compositor != null : layer.Texture != null);
+            if (!hasPixels)
             {
                 EditorUtility.DisplayDialog(PSDTranslation.Get("Error", "エラー"),
                     PSDTranslation.Get("ColorRangeErrorNoPixels", "このレイヤーには画素がないため、色域選択マスクを生成できません。"), "OK");
-                return;
+                return false;
             }
             if (string.IsNullOrEmpty(_exportDir))
             {
                 EditorUtility.DisplayDialog(PSDTranslation.Get("Error", "エラー"), PSDTranslation.Get("ColorRangeErrorNoExportDir", "出力先フォルダが指定されていません。"), "OK");
-                return;
+                return false;
             }
+            return true;
+        }
 
+        /// <summary>
+        /// マスク画素 (ボトムアップ・矩形サイズ) をキャンバス全体サイズの黒地へ貼り付けて
+        /// PNG として保存する共通処理。保存後はプロジェクト内なら Ping、外ならエクスプローラー表示。
+        /// </summary>
+        void SaveMaskPng(PSDLayer layer, Color32[] maskPixels, int left, int top, int w, int h,
+                         string suffix, Func<string, string> successMessage)
+        {
             Texture2D maskTex = null;
             try
             {
-                var layerPixels = ColorRangeMask.BuildMaskPixels(
-                    layer, layer.UI.ColorRangeTarget, layer.UI.ColorRangeThreshold,
-                    out int lw, out int lh, GetColorRangeSourcePixels(layer));
-                if (layerPixels == null)
-                {
-                    EditorUtility.DisplayDialog(PSDTranslation.Get("Error", "エラー"), PSDTranslation.Get("ColorRangeErrorFailed", "マスクの生成に失敗しました。"), "OK");
-                    return;
-                }
-
-                // キャンバス全体サイズで黒マスクを作り、レイヤー位置へ貼り付ける
+                // キャンバス全体サイズで黒マスクを作り、走査矩形位置へ貼り付ける
                 int cw = _psdFile.Width;
                 int ch = _psdFile.Height;
                 var canvas = new Color32[cw * ch];
                 for (int i = 0; i < canvas.Length; i++)
                     canvas[i] = new Color32(0, 0, 0, 255);
 
-                // Unity テクスチャはボトムアップ。レイヤー pixel y=0 は PSD 下端 (Bottom-1行目)
-                // キャンバス上の対応行: ch - layer.Bottom + y_l
-                int baseRow = ch - layer.Bottom;
-                for (int y = 0; y < lh; y++)
+                // Unity テクスチャはボトムアップ。マスク pixel y=0 は矩形の PSD 下端行。
+                // キャンバス上の対応行: ch - (top + h) + y
+                int baseRow = ch - (top + h);
+                for (int y = 0; y < h; y++)
                 {
                     int canvasY = baseRow + y;
                     if (canvasY < 0 || canvasY >= ch) continue;
-                    for (int x = 0; x < lw; x++)
+                    for (int x = 0; x < w; x++)
                     {
-                        int canvasX = layer.Left + x;
+                        int canvasX = left + x;
                         if (canvasX < 0 || canvasX >= cw) continue;
-                        canvas[canvasY * cw + canvasX] = layerPixels[y * lw + x];
+                        canvas[canvasY * cw + canvasX] = maskPixels[y * w + x];
                     }
                 }
 
@@ -273,13 +399,13 @@ namespace PSDSimpleEditor
 
                 string psdName  = string.IsNullOrEmpty(_psdPath)
                     ? "psd" : Path.GetFileNameWithoutExtension(_psdPath);
-                string baseName = SanitizeFileName($"{psdName}_{layer.Name}_mask");
+                string baseName = SanitizeFileName($"{psdName}_{layer.Name}_{suffix}");
                 string savePath = GetUniqueExportPath(_exportDir, baseName, ".png");
 
                 byte[] png = maskTex.EncodeToPNG();
                 File.WriteAllBytes(savePath, png);
-                Debug.Log($"[PSDSimpleEditor] 色域選択マスクを保存しました: {savePath}");
-                SetStatus(PSDTranslation.GetFormat("ColorRangeSuccessFormat", Path.GetFileName(savePath)), StatusType.Success);
+                Debug.Log($"[PSDSimpleEditor] マスクを保存しました: {savePath}");
+                SetStatus(successMessage(Path.GetFileName(savePath)), StatusType.Success);
 
                 // プロジェクト内なら AssetDatabase を更新して Ping、外なら Finder/Explorer を開く
                 string normalized = savePath.Replace('\\', '/');
@@ -302,7 +428,7 @@ namespace PSDSimpleEditor
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[PSDSimpleEditor] 色域選択マスク保存失敗: {ex}");
+                Debug.LogError($"[PSDSimpleEditor] マスク保存失敗: {ex}");
                 EditorUtility.DisplayDialog(PSDTranslation.Get("ExportError", "書き出しエラー"),
                     PSDTranslation.GetFormat("ColorRangeErrorSaveFailedFormat", ex.Message), "OK");
             }

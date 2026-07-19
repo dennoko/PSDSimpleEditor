@@ -15,8 +15,10 @@ namespace PSDSimpleEditor
     // ────────────────────────────────────────────────────────────────
     public partial class PSDSimpleEditorWindow
     {
-        /// <summary>「色調補正」フォールドアウト。明るさ/コントラスト/色相/彩度/明度 + グラデーションマップ。</summary>
-        void DrawAdjustmentFoldout(PSDLayer layer, int indent)
+        /// <summary>「色調補正」フォールドアウト。明るさ/コントラスト/色相/彩度/明度 + グラデーションマップ。
+        /// isGroup = true (フォルダ単位の補正: 配下の平坦化結果へ適用) のときは、
+        /// グループ合成経路で表現できない画像クリップ合成と輝度正規化を出さない。</summary>
+        void DrawAdjustmentFoldout(PSDLayer layer, int indent, bool isGroup = false)
         {
             layer.UI.AdjustExpanded = DrawSectionFoldout(PSDTranslation.Get("AdjustmentSection", "色調補正"), layer.UI.AdjustExpanded, indent, layer, ClipboardKind.FullAdjustmentSection);
             if (!layer.UI.AdjustExpanded) { RowSpace(); return; }
@@ -66,8 +68,9 @@ namespace PSDSimpleEditor
             DrawCurveControls(layer, ci);
             DrawColorBalanceControls(layer, ci);
 
-            DrawGradientMapControls(layer, ci);
-            DrawImageClipControls(layer, ci);
+            DrawGradientMapControls(layer, ci, allowNormalize: !isGroup);
+            if (!isGroup)
+                DrawImageClipControls(layer, ci);
         }
 
         /// <summary>「着色」トグル。ON で絶対値の色相・彩度を強制し、白黒 (彩度0) にも色が乗る。</summary>
@@ -447,8 +450,10 @@ namespace PSDSimpleEditor
             }
         }
 
-        /// <summary>グラデーションマップの有効トグル・グラデーション編集・適用率。</summary>
-        void DrawGradientMapControls(PSDLayer layer, int indent)
+        /// <summary>グラデーションマップの有効トグル・グラデーション編集・適用率。
+        /// allowNormalize = false (グループ: 走査元テクスチャがなく正規化レンジを計算できない) は
+        /// 輝度正規化トグルを出さない。</summary>
+        void DrawGradientMapControls(PSDLayer layer, int indent, bool allowNormalize = true)
         {
             EditorGUILayout.BeginHorizontal();
             GUILayout.Space(indent * IndentWidth + 18f);
@@ -474,24 +479,27 @@ namespace PSDSimpleEditor
 
             if (layer.UI.Gradient == null) layer.UI.Gradient = AdjustmentLutBaker.CreateDefaultGradient();
 
-            EditorGUILayout.BeginHorizontal();
-            GUILayout.Space(indent * IndentWidth + 18f);
-            bool normalize = EditorGUILayout.ToggleLeft(
-                new GUIContent(PSDTranslation.Get("NormalizeLuminosity", "輝度を正規化"), PSDTranslation.Get("NormalizeLuminosityTooltip", "レイヤー内の最も暗い色から最も明るい色の輝度範囲を0〜1に自動ストレッチして、グラデーションが均等にかかるように調整します。")),
-                layer.UI.GradientMapNormalize, GUILayout.Height(RowH));
-            EditorGUILayout.EndHorizontal();
-            RowSpace();
-            if (normalize != layer.UI.GradientMapNormalize)
+            if (allowNormalize)
             {
-                RegisterUndo("Toggle Gradient Map Normalization");
-                layer.UI.GradientMapNormalize = normalize;
-                if (normalize) AdjustmentLutBaker.ComputeGradientLumRange(layer);
-                ForEachCoTarget(layer, t => {
-                    t.UI.GradientMapNormalize = normalize;
-                    if (normalize) AdjustmentLutBaker.ComputeGradientLumRange(t);
-                });
-                SaveStatesToSerialized();
-                MarkDirty();
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.Space(indent * IndentWidth + 18f);
+                bool normalize = EditorGUILayout.ToggleLeft(
+                    new GUIContent(PSDTranslation.Get("NormalizeLuminosity", "輝度を正規化"), PSDTranslation.Get("NormalizeLuminosityTooltip", "レイヤー内の最も暗い色から最も明るい色の輝度範囲を0〜1に自動ストレッチして、グラデーションが均等にかかるように調整します。")),
+                    layer.UI.GradientMapNormalize, GUILayout.Height(RowH));
+                EditorGUILayout.EndHorizontal();
+                RowSpace();
+                if (normalize != layer.UI.GradientMapNormalize)
+                {
+                    RegisterUndo("Toggle Gradient Map Normalization");
+                    layer.UI.GradientMapNormalize = normalize;
+                    if (normalize) AdjustmentLutBaker.ComputeGradientLumRange(layer);
+                    ForEachCoTarget(layer, t => {
+                        t.UI.GradientMapNormalize = normalize;
+                        if (normalize) AdjustmentLutBaker.ComputeGradientLumRange(t);
+                    });
+                    SaveStatesToSerialized();
+                    MarkDirty();
+                }
             }
 
             EditorGUILayout.BeginHorizontal();

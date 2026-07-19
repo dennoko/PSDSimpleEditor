@@ -55,6 +55,22 @@ namespace PSDSimpleEditor
             return DrawSectionFoldout(new GUIContent(label), expanded, indent, layer, kind);
         }
 
+        /// <summary>歯車 (コピー&ペースト) メニューを持たない折りたたみ見出し。</summary>
+        bool DrawSectionFoldout(GUIContent label, bool expanded, int indent)
+        {
+            bool result = expanded;
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(indent * IndentWidth + 18f);
+            if (GUILayout.Button(expanded ? "▾" : "▸", PSDEditorTheme.FoldoutButtonStyle,
+                                 GUILayout.Width(18), GUILayout.Height(RowH)))
+                result = !expanded;
+            if (GUILayout.Button(label, PSDEditorTheme.FoldoutLabelStyle, GUILayout.ExpandWidth(true),
+                                 GUILayout.Height(RowH)))
+                result = !expanded;
+            EditorGUILayout.EndHorizontal();
+            return result;
+        }
+
 
 
         /// <summary>種別プレフィックス付きのレイヤー名を組み立てる。</summary>
@@ -197,9 +213,9 @@ namespace PSDSimpleEditor
             if (!layer.IsAdjustmentLayer)
                 DrawAdjustmentFoldout(layer, indent);
 
-            // 色域選択マスク (ピクセルを持つレイヤーのみ)
+            // マスク生成 (色域選択マスク / 不透明範囲マスク。ピクセルを持つレイヤーのみ)
             if (layer.Texture != null)
-                DrawColorRangeMaskControls(layer, indent);
+                DrawMaskGenControls(layer, indent);
 
             // マスクの有効/無効表示
             if (layer.HasMask)

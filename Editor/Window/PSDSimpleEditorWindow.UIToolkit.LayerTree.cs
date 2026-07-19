@@ -146,6 +146,11 @@ namespace PSDSimpleEditor
                             GUILayout.Label(PSDTranslation.Get("PassThroughWarning", "※ パススルー時は不透明度は適用されません"), PSDEditorTheme.CaptionStyle);
                             EditorGUILayout.EndHorizontal();
                         }
+
+                        // フォルダ単位の色調補正 (配下の平坦化結果へ適用。補正が有効な間は
+                        // パススルーでも分離合成される) + マスク生成
+                        DrawAdjustmentFoldout(layer, 0, isGroup: true);
+                        DrawMaskGenControls(layer, 0);
                     }
                     finally
                     {

@@ -274,7 +274,10 @@ namespace PSDSimpleEditor
         {
             var group = layers[groupIdx];
 
-            if (group.GroupBlendMode == BlendMode.PassThrough)
+            // パススルーでも、グループ自体に非破壊補正が効いている場合は分離合成へ切り替える
+            // (子を親バッファへ直接合成するパススルー経路では平坦化結果への補正を適用できない)。
+            // その際 GroupBlendMode は ToShaderBlendMode により Normal として扱われる。
+            if (group.GroupBlendMode == BlendMode.PassThrough && !group.UI.HasActiveAdjustments)
             {
                 // ── パススルー: 子を現在のバッファへ直接再帰合成 ──
                 // 簡略化: パススルーグループの UI.Opacity (< 1) とグループ自身のマスクは無視する

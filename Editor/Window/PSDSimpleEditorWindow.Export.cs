@@ -173,9 +173,9 @@ namespace PSDSimpleEditor
             string savePath = EditorUtility.SaveFilePanel("PSD として保存", dir, defaultName, "psd");
             if (string.IsNullOrEmpty(savePath)) return;
 
-            int bakeCount = 0, overlayConvert = 0, overlayLost = 0;
-            CountPsdExportConversions(_psdFile.Layers, ref bakeCount, ref overlayConvert, ref overlayLost);
-            if (bakeCount > 0 || overlayConvert > 0 || overlayLost > 0)
+            int bakeCount = 0, overlayConvert = 0, overlayLost = 0, groupAdjustLost = 0;
+            CountPsdExportConversions(_psdFile.Layers, ref bakeCount, ref overlayConvert, ref overlayLost, ref groupAdjustLost);
+            if (bakeCount > 0 || overlayConvert > 0 || overlayLost > 0 || groupAdjustLost > 0)
             {
                 var sb = new System.Text.StringBuilder();
                 if (bakeCount > 0)
@@ -188,6 +188,9 @@ namespace PSDSimpleEditor
                 if (overlayLost > 0)
                     sb.AppendLine($"・クリッピング中のレイヤーが持つカラーオーバーレイ効果 {overlayLost} 件は" +
                                   "書き出しに含まれません。");
+                if (groupAdjustLost > 0)
+                    sb.AppendLine($"・フォルダ単位の色調補正 {groupAdjustLost} 件は PSD には保存されません\n" +
+                                  "  (プレビュー・PNG/TGA 書き出しにのみ反映されます)。");
                 sb.AppendLine();
                 sb.Append("続行しますか?");
 
@@ -267,9 +270,10 @@ namespace PSDSimpleEditor
         /// クリップ調整レイヤーとして書き出されるため対象外。
         /// bake = 補正を画素へ焼き込むレイヤー (クリッピング中の補正・輝度正規化グラデマップ)、
         /// overlayConvert = ベタ塗りクリッピングレイヤーへ変換されるカラーオーバーレイ、
-        /// overlayLost = 変換できず消失するカラーオーバーレイ (クリップメンバー上)。</summary>
+        /// overlayLost = 変換できず消失するカラーオーバーレイ (クリップメンバー上)、
+        /// groupAdjustLost = PSD へ保存されないフォルダ単位の色調補正。</summary>
         static void CountPsdExportConversions(List<PSDLayer> layers,
-            ref int bake, ref int overlayConvert, ref int overlayLost)
+            ref int bake, ref int overlayConvert, ref int overlayLost, ref int groupAdjustLost)
         {
             if (layers == null) return;
             foreach (var l in layers)
@@ -280,7 +284,8 @@ namespace PSDSimpleEditor
                     if (!l.IsClipping && l.Texture != null && l.Children == null) overlayConvert++;
                     else overlayLost++;
                 }
-                CountPsdExportConversions(l.Children, ref bake, ref overlayConvert, ref overlayLost);
+                if (l.Children != null && l.UI.HasActiveAdjustments) groupAdjustLost++;
+                CountPsdExportConversions(l.Children, ref bake, ref overlayConvert, ref overlayLost, ref groupAdjustLost);
             }
         }
     }

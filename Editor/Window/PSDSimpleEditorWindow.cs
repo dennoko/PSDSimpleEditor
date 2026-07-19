@@ -301,6 +301,7 @@ namespace PSDSimpleEditor
             if (_psdFile == null || _compositor == null || !_compositor.IsValid) return;
 
             SafeDestroy(ref _compositeTexture); // 読み戻しキャッシュは古くなったので無効化
+            InvalidateGroupMaskSourceCache();   // グループ内容も変わった可能性があるため走査元を破棄
             _compositeRT = _compositor.CompositeToRT(_psdFile.Layers);
             if (_isRealtimePreviewEnabled)
             {

@@ -190,10 +190,28 @@ namespace PSDSimpleEditor
         // ── UI フォールドアウト状態 (色調補正セクションの開閉) ──
         public bool AdjustExpanded;
 
+        // ── マスク生成 (色域選択マスク / 不透明範囲マスクの親セクション) ──
+        public bool MaskGenExpanded;
+
         // ── 色域選択マスク (このレイヤー自身の画素から、対象色 ± 閾値で選択範囲を作り PNG 出力) ──
         public bool  ColorRangeExpanded;
         public Color ColorRangeTarget    = Color.white; // 対象色
         public float ColorRangeThreshold = 0.1f;        // 閾値 0..1 (RGB 正規化距離)
+
+        /// <summary>
+        /// いずれかの非破壊色調補正が実際に効いている状態か。
+        /// パススルーグループが補正を持つ場合に分離合成へ切り替える判定に使う
+        /// (子へ直接合成するパススルー経路では補正を適用できないため)。
+        /// </summary>
+        public bool HasActiveAdjustments =>
+            !Mathf.Approximately(Brightness, 0f) ||
+            !Mathf.Approximately(Contrast,   0f) ||
+            !Mathf.Approximately(Hue,        0f) ||
+            !Mathf.Approximately(Saturation, 0f) ||
+            !Mathf.Approximately(Lightness,  0f) ||
+            Colorize || Invert || ThresholdEnabled || PosterizeEnabled ||
+            LevelsEnabled || CurveEnabled || ColorBalanceEnabled ||
+            GradientMapEnabled;
     }
 
     // ─── レイヤーの描画用ランタイムキャッシュ ─────────────────────────────

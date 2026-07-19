@@ -216,6 +216,58 @@ namespace PSDSimpleEditor
         }
 
         /// <summary>
+        /// グループ (フォルダ) の配下を単独で平坦化し、キャンバスサイズの Color32[]
+        /// (ボトムアップ = Unity 標準向き) で返す。グループ自身のマスク・非破壊補正は
+        /// 適用するが、ブレンドモード・不透明度は適用しない (マスク生成用の「見えている
+        /// 内容の形」を取るのが目的のため、不透明度 1・Normal で透明背景へ描画する)。
+        /// グループでない・合成不能のときは null。GPU→CPU 読み戻しを伴うため多用しないこと。
+        /// </summary>
+        public Color32[] RenderGroupPixels(PSDLayer group)
+        {
+            if (!IsValid || group == null || group.Children == null) return null;
+
+            bool prevSRGBWrite = GL.sRGBWrite;
+            var  prevActive    = RenderTexture.active;
+            GL.sRGBWrite = false;
+
+            RenderTexture gCur = null, gNext = null, fCur = null, fNext = null;
+            Texture2D tmp = null;
+            try
+            {
+                // 1) 配下を透明バッファへ平坦化
+                gCur  = AcquireRT(clearToTransparent: true);
+                gNext = AcquireRT(clearToTransparent: false);
+                CompositeList(group.Children, ref gCur, ref gNext);
+
+                // 2) グループ自身のマスク・補正を適用 (不透明度は 1 に固定)
+                fCur  = AcquireRT(clearToTransparent: true);
+                fNext = AcquireRT(clearToTransparent: false);
+                float savedOpacity = group.UI.Opacity;
+                group.UI.Opacity = 1f;
+                try     { BlitAsFullCanvasLayer(gCur, group, (int)BlendMode.Normal, null, ref fCur, ref fNext); }
+                finally { group.UI.Opacity = savedOpacity; }
+
+                // 3) CPU へ読み戻し (ボトムアップのまま返す)
+                tmp = new Texture2D(_canvasW, _canvasH, TextureFormat.RGBA32, false, linear: false)
+                { hideFlags = HideFlags.HideAndDontSave };
+                RenderTexture.active = fCur;
+                tmp.ReadPixels(new Rect(0, 0, _canvasW, _canvasH), 0, 0);
+                tmp.Apply(false);
+                return tmp.GetPixels32();
+            }
+            finally
+            {
+                RenderTexture.active = prevActive;
+                if (tmp != null) Object.DestroyImmediate(tmp);
+                ReleaseToPool(gCur);
+                ReleaseToPool(gNext);
+                ReleaseToPool(fCur);
+                ReleaseToPool(fNext);
+                GL.sRGBWrite = prevSRGBWrite;
+            }
+        }
+
+        /// <summary>
         /// 画像クリップ合成の元画像を「ベースレイヤーのサイズ (Width×Height)」へタイル展開し、
         /// トップダウン (PSD 向き = 行 0 が上端) の Color32[] で返す。
         /// ブレンドモード/不透明度/クリッピングは PSD 側プロパティとして保持するため、ここでは
