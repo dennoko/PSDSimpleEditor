@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -161,6 +162,8 @@ namespace PSDSimpleEditor
             }
             r.Seek(pos); // メインリーダーはチャンネルデータ末尾へ (以降のセクション読みを維持)
 
+            var warnings = new ConcurrentQueue<string>();
+
             Parallel.For(0, flat.Count, i =>
             {
                 try
@@ -174,9 +177,14 @@ namespace PSDSimpleEditor
                 }
                 catch (Exception e)
                 {
-                    Debug.LogWarning($"[PSDParser] レイヤー '{flat[i].Name}' のチャンネルデータ読み取りに失敗 (スキップ): {e.Message}");
+                    warnings.Enqueue($"[PSDParser] レイヤー '{flat[i].Name}' のチャンネルデータ読み取りに失敗 (スキップ): {e.Message}");
                 }
             });
+
+            while (warnings.TryDequeue(out string msg))
+            {
+                Debug.LogWarning(msg);
+            }
         }
 
         // ────────────────────────────────────────────────────────────────

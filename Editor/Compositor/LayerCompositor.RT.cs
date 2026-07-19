@@ -57,7 +57,7 @@ namespace PSDSimpleEditor
             rt = null;
         }
 
-        const int SolidCacheMax = 64; // ドラッグ編集で無制限に増えるのを防ぐ上限
+        const int SolidCacheMax = 256; // ドラッグ編集で無制限に増えるのを防ぐ上限 (1×1 テクスチャのためメモリ影響は極小)
 
         // SoCo / Color Overlay 用の 1×1 ソリッドテクスチャ (色ごとにキャッシュ)
         Texture2D GetSolidTexture(Color color)

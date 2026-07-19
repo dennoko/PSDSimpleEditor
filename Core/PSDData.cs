@@ -229,17 +229,11 @@ namespace PSDSimpleEditor
     // ─── PSD レイヤー ────────────────────────────────────────────────────────
     public class PSDLayer
     {
-        // Undo 用のレイヤー識別子。初回アクセス時に自動生成される (遅延初期化)。
-        // PSD パース後にアクセスされた時点で一意な ID が割り当てられ、以降は不変。
-        private string _guid;
+        // Undo 用のレイヤー識別子。インスタンス生成時に一意な ID が割り当てられ、以降は不変。
+        private string _guid = System.Guid.NewGuid().ToString();
         public string Guid
         {
-            get
-            {
-                if (string.IsNullOrEmpty(_guid))
-                    _guid = System.Guid.NewGuid().ToString();
-                return _guid;
-            }
+            get => _guid;
             set => _guid = value;
         }
 
