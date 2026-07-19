@@ -179,6 +179,11 @@
     { "key": "SelectionClear", "value": "選択解除" },
     { "key": "SelectionClearTooltip", "value": "レイヤーの複数選択を解除します。" },
     { "key": "PasteToSelectionFormat", "value": "選択中の全レイヤーにペースト ({0})" },
-    { "key": "PasteToSelection", "value": "選択中の全レイヤーにペースト" }
+    { "key": "PasteToSelection", "value": "選択中の全レイヤーにペースト" },
+    { "key": "Copy", "value": "コピー" },
+    { "key": "Paste", "value": "ペースト" },
+    { "key": "Reset", "value": "リセット" },
+    { "key": "ResetToSelectionFormat", "value": "選択中の全レイヤーをリセット ({0})" },
+    { "key": "ResetToSelection", "value": "選択中の全レイヤーをリセット" }
   ]
 }

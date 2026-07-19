@@ -16,9 +16,16 @@ namespace PSDSimpleEditor
             {
                 if (layer.Children != null)
                 {
-                    // グループ: 終端マーカー → 子 → フォルダ
+                    // グループ: 終端マーカー → 子 → (フォルダ単位の調整レイヤー) → フォルダ
                     outRecs.Add(BuildGroupEndMarker());
                     BuildRecords(layer.Children, outRecs, comp);
+
+                    // フォルダ単位の非破壊補正を、dPSE マーカー付きの「非クリップ」調整レイヤー
+                    // としてグループ内最上段へ積む。Photoshop はグループ内の調整レイヤーを
+                    // 「グループ内でそれより下の合成結果」へ適用するため、
+                    // 本ツールの「平坦化結果へ補正」と同じ見た目になる。
+                    AppendGroupAdjustmentRecords(layer, outRecs);
+
                     outRecs.Add(BuildFolderRecord(layer));
                 }
                 else
@@ -59,7 +66,13 @@ namespace PSDSimpleEditor
 
         static ExportRecord BuildFolderRecord(PSDLayer layer)
         {
-            string gkey = PSDWriter.KeyOf(layer.GroupBlendMode);
+            // パススルーのままだとグループ内調整レイヤーの効果がグループ外の下層まで
+            // 波及してしまうため、補正が有効なフォルダは分離合成 (Normal) として書き出す
+            // (プレビュー側も補正が有効な間はパススルーを分離合成へ切り替えている)。
+            var mode = layer.GroupBlendMode;
+            if (mode == BlendMode.PassThrough && HasAnyActiveAdjustment(layer))
+                mode = BlendMode.Normal;
+            string gkey = PSDWriter.KeyOf(mode);
             return new ExportRecord
             {
                 Name          = layer.Name,
@@ -213,7 +226,7 @@ namespace PSDSimpleEditor
             return a == null || (!a.HasSolidColor && !a.HasGradientFill);
         }
 
-        static bool HasAnyActiveAdjustment(PSDLayer layer)
+        internal static bool HasAnyActiveAdjustment(PSDLayer layer)
         {
             return !Mathf.Approximately(layer.UI.Brightness, 0f)
                 || !Mathf.Approximately(layer.UI.Contrast,   0f)
@@ -256,62 +269,81 @@ namespace PSDSimpleEditor
         /// <summary>
         /// レイヤーの有効な非破壊調整を、dPSE マーカー付きのクリップ調整レイヤー
         /// (ゼロ面積 + Clipping=1 + 調整キー) としてベースの直上へ積む。
-        /// 積み順はシェーダー (LayerBlend.shader ApplyAdjustments) の適用順に合わせる:
-        /// 反転 → レベル → カーブ → ポスタリ → しきい値 → 明るさ/コントラスト
-        /// → カラーバランス → 色相・彩度 → グラデーションマップ。
         /// </summary>
         static void AppendAdjustmentClipRecords(PSDLayer layer, List<ExportRecord> outRecs)
         {
             if (!IsPlainPixelLayer(layer) || WillBakeAdjustments(layer)) return;
+            AppendAdjustmentRecords(layer, outRecs, clipped: true);
+        }
 
+        /// <summary>
+        /// フォルダ単位の非破壊調整を、dPSE マーカー付きの「非クリップ」調整レイヤーとして
+        /// グループ内最上段へ積む (呼び出し位置がフォルダレコード直前 = グループ内最上段)。
+        /// 再読み込み時は PSDLayerAssembler.FoldBackToolAdjustmentClips がフォルダの
+        /// 編集状態 (UI) へ畳み戻す。
+        /// </summary>
+        static void AppendGroupAdjustmentRecords(PSDLayer group, List<ExportRecord> outRecs)
+        {
+            if (!HasAnyActiveAdjustment(group)) return;
+            AppendAdjustmentRecords(group, outRecs, clipped: false);
+        }
+
+        /// <summary>
+        /// layer の編集状態 (UI) の有効な補正を調整レイヤーレコード列として積む共通処理。
+        /// 積み順はシェーダー (LayerBlend.shader ApplyAdjustments) の適用順に合わせる:
+        /// 反転 → レベル → カーブ → ポスタリ → しきい値 → 明るさ/コントラスト
+        /// → カラーバランス → 色相・彩度 → グラデーションマップ。
+        /// </summary>
+        static void AppendAdjustmentRecords(PSDLayer layer, List<ExportRecord> outRecs, bool clipped)
+        {
             if (layer.UI.Invert)
-                outRecs.Add(BuildAdjustmentClipRecord("階調の反転",
+                outRecs.Add(BuildAdjustmentRecord("階調の反転", clipped,
                     new ExportExtraBlock { Key = "nvrt", Data = new byte[0] }));
 
             if (layer.UI.LevelsEnabled)
-                outRecs.Add(BuildAdjustmentClipRecord("レベル補正",
+                outRecs.Add(BuildAdjustmentRecord("レベル補正", clipped,
                     PSDAdjustmentInfoWriter.EncodeLevl(layer)));
 
             if (layer.UI.CurveEnabled && layer.UI.Curve != null)
             {
                 var curv = PSDAdjustmentInfoWriter.EncodeCurv(layer);
                 if (curv != null)
-                    outRecs.Add(BuildAdjustmentClipRecord("トーンカーブ", curv));
+                    outRecs.Add(BuildAdjustmentRecord("トーンカーブ", clipped, curv));
             }
 
             if (layer.UI.PosterizeEnabled)
-                outRecs.Add(BuildAdjustmentClipRecord("ポスタリゼーション",
+                outRecs.Add(BuildAdjustmentRecord("ポスタリゼーション", clipped,
                     PSDAdjustmentInfoWriter.EncodePost(layer.UI.PosterizeLevels)));
 
             if (layer.UI.ThresholdEnabled)
-                outRecs.Add(BuildAdjustmentClipRecord("2階調化",
+                outRecs.Add(BuildAdjustmentRecord("2階調化", clipped,
                     PSDAdjustmentInfoWriter.EncodeThrs(layer.UI.ThresholdLevel)));
 
             if (!Mathf.Approximately(layer.UI.Brightness, 0f) || !Mathf.Approximately(layer.UI.Contrast, 0f))
-                outRecs.Add(BuildAdjustmentClipRecord("明るさ・コントラスト",
+                outRecs.Add(BuildAdjustmentRecord("明るさ・コントラスト", clipped,
                     PSDAdjustmentInfoWriter.EncodeBrit(layer.UI.Brightness, layer.UI.Contrast),
                     PSDAdjustmentInfoWriter.EncodeCgEd(layer.UI.Brightness, layer.UI.Contrast)));
 
             if (layer.UI.ColorBalanceEnabled)
-                outRecs.Add(BuildAdjustmentClipRecord("カラーバランス",
+                outRecs.Add(BuildAdjustmentRecord("カラーバランス", clipped,
                     PSDAdjustmentInfoWriter.EncodeBlnc(layer)));
 
             if (HasActiveHsl(layer))
-                outRecs.Add(BuildAdjustmentClipRecord("色相・彩度",
+                outRecs.Add(BuildAdjustmentRecord("色相・彩度", clipped,
                     PSDAdjustmentInfoWriter.EncodeHue2(
                         layer.UI.Hue, layer.UI.Saturation, layer.UI.Lightness, layer.UI.Colorize)));
 
             if (layer.UI.GradientMapEnabled && layer.UI.Gradient != null)
             {
-                var rec = BuildAdjustmentClipRecord("グラデーションマップ",
+                var rec = BuildAdjustmentRecord("グラデーションマップ", clipped,
                     PSDAdjustmentInfoWriter.EncodeGrdm(layer.UI.Gradient));
                 rec.Opacity = ToByteOpacity(layer.UI.GradientMapOpacity); // 適用率 → レイヤー不透明度
                 outRecs.Add(rec);
             }
         }
 
-        /// <summary>ゼロ面積 + Clipping=1 + マーカー付きのクリップ調整レイヤーレコード。</summary>
-        static ExportRecord BuildAdjustmentClipRecord(string name, params ExportExtraBlock[] blocks)
+        /// <summary>ゼロ面積 + マーカー付きの調整レイヤーレコード (clipped: クリップ用 / 非クリップ = グループ用)。</summary>
+        static ExportRecord BuildAdjustmentRecord(string name, bool clipped, params ExportExtraBlock[] blocks)
         {
             var extra = new List<ExportExtraBlock>(blocks);
             extra.Add(PSDAdjustmentInfoWriter.BuildClipMarkerBlock());
@@ -320,7 +352,7 @@ namespace PSDSimpleEditor
                 Name        = name,
                 BlendKey    = "norm",
                 Opacity     = 255,
-                Clipping    = 1,
+                Clipping    = (byte)(clipped ? 1 : 0),
                 Flags       = 0x00, // 表示
                 Channels    = EmptyChannels(),
                 ExtraBlocks = extra,

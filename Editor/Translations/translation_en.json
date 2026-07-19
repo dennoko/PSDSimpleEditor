@@ -179,6 +179,11 @@
     { "key": "SelectionClear", "value": "Deselect" },
     { "key": "SelectionClearTooltip", "value": "Clears the multi-layer selection." },
     { "key": "PasteToSelectionFormat", "value": "Paste to All Selected Layers ({0})" },
-    { "key": "PasteToSelection", "value": "Paste to All Selected Layers" }
+    { "key": "PasteToSelection", "value": "Paste to All Selected Layers" },
+    { "key": "Copy", "value": "Copy" },
+    { "key": "Paste", "value": "Paste" },
+    { "key": "Reset", "value": "Reset" },
+    { "key": "ResetToSelectionFormat", "value": "Reset All Selected Layers ({0})" },
+    { "key": "ResetToSelection", "value": "Reset All Selected Layers" }
   ]
 }

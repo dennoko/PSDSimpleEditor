@@ -178,12 +178,14 @@ namespace PSDSimpleEditor
 
         // ════════════════════════════════════════════════════════════════
         //  本ツール製クリップ調整レイヤーの畳み戻し
-        //  (PSDExportRecordBuilder.AppendAdjustmentClipRecords の逆変換)
+        //  (PSDExportRecordBuilder.AppendAdjustmentClipRecords / AppendGroupAdjustmentRecords の逆変換)
         // ════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// dPSE マーカー付きのクリップ調整レイヤーを直下のピクセルレイヤーの編集状態 (UI) へ吸収し、
-        /// ツリーから除去する (InitUIState 実行後に呼ぶこと)。
+        /// dPSE マーカー付きの調整レイヤーを編集状態 (UI) へ吸収し、ツリーから除去する
+        /// (InitUIState 実行後に呼ぶこと)。
+        /// ・クリップ済みマーカー → 直下のピクセルレイヤーへ (ピクセルレイヤーの非破壊補正の逆変換)
+        /// ・グループ内最上段の非クリップマーカー → そのグループへ (フォルダ単位補正の逆変換)
         /// Photoshop 側でマスク付与・非表示化・不透明度変更・ブレンド変更されたものは
         /// 情報を壊さないよう畳み戻さず通常の調整レイヤーとして残す。
         /// </summary>
@@ -195,13 +197,26 @@ namespace PSDSimpleEditor
                 var baseLayer = layers[i];
                 FoldBackToolAdjustmentClips(baseLayer.Children);
 
-                // 畳み戻し先はピクセルレイヤーのみ (マーカー自身・グループ・調整レイヤーは対象外)
-                if (baseLayer.Children != null || baseLayer.Texture == null ||
+                if (baseLayer.Children != null)
+                {
+                    // グループ内最上段 (= Children 末尾) に連続する非クリップマーカーを
+                    // フォルダ単位補正としてグループの編集状態へ吸収する
+                    var ch = baseLayer.Children;
+                    while (ch.Count > 0 && CanFoldBack(ch[ch.Count - 1], expectClipping: false))
+                    {
+                        AbsorbAdjustmentClip(baseLayer, ch[ch.Count - 1]);
+                        ch.RemoveAt(ch.Count - 1);
+                    }
+                    continue;
+                }
+
+                // 畳み戻し先はピクセルレイヤーのみ (マーカー自身・調整レイヤーは対象外)
+                if (baseLayer.Texture == null ||
                     baseLayer.IsAdjustmentLayer || baseLayer.IsToolAdjustmentClip) continue;
 
-                // 直上に連続するマーカー付きレイヤーを順に吸収する
+                // 直上に連続するマーカー付きクリップレイヤーを順に吸収する
                 // (非対象レイヤーが現れた時点で停止 = 適用順を壊さない)
-                while (i + 1 < layers.Count && CanFoldBack(layers[i + 1]))
+                while (i + 1 < layers.Count && CanFoldBack(layers[i + 1], expectClipping: true))
                 {
                     AbsorbAdjustmentClip(baseLayer, layers[i + 1]);
                     layers.RemoveAt(i + 1);
@@ -209,9 +224,11 @@ namespace PSDSimpleEditor
             }
         }
 
-        static bool CanFoldBack(PSDLayer m)
+        // expectClipping: ピクセルレイヤー用マーカーはクリップ済み、グループ用マーカーは非クリップで
+        // 書き出される。クリップ状態が期待と異なる = 外部で変更された可能性があるため吸収しない。
+        static bool CanFoldBack(PSDLayer m, bool expectClipping)
         {
-            if (!m.IsToolAdjustmentClip || !m.IsClipping) return false;
+            if (!m.IsToolAdjustmentClip || m.IsClipping != expectClipping) return false;
             if (m.Children != null || !m.IsAdjustmentLayer) return false;   // ピクセルを持つ = 対象外
             if (m.HasMask && m.MaskTexture != null) return false;           // マスクが付与された
             if (!m.IsVisible) return false;                                 // 非表示化された

@@ -235,11 +235,19 @@ namespace PSDSimpleEditor
             layer.UI.ImageClipOpacity = s.Opacity;
         }
 
+        /// <summary>アクティブなコントロール (数値入力フィールドなど) のキーボードフォーカスを解除する。</summary>
+        static void UnfocusControl()
+        {
+            GUIUtility.keyboardControl = 0;
+            GUI.FocusControl(null);
+        }
+
         /// <summary>クリップボードから指定した種類の調整パラメーターを layer へ貼り付ける。データが無ければ false。</summary>
         bool PasteAdjustment(ClipboardKind kind, PSDLayer layer)
         {
             if (!_adjustmentClipboard.TryGetValue(kind, out object raw)) return false;
 
+            UnfocusControl();
             RegisterUndo($"Paste {kind}");
             bool ok = PasteAdjustmentCore(kind, layer, raw, allowPreview: true);
             SaveStatesToSerialized();
@@ -257,6 +265,7 @@ namespace PSDSimpleEditor
             var targets = EnumerateSelectedLeaves();
             if (targets.Count == 0) return;
 
+            UnfocusControl();
             RegisterUndo($"Paste {kind} (Multi)");
             foreach (var t in targets)
                 PasteAdjustmentCore(kind, t, raw, allowPreview: false); // 色域プレビューは単一スロットのため一括時は抑止
@@ -369,18 +378,150 @@ namespace PSDSimpleEditor
             return true;
         }
 
-        /// <summary>トグル行・セクション見出しの右端に置く歯車ボタン。クリックでコピー/ペーストのメニューを開く。</summary>
-        void DrawAdjustmentGearMenu(ClipboardKind kind, PSDLayer layer)
+        /// <summary>指定した種類の調整パラメーターを layer でリセット（初期状態に戻す）する。</summary>
+        bool ResetAdjustment(ClipboardKind kind, PSDLayer layer)
         {
-            if (!GUILayout.Button(new GUIContent("⚙", "この設定のコピー・ペースト"), PSDEditorTheme.FoldoutButtonStyle,
-                                  GUILayout.Width(18), GUILayout.Height(RowH)))
-                return;
+            UnfocusControl();
+            RegisterUndo($"Reset {kind}");
+            bool ok = ResetAdjustmentCore(kind, layer, allowPreview: true);
+            SaveStatesToSerialized();
+            MarkDirty();
+            return ok;
+        }
 
+        /// <summary>
+        /// 指定した種類の調整パラメーターを選択中の全リーフレイヤーでリセットする。
+        /// </summary>
+        void ResetAdjustmentToSelection(ClipboardKind kind)
+        {
+            var targets = EnumerateSelectedLeaves();
+            if (targets.Count == 0) return;
+
+            UnfocusControl();
+            RegisterUndo($"Reset {kind} (Multi)");
+            foreach (var t in targets)
+                ResetAdjustmentCore(kind, t, allowPreview: false);
+            SaveStatesToSerialized();
+            MarkDirty();
+        }
+
+        /// <summary>リセットの適用本体 (Undo 登録・シリアライズ保存・再合成トリガは呼び出し側の責務)。</summary>
+        bool ResetAdjustmentCore(ClipboardKind kind, PSDLayer layer, bool allowPreview)
+        {
+            switch (kind)
+            {
+                case ClipboardKind.Colorize:
+                    layer.UI.Colorize = false;
+                    break;
+                case ClipboardKind.Invert:
+                    layer.UI.Invert = false;
+                    break;
+                case ClipboardKind.Threshold:
+                    layer.UI.ThresholdEnabled = false;
+                    layer.UI.ThresholdLevel   = 128f;
+                    break;
+                case ClipboardKind.Posterize:
+                    layer.UI.PosterizeEnabled = false;
+                    layer.UI.PosterizeLevels  = 4f;
+                    break;
+                case ClipboardKind.Levels:
+                    layer.UI.LevelsEnabled     = false;
+                    layer.UI.LevelsInputBlack  = 0f;
+                    layer.UI.LevelsInputWhite  = 255f;
+                    layer.UI.LevelsGamma       = 1f;
+                    layer.UI.LevelsOutputBlack = 0f;
+                    layer.UI.LevelsOutputWhite = 255f;
+                    break;
+                case ClipboardKind.ColorBalance:
+                    layer.UI.ColorBalanceEnabled  = false;
+                    layer.UI.CBShadows            = Vector3.zero;
+                    layer.UI.CBMidtones           = Vector3.zero;
+                    layer.UI.CBHighlights         = Vector3.zero;
+                    layer.UI.CBPreserveLuminosity = true;
+                    break;
+                case ClipboardKind.Curve:
+                    layer.UI.CurveEnabled = false;
+                    layer.UI.Curve        = AdjustmentLutBaker.CreateDefaultCurve();
+                    AdjustmentLutBaker.BakeCurveLut(layer);
+                    break;
+                case ClipboardKind.GradientMap:
+                    layer.UI.GradientMapEnabled   = false;
+                    layer.UI.Gradient             = AdjustmentLutBaker.CreateDefaultGradient();
+                    layer.UI.GradientMapOpacity   = 1f;
+                    layer.UI.GradientMapNormalize = false;
+                    AdjustmentLutBaker.BakeGradientLut(layer);
+                    break;
+                case ClipboardKind.ImageClip:
+                    layer.UI.ImageClipEnabled = false;
+                    layer.UI.ImageClipTex     = null;
+                    layer.UI.ImageClipTile    = Vector2.one;
+                    layer.UI.ImageClipBlend   = BlendMode.Normal;
+                    layer.UI.ImageClipOpacity = 1f;
+                    break;
+                case ClipboardKind.ColorRangeMask:
+                    layer.UI.ColorRangeTarget    = Color.white;
+                    layer.UI.ColorRangeThreshold = 0.1f;
+                    if (allowPreview) EndColorRangePreview();
+                    break;
+                case ClipboardKind.FullAdjustmentSection:
+                    layer.UI.Brightness = 0f;
+                    layer.UI.Contrast   = 0f;
+                    layer.UI.Hue        = 0f;
+                    layer.UI.Saturation = 0f;
+                    layer.UI.Lightness  = 0f;
+                    layer.UI.Colorize   = false;
+                    layer.UI.Invert     = false;
+
+                    layer.UI.ThresholdEnabled = false;
+                    layer.UI.ThresholdLevel   = 128f;
+
+                    layer.UI.PosterizeEnabled = false;
+                    layer.UI.PosterizeLevels  = 4f;
+
+                    layer.UI.LevelsEnabled     = false;
+                    layer.UI.LevelsInputBlack  = 0f;
+                    layer.UI.LevelsInputWhite  = 255f;
+                    layer.UI.LevelsGamma       = 1f;
+                    layer.UI.LevelsOutputBlack = 0f;
+                    layer.UI.LevelsOutputWhite = 255f;
+
+                    layer.UI.ColorBalanceEnabled  = false;
+                    layer.UI.CBShadows            = Vector3.zero;
+                    layer.UI.CBMidtones           = Vector3.zero;
+                    layer.UI.CBHighlights         = Vector3.zero;
+                    layer.UI.CBPreserveLuminosity = true;
+
+                    layer.UI.CurveEnabled = false;
+                    layer.UI.Curve        = AdjustmentLutBaker.CreateDefaultCurve();
+                    AdjustmentLutBaker.BakeCurveLut(layer);
+
+                    layer.UI.GradientMapEnabled   = false;
+                    layer.UI.Gradient             = AdjustmentLutBaker.CreateDefaultGradient();
+                    layer.UI.GradientMapOpacity   = 1f;
+                    layer.UI.GradientMapNormalize = false;
+                    AdjustmentLutBaker.BakeGradientLut(layer);
+
+                    layer.UI.ImageClipEnabled = false;
+                    layer.UI.ImageClipTex     = null;
+                    layer.UI.ImageClipTile    = Vector2.one;
+                    layer.UI.ImageClipBlend   = BlendMode.Normal;
+                    layer.UI.ImageClipOpacity = 1f;
+                    break;
+                default:
+                    return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>指定した種類の調整パラメーターのコンテキストメニュー (コピー・ペースト・リセット) を表示する。</summary>
+        void ShowAdjustmentContextMenu(ClipboardKind kind, PSDLayer layer)
+        {
             var menu = new GenericMenu();
-            menu.AddItem(new GUIContent("コピー"), false, () => CopyAdjustment(kind, layer));
+            menu.AddItem(new GUIContent(PSDTranslation.Get("Copy", "コピー")), false, () => CopyAdjustment(kind, layer));
             if (HasClipboard(kind))
             {
-                menu.AddItem(new GUIContent("ペースト"), false, () =>
+                menu.AddItem(new GUIContent(PSDTranslation.Get("Paste", "ペースト")), false, () =>
                 {
                     PasteAdjustment(kind, layer);
                     Repaint();
@@ -388,7 +529,7 @@ namespace PSDSimpleEditor
             }
             else
             {
-                menu.AddDisabledItem(new GUIContent("ペースト"));
+                menu.AddDisabledItem(new GUIContent(PSDTranslation.Get("Paste", "ペースト")));
             }
 
             // 複数選択中への一括ペースト (歯車の行が選択外でも選択集合に適用する)
@@ -405,7 +546,40 @@ namespace PSDSimpleEditor
             {
                 menu.AddDisabledItem(new GUIContent(PSDTranslation.Get("PasteToSelection", "選択中の全レイヤーにペースト")));
             }
+
+            // 誤クリック防止のための横線 (Separator)
+            menu.AddSeparator("");
+
+            menu.AddItem(new GUIContent(PSDTranslation.Get("Reset", "リセット")), false, () =>
+            {
+                ResetAdjustment(kind, layer);
+                Repaint();
+            });
+
+            if (selCount > 0)
+            {
+                menu.AddItem(new GUIContent(PSDTranslation.GetFormat("ResetToSelectionFormat", selCount)), false, () =>
+                {
+                    ResetAdjustmentToSelection(kind);
+                    Repaint();
+                });
+            }
+            else
+            {
+                menu.AddDisabledItem(new GUIContent(PSDTranslation.Get("ResetToSelection", "選択中の全レイヤーをリセット")));
+            }
+
             menu.ShowAsContext();
+        }
+
+        /// <summary>トグル行・セクション見出しの右端に置くハンガーメニューボタン。クリックでコピー/ペースト/リセットの各種メニューを開く。</summary>
+        void DrawAdjustmentGearMenu(ClipboardKind kind, PSDLayer layer)
+        {
+            if (GUILayout.Button(new GUIContent("≡", "この設定のオプションメニュー (コピー・ペースト・リセット)"), PSDEditorTheme.FoldoutButtonStyle,
+                                  GUILayout.Width(18), GUILayout.Height(RowH)))
+            {
+                ShowAdjustmentContextMenu(kind, layer);
+            }
         }
     }
 }
