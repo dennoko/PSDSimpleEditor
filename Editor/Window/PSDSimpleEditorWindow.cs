@@ -153,6 +153,8 @@ namespace PSDSimpleEditor
             _colorRangeSrcPixels    = null;
             _eyedropperTarget       = null;
 
+            EndSelectionFlash(); // RT 本体はコンポジターの Dispose で破棄済み
+
             if (_psdFile != null)
             {
                 DestroyLayerTexturesRecursive(_psdFile.Layers);
@@ -191,6 +193,13 @@ namespace PSDSimpleEditor
 
         void Update()
         {
+            // 選択フラッシュのフェード駆動 (表示中は再描画し続け、消え切ったら状態を捨てる)
+            if (_selectionFlashStart >= 0)
+            {
+                if (SelectionFlashAlpha() <= 0f) EndSelectionFlash();
+                Repaint();
+            }
+
             // ステータスの自動リセット (Info 以外を一定時間後に戻す)
             if (_statusResetTime > 0 && EditorApplication.timeSinceStartup > _statusResetTime)
             {

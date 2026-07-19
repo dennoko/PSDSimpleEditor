@@ -48,6 +48,9 @@ namespace PSDSimpleEditor
         // GUI 描画・マテリアルバインドできる (バイト値は sRGBWrite=false の Blit でそのままコピー)。
         RenderTexture _resultRT;
 
+        // 選択フラッシュ用の常駐 RT (RenderSelectionHighlight の返却先。_resultRT と同じ sRGB 扱い)
+        RenderTexture _selectionHighlightRT;
+
         // グループ合成・クリップマスク用の RT プール (全てキャンバスサイズ)
         readonly Stack<RenderTexture> _pool = new Stack<RenderTexture>();
 
@@ -111,6 +114,7 @@ namespace PSDSimpleEditor
             ReleaseRT(ref _rtA);
             ReleaseRT(ref _rtB);
             ReleaseRT(ref _resultRT);
+            ReleaseRT(ref _selectionHighlightRT);
 
             while (_pool.Count > 0)
             {

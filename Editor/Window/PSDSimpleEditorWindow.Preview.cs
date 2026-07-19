@@ -5,10 +5,12 @@ namespace PSDSimpleEditor
 {
     // ── プレビューパネル (右): 合成結果表示 / チェッカー背景 / マージ参照小窓 ──
     // ─── partial 見取り図 ───────────────────────────────────────────
-    // 責務   : プレビューパネル (右側) の描画、チェッカー背景の表示、およびマージ参照小窓の描画
+    // 責務   : プレビューパネル (右側) の描画、チェッカー背景の表示、マージ参照小窓の描画、
+    //          選択フラッシュ (選択レイヤーの不透明部分ハイライト) の重ね描き
     // 宣言   : なし
-    // 参照   : _compositeRT (R), _showMergedRef (RW), _checkerTexture (RW), _eyedropperTarget (RW)
-    // 依存   : HandleEyedropper (.ColorRangeMask.cs)
+    // 参照   : _compositeRT (R), _showMergedRef (RW), _checkerTexture (RW), _eyedropperTarget (RW),
+    //          _selectionFlashRT (R)
+    // 依存   : HandleEyedropper (.ColorRangeMask.cs), SelectionFlashAlpha (.Selection.cs)
     // ────────────────────────────────────────────────────────────────
     public partial class PSDSimpleEditorWindow
     {
@@ -58,6 +60,9 @@ namespace PSDSimpleEditor
                     // 色域選択ハイライト (対象レイヤーの選択範囲を色付きで重ね描き)
                     DrawColorRangeHighlight(drawRect);
 
+                    // 選択フラッシュ (選択したレイヤーの不透明部分を一瞬ハイライト)
+                    DrawSelectionFlash(drawRect);
+
                     // マージ済み画像の参照小窓 (右下)
                     if (_showMergedRef && _psdFile != null && _psdFile.MergedComposite != null)
                         DrawMergedOverlay(area);
@@ -67,6 +72,18 @@ namespace PSDSimpleEditor
                     GUI.Label(area, PSDTranslation.Get("PreviewNone", "プレビューなし"), PSDEditorTheme.CenteredCaptionStyle);
                 }
             }
+        }
+
+        /// <summary>選択フラッシュ: 選択したレイヤー群の不透明部分をフェードアウト付きで重ね描きする。</summary>
+        void DrawSelectionFlash(Rect drawRect)
+        {
+            float fade = SelectionFlashAlpha();
+            if (fade <= 0f) return;
+
+            var prev = GUI.color;
+            GUI.color = new Color(1f, 1f, 1f, SelectionFlashMaxAlpha * fade);
+            GUI.DrawTexture(drawRect, _selectionFlashRT, ScaleMode.StretchToFill, true);
+            GUI.color = prev;
         }
 
         /// <summary>マージ済み画像を右下に小窓で重ね描きする。</summary>

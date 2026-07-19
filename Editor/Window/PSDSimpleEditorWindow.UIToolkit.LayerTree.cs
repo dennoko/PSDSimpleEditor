@@ -113,7 +113,7 @@ namespace PSDSimpleEditor
             _groupRowByGuid[layer.Guid] = container;
 
             // グループヘッダ (タイトル〜ブレンドモード左までの余白) のクリック:
-            // 折りたたみ中は展開+配下選択 / 展開中は折りたたみ / 修飾キーで配下選択トグル
+            // 展開状態は変更せず配下リーフの選択状態を切り替える
             // (▾/▸ ボタン・Toggle・Dropdown のクリックは IsInteractiveTarget の遡り判定で除外)
             header.RegisterCallback<PointerDownEvent>(evt =>
             {

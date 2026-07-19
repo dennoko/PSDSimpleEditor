@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace PSDSimpleEditor
@@ -7,9 +8,10 @@ namespace PSDSimpleEditor
     //  クリップマスク用: 実効 α の単独描画
     // ════════════════════════════════════════════════════════════════
     // ─── partial 見取り図 ───────────────────────────────────────────
-    // 責務   : レイヤー単独の色調補正等の焼き込み書き出し、および実効 α の単独描画処理
+    // 責務   : レイヤー単独の色調補正等の焼き込み書き出し、実効 α の単独描画処理、
+    //          選択フラッシュ用ハイライト RT の生成
     // 宣言   : なし
-    // 参照   : _mat (R)
+    // 参照   : _mat (R), _selectionHighlightRT (RW)
     // 依存   : AcquireRT (RT.cs), ReleaseToPool (RT.cs), NewParams (Params.cs), ApplyParams (Params.cs) 等
     // ────────────────────────────────────────────────────────────────
     public partial class LayerCompositor
@@ -85,6 +87,74 @@ namespace PSDSimpleEditor
 
             ReleaseToPool(clearBg);
             return result;
+        }
+
+        /// <summary>
+        /// 選択フラッシュ用: 指定レイヤー群の「ピクセルを持つ部分」を color で塗った全面 RT を返す。
+        /// 各レイヤーを Normal・不透明度 1 で透明バッファへ重ね描きして α の和集合を作り、
+        /// その α をクリップマスクにして単色を切り抜く。マスク・不透明度・表示状態は反映しない
+        /// (「レイヤーがどこにあるか」の提示が目的のため)。
+        /// 返却 RT はコンポジターが所有する。内容は次回呼び出しで上書きされ、Dispose で破棄される。
+        /// ピクセルを持つレイヤーが 1 枚も無い場合は null。
+        /// </summary>
+        public RenderTexture RenderSelectionHighlight(IReadOnlyList<PSDLayer> layers, Color color)
+        {
+            if (!IsValid || layers == null) return null;
+
+            bool anyPixels = false;
+            foreach (var l in layers)
+                if (l != null && l.Texture != null) { anyPixels = true; break; }
+            if (!anyPixels) return null;
+
+            bool prevSRGBWrite = GL.sRGBWrite;
+            var  prevActive    = RenderTexture.active;
+            GL.sRGBWrite = false;
+
+            RenderTexture cur = null, next = null;
+            try
+            {
+                // 1) α の和集合: 各レイヤーを Normal・不透明度 1 で透明バッファへ重ね描き
+                cur  = AcquireRT(clearToTransparent: true);
+                next = AcquireRT(clearToTransparent: false);
+                foreach (var layer in layers)
+                {
+                    if (layer == null || layer.Texture == null) continue;
+                    var p = NewParams();
+                    p.LayerTex  = layer.Texture;
+                    p.LayerRect = LayerRectOf(layer);
+                    p.Opacity   = 1f;
+                    p.BlendMode = 0; // Normal (α の和集合を作るだけ)
+                    ApplyParams(p);
+                    Graphics.Blit(cur, next, _mat);
+                    Swap(ref cur, ref next);
+                }
+
+                // 2) 和集合 α をクリップマスクにして単色を全面へ描く
+                if (_selectionHighlightRT == null)
+                {
+                    _selectionHighlightRT = new RenderTexture(_canvasW, _canvasH, 0,
+                        RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB)
+                    { hideFlags = HideFlags.HideAndDontSave };
+                    _selectionHighlightRT.Create();
+                }
+                ClearRT(next);
+                var sp = NewParams();
+                sp.LayerTex    = GetSolidTexture(color);
+                sp.LayerRect   = FullCanvasRect;
+                sp.Opacity     = 1f;
+                sp.BlendMode   = 0; // Normal
+                sp.ClipMaskTex = cur;
+                ApplyParams(sp);
+                Graphics.Blit(next, _selectionHighlightRT, _mat);
+                return _selectionHighlightRT;
+            }
+            finally
+            {
+                ReleaseToPool(cur);
+                ReleaseToPool(next);
+                RenderTexture.active = prevActive;
+                GL.sRGBWrite = prevSRGBWrite;
+            }
         }
 
         /// <summary>

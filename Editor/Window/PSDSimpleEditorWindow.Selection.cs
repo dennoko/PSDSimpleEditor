@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -8,13 +9,16 @@ namespace PSDSimpleEditor
     // ── レイヤー複数選択 + 一括編集の伝播 ──────────────────────────────────
     // ─── partial 見取り図 ───────────────────────────────────────────
     // 責務   : レイヤー行の複数選択状態の管理 (Ctrl/Shift クリック・ハイライト・選択数表示)、
-    //          選択中レイヤーへの編集一括伝播ヘルパー (スカラーは delta、bool/非スカラーは絶対適用)
+    //          選択中レイヤーへの編集一括伝播ヘルパー (スカラーは delta、bool/非スカラーは絶対適用)、
+    //          選択フラッシュ (選択レイヤーの不透明部分をプレビューへ一瞬ハイライト) の状態管理
     // 宣言   : _selectedLayerGuids, _selectionAnchorGuid, _visibleLeafOrder, _leafRowByGuid,
     //          _visibleGroups, _groupRowByGuid,
-    //          _selectionCountLabel, _selectionHintLabel, _selectionClearButton
-    // 参照   : _layerByGuid (R), _layerTreeScrollView (R)
+    //          _selectionCountLabel, _selectionHintLabel, _selectionClearButton,
+    //          _selectionFlashRT, _selectionFlashStart
+    // 参照   : _layerByGuid (R), _layerTreeScrollView (R), _compositor (R)
     // 依存   : CloneGradient/CloneCurve (.AdjustmentClipboard.cs), AdjustmentLutBaker (LUT ベイク),
-    //          RebuildLayerTree (.UIToolkit.LayerTree.cs) が行レジストリを構築する
+    //          RebuildLayerTree (.UIToolkit.LayerTree.cs) が行レジストリを構築する、
+    //          DrawSelectionFlash (.Preview.cs) が SelectionFlashAlpha を参照して重ね描きする
     // ────────────────────────────────────────────────────────────────
     public partial class PSDSimpleEditorWindow
     {
@@ -37,6 +41,51 @@ namespace PSDSimpleEditor
         Label  _selectionHintLabel;    // 同・複数選択操作の補助文
         Button _selectionClearButton;  // 同・全解除ボタン
 
+        // ── 選択フラッシュ ──────────────────────────────────────────────────
+        // レイヤー/フォルダ選択時に、選択レイヤーの「ピクセルを持つ部分」をプレビューへ
+        // 一瞬ハイライト表示する (ホールド後フェードアウト)。RT はコンポジター所有。
+
+        [NonSerialized] RenderTexture _selectionFlashRT;           // ハイライト RT (参照のみ保持。破棄はコンポジター)
+        [NonSerialized] double        _selectionFlashStart = -1.0; // フラッシュ開始時刻 (< 0 = 非表示)
+
+        const float SelectionFlashHoldSec  = 0.25f;  // 全開で表示する時間
+        const float SelectionFlashFadeSec  = 0.60f;  // フェードアウトにかける時間
+        const float SelectionFlashMaxAlpha = 0.55f;  // 全開時の重ね描き不透明度
+        static readonly Color SelectionFlashColor = new Color(0.30f, 0.65f, 1f, 1f); // ハイライト色 (α は描画時に付与)
+
+        /// <summary>選択したレイヤーの不透明部分のハイライトをプレビューへ一瞬表示する。</summary>
+        void StartSelectionFlash(PSDLayer layer)
+            => StartSelectionFlash(new List<PSDLayer> { layer });
+
+        /// <summary>選択したレイヤー群の不透明部分のハイライトをプレビューへ一瞬表示する。</summary>
+        void StartSelectionFlash(List<PSDLayer> layers)
+        {
+            if (_compositor == null || !_compositor.IsValid) return;
+
+            var rt = _compositor.RenderSelectionHighlight(layers, SelectionFlashColor);
+            if (rt == null) return; // ピクセルを持つレイヤーが無い (調整レイヤーのみ等) → 表示しない
+
+            _selectionFlashRT    = rt;
+            _selectionFlashStart = EditorApplication.timeSinceStartup;
+            Repaint();
+        }
+
+        /// <summary>現在のフェード係数 (1=全開, 0=非表示)。DrawSelectionFlash と Update が参照する。</summary>
+        float SelectionFlashAlpha()
+        {
+            if (_selectionFlashStart < 0 || _selectionFlashRT == null) return 0f;
+            float t = (float)(EditorApplication.timeSinceStartup - _selectionFlashStart);
+            if (t <= SelectionFlashHoldSec) return 1f;
+            return Mathf.Clamp01(1f - (t - SelectionFlashHoldSec) / SelectionFlashFadeSec);
+        }
+
+        /// <summary>フラッシュを終了して状態を捨てる (RT はコンポジター所有のため破棄しない)。</summary>
+        void EndSelectionFlash()
+        {
+            _selectionFlashRT    = null;
+            _selectionFlashStart = -1.0;
+        }
+
         // ── 選択操作 ────────────────────────────────────────────────────────
 
         /// <summary>リーフ行ヘッダのクリック。Shift=範囲選択 (選択済みの場合は解除) / Ctrl(Cmd)=トグル / 通常=単一選択。</summary>
@@ -49,6 +98,10 @@ namespace PSDSimpleEditor
             }
             else if (evt.ctrlKey || evt.commandKey)  ToggleSelect(layer);
             else                                     SelectSingle(layer);
+
+            // クリックの結果このレイヤーが選択状態ならプレビューへ一瞬ハイライト表示 (解除時は出さない)
+            if (_selectedLayerGuids.Contains(layer.Guid))
+                StartSelectionFlash(layer);
 
             // Esc での解除がツリーにフォーカスがある間は効くようにする (best-effort)
             _layerTreeScrollView?.Focus();
@@ -121,38 +174,76 @@ namespace PSDSimpleEditor
 
         /// <summary>
         /// グループ行ヘッダ (タイトル〜ブレンドモード左までの余白全体) のクリック。
-        /// ・折りたたみ中          : 展開して配下リーフを選択に加える
-        /// ・展開中 + 通常クリック : 折りたたむ (非表示になった子行は Prune で選択から自動的に外れる)
-        /// ・展開中 + 修飾キー     : 折りたたみ状態は変えず、配下リーフの選択をまとめてトグル
+        /// 展開状態 (IsExpanded) は変更せず、配下リーフ全体の選択状態を切り替える。
+        /// ・通常クリック              : 他の選択を解除し、このグループ配下のリーフを選択 (既に配下全リーフのみ選択中の場合は全解除)
+        /// ・修飾キー (Ctrl/Cmd/Shift)  : 既存の選択を保持し、このグループ配下のリーフの選択状態をまとめてトグル
         /// </summary>
         void OnGroupRowPointerDown(PointerDownEvent evt, PSDLayer group)
         {
             bool modifier = evt.ctrlKey || evt.commandKey || evt.shiftKey;
-
-            if (!group.IsExpanded)
-            {
-                // 畳んでいるフォルダの選択: 展開してから配下を選択状態にする
-                group.IsExpanded = true;
-                RebuildLayerTree(); // 子行を生成して _leafRowByGuid / _visibleLeafOrder を更新
-                SelectDescendantLeaves(group);
-            }
-            else if (modifier)
+            if (modifier)
             {
                 ToggleDescendantSelection(group);
             }
             else
             {
-                group.IsExpanded = false;
-                RebuildLayerTree(); // Prune が畳まれた配下を選択から外す
+                SelectSingleGroup(group);
             }
+
+            // クリックの結果配下リーフが選択されていれば、その範囲をプレビューへ一瞬ハイライト表示
+            // (トグル解除・全解除では選択が残らないため表示されない)
+            var flashLeaves = new List<PSDLayer>();
+            CollectAllDescendantLeaves(group, flashLeaves);
+            flashLeaves.RemoveAll(l => !_selectedLayerGuids.Contains(l.Guid));
+            if (flashLeaves.Count > 0)
+                StartSelectionFlash(flashLeaves);
+
             _layerTreeScrollView?.Focus();
         }
 
-        /// <summary>配下の (行が見えている) リーフを選択に加える (既存の選択は保持)。</summary>
+        /// <summary>他行の選択を解除し、このグループ配下の全リーフを選択する (既にこのグループ配下の全リーフのみ選択中の場合は選択解除)。</summary>
+        void SelectSingleGroup(PSDLayer group)
+        {
+            var leaves = new List<PSDLayer>();
+            CollectAllDescendantLeaves(group, leaves);
+            if (leaves.Count == 0) return;
+
+            bool isOnlyThisGroupSelected = _selectedLayerGuids.Count == leaves.Count;
+            if (isOnlyThisGroupSelected)
+            {
+                foreach (var l in leaves)
+                {
+                    if (!_selectedLayerGuids.Contains(l.Guid))
+                    {
+                        isOnlyThisGroupSelected = false;
+                        break;
+                    }
+                }
+            }
+
+            if (isOnlyThisGroupSelected)
+            {
+                ClearSelection();
+                return;
+            }
+
+            foreach (string g in _selectedLayerGuids) SetRowHighlight(g, false);
+            _selectedLayerGuids.Clear();
+
+            foreach (var l in leaves)
+            {
+                _selectedLayerGuids.Add(l.Guid);
+                SetRowHighlight(l.Guid, true);
+            }
+            _selectionAnchorGuid = leaves[0].Guid;
+            UpdateSelectionUI();
+        }
+
+        /// <summary>配下の全リーフを選択に加える (既存の選択は保持)。</summary>
         void SelectDescendantLeaves(PSDLayer group)
         {
             var leaves = new List<PSDLayer>();
-            CollectVisibleDescendantLeaves(group, leaves);
+            CollectAllDescendantLeaves(group, leaves);
             if (leaves.Count == 0) return;
 
             foreach (var l in leaves)
@@ -165,13 +256,13 @@ namespace PSDSimpleEditor
         }
 
         /// <summary>
-        /// 配下の (行が見えている) リーフ全体の選択状態をまとめてトグルする:
+        /// 配下の全リーフ全体の選択状態をまとめてトグルする:
         /// 全員選択済みなら解除、そうでなければ全員選択に加える。
         /// </summary>
         void ToggleDescendantSelection(PSDLayer group)
         {
             var leaves = new List<PSDLayer>();
-            CollectVisibleDescendantLeaves(group, leaves);
+            CollectAllDescendantLeaves(group, leaves);
             if (leaves.Count == 0) return;
 
             bool allSelected = true;
@@ -199,6 +290,17 @@ namespace PSDSimpleEditor
             UpdateSelectionUI();
         }
 
+        /// <summary>グループ配下の全リーフレイヤー (展開・折りたたみに関わらず全子孫) を再帰収集する。</summary>
+        void CollectAllDescendantLeaves(PSDLayer group, List<PSDLayer> result)
+        {
+            if (group.Children == null) return;
+            foreach (var child in group.Children)
+            {
+                if (child.Children != null) CollectAllDescendantLeaves(child, result);
+                else result.Add(child);
+            }
+        }
+
         /// <summary>配下のリーフのうち、ツリーに行が存在する (見えている) ものを再帰収集する。</summary>
         void CollectVisibleDescendantLeaves(PSDLayer group, List<PSDLayer> result)
         {
@@ -219,14 +321,22 @@ namespace PSDSimpleEditor
         }
 
         /// <summary>
-        /// RebuildLayerTree 直後に呼ぶ。ツリーに行が存在しなくなった GUID (グループ折りたたみ /
-        /// 非表示化で消えた行) を選択から外し、「見えている行だけが同期対象」の不変条件を保つ。
+        /// RebuildLayerTree 直後に呼ぶ。PSD モデルに存在しなくなった GUID を選択から外し、
+        /// 有効なレイヤーのみを選択状態として維持する。
         /// </summary>
         void PruneSelectionToVisibleRows()
         {
-            _selectedLayerGuids.RemoveWhere(g => !_leafRowByGuid.ContainsKey(g));
-            if (_selectionAnchorGuid != null && !_leafRowByGuid.ContainsKey(_selectionAnchorGuid))
+            if (_layerByGuid == null)
+            {
+                _selectedLayerGuids.Clear();
                 _selectionAnchorGuid = null;
+            }
+            else
+            {
+                _selectedLayerGuids.RemoveWhere(g => !_layerByGuid.ContainsKey(g));
+                if (_selectionAnchorGuid != null && !_layerByGuid.ContainsKey(_selectionAnchorGuid))
+                    _selectionAnchorGuid = null;
+            }
             UpdateSelectionUI();
         }
 
@@ -254,7 +364,7 @@ namespace PSDSimpleEditor
             UpdateGroupHighlights();
         }
 
-        /// <summary>配下の見えているリーフがすべて選択されているグループ行にハイライトを追随させる。</summary>
+        /// <summary>配下の全リーフがすべて選択されているグループ行にハイライトを追随させる。</summary>
         void UpdateGroupHighlights()
         {
             foreach (var group in _visibleGroups)
@@ -262,7 +372,7 @@ namespace PSDSimpleEditor
                 if (!_groupRowByGuid.TryGetValue(group.Guid, out var row) || row == null) continue;
 
                 var leaves = new List<PSDLayer>();
-                CollectVisibleDescendantLeaves(group, leaves);
+                CollectAllDescendantLeaves(group, leaves);
                 bool all = leaves.Count > 0;
                 foreach (var l in leaves)
                     if (!_selectedLayerGuids.Contains(l.Guid)) { all = false; break; }
