@@ -12,6 +12,7 @@
     --accent: #ffffff;
     --semantic-success: #4caf50;
     --semantic-error: #ff6565;
+    --semantic-info: #64b5f6;
     --input-outline: #5a5a5a;
     --surface-hover: #3e3e3e;
     --surface-active: #4e4e4e;
@@ -26,6 +27,8 @@
     margin: 0;
 }
 
+/* 固定サイズを保つカード。ウィンドウ縮小時は .main-area 側だけが縮むようにする
+   (伸縮させたい .empty-state 側で flex-shrink を戻している) */
 .card {
     background-color: var(--surface-1);
     border-color: var(--outline);
@@ -33,6 +36,7 @@
     border-radius: 4px;
     padding: 10px 12px;
     margin: 6px 8px;
+    flex-shrink: 0;
 }
 
 .card-outer {
@@ -58,12 +62,14 @@
     padding: 5px 8px;
     flex-direction: row;
     align-items: center;
+    flex-shrink: 0;
 }
 
 .separator {
     background-color: var(--outline);
     height: 1px;
     margin: 4px 0;
+    flex-shrink: 0;
 }
 
 /* ── Typography ─────────────────────────────────────────────────── */
@@ -128,6 +134,7 @@
     flex-direction: row;
     align-items: center;
     padding: 8px 12px;
+    flex-shrink: 0;
 }
 
 /* ヘッダー左側: タイトル + バージョンをまとめる行 */
@@ -231,10 +238,12 @@
     padding-right: 8px;
 }
 
+/* 空状態カードはメインエリアを埋める側なので .card の flex-shrink: 0 を戻す */
 .empty-state {
     align-items: center;
     justify-content: center;
     flex-grow: 1;
+    flex-shrink: 1;
     margin: 20px;
 }
 
@@ -270,6 +279,7 @@
 .bottom-bar {
     flex-direction: row;
     align-items: center;
+    flex-shrink: 0;
 }
 
 .format-label {
@@ -362,13 +372,27 @@
     color: var(--text-primary);
 }
 
-.root .button-tool-active {
-    background-color: var(--surface-hover) !important;
-    color: var(--text-primary) !important;
+/* アクティブ (選択中) 状態。
+   USS に !important は存在せず、書くと宣言そのものが破棄されるため詳細度で解決する。
+   .root .button-tool:hover (0,3,0) に勝つよう .unity-button を連結して (0,3,0) にし、
+   同数詳細度は後勝ちになるので必ず .button-tool より後方に定義する。
+   背景の明度差だけでは選択中が判別しづらいので border を semantic-info の青にする。
+   :hover / :active でも border-color を再指定しないと汎用の accent 白枠に戻る。 */
+.root .unity-button.button-tool-active {
+    background-color: var(--surface-hover);
+    color: var(--text-primary);
+    border-color: var(--semantic-info);
     -unity-font-style: bold;
 }
-.root .button-tool-active:hover {
-    background-color: var(--surface-active) !important;
+.root .unity-button.button-tool-active:hover {
+    background-color: var(--surface-active);
+    color: var(--text-primary);
+    border-color: var(--semantic-info);
+}
+.root .unity-button.button-tool-active:active {
+    background-color: var(--surface-active);
+    color: var(--text-primary);
+    border-color: var(--semantic-info);
 }
 
 .root .button-mini {
@@ -509,6 +533,7 @@
     font-size: 11px;
     white-space: normal;
     -unity-text-align: middle-left;
+    flex-shrink: 0;
 }
 
 .status-info {
