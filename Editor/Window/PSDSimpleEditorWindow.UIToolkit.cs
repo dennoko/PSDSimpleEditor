@@ -57,6 +57,10 @@ namespace PSDSimpleEditor
                 }
             }
 
+            // 標準フォント (OS のメイリオ) を適用。生成・アトラス保護・再適用は
+            // DennokoUIFont が内包するのでここで FontAsset を作らないこと。
+            DennokoUIFont.Apply(rootVisualElement);
+
             // Create root container
             _rootContainer = new VisualElement();
             _rootContainer.AddToClassList("root");

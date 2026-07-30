@@ -34,6 +34,7 @@ PSDSimpleEditor/
 │   ├── PSDTranslation.cs          — UI 文言の日英ローカライズ
 │   ├── PSDEditorVersion.cs        — ローカル version.json から現行版を取得 (InitializeOnLoad で起動時に自動チェック、GUID+スクリプト相対でパス解決、SessionState 保存)
 │   ├── DennokoVersionChecker.cs   — GitHub version.json 取得 → ローカル版比較 (自己完結・例外を投げず State のみ返す、branch は main へフォールバック、SemVer 正規化)
+│   ├── DennokoUIFont.cs           — UI Toolkit 標準フォント (OS メイリオ) の SDF FontAsset 生成・アトラス保護・自己修復 (dennokoworks skill テンプレートのコピー。ウィンドウ側で FontAsset を作らない)
 │   ├── Compositor/                — LayerCompositor の実装分割 (partial class、共有状態あり)
 │   │   ├── LayerCompositor.cs         — 合成パイプライン本体 (Composite/CompositeList/CompositeGroup/DrawLayer)
 │   │   ├── LayerCompositor.Params.cs  — シェーダー uniform 設定 (DrawParams, ApplyParams)
