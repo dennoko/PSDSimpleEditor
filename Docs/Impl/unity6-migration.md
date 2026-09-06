@@ -3,7 +3,7 @@
 - 調査日: 2026-09-06
 - 現行: Unity 2022.3.22f1 / Built-in RP
 - 目標: Unity 6 (6000.0 LTS) / **BiRP 維持**
-- 共通調査: [`../../../Docs/Impl/unity6-migration-overview.md`](../../../Docs/Impl/unity6-migration-overview.md)
+- 共通調査: [`unity6-migration-overview.md`](unity6-migration-overview.md)
 
 ## 判定
 
@@ -21,7 +21,7 @@ Unity 6 上での描画結果の検証が重要。
 | UI | **UI Toolkit**（`PSDEditorTheme.uss`）+ IMGUI 併用 |
 | 外部依存 | **なし**（VRChat SDK / NDMF / lilToon すべて非依存） |
 
-**外部依存がゼロ**のため、VRChat SDK の Unity 6 対応を待たずに単体検証できる。
+**外部依存がゼロ**のため、VRChat SDK に依存せず単体検証できる。
 規模が大きく描画依存も強いため、**共通調査フェーズ 2（先行検証）の重点対象**。
 
 ## 検出事項
