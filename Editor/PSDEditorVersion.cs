@@ -1,6 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 using System;
+using System.Globalization;
 using System.IO;
 using System.Runtime.CompilerServices;
 
@@ -14,18 +15,17 @@ namespace PSDSimpleEditor
     [InitializeOnLoad]
     internal static class PSDEditorVersion
     {
-        // version.json の GUID (アセット移動に対応するため GUID 経由でパス解決する)
-        private const string VersionJsonGuid = "6fa54a17a5ffc3d478e0e3102679527b";
-        // version.json をどうしても読めなかった場合の最終フォールバック (通常は使われない)
+        // ─── バージョン定義 ─────────────────────────────────────────────────
         private const string FallbackVersion = "0.0.0";
-        private static string _currentCache = null;
+        private const string VersionJsonGuid = "6fa54a17a5ffc3d478e0e3102679527b";
 
-        internal static string Current
+        private static string _currentCache;
+
+        /// <summary>現行バージョン（"1.2.0" 形式）。読めない環境でも "0.0.0" を返す。</summary>
+        public static string Current
         {
             get
             {
-                // 失敗 (null) はキャッシュしない。インポート直後で version.json がまだ読めなかった
-                // 場合でも、次回アクセス時に再試行できるようにする。
                 if (string.IsNullOrEmpty(_currentCache))
                 {
                     _currentCache = LoadLocalVersion();
@@ -39,6 +39,20 @@ namespace PSDSimpleEditor
         internal const string RepoName        = "PSDSimpleEditor";
         internal const string RepoBranch      = "master";
         internal const string VersionFilePath = "version.json";
+
+        /// <summary>
+        /// 自動チェックを行う間隔（時間）。Unity のドメインリロードは頻繁に走るため、
+        /// 毎回通信すると GitHub の 403 レート制限に引っかかる。
+        /// 手動リロード（ForceRecheck）はこの間隔を無視して即座に取得する。
+        /// </summary>
+        private const double CheckIntervalHours = 6.0;
+
+        // 永続キー（EditorPrefs）。ドメインリロードやエディタ再起動を跨いで保持する。
+        // レート制限回避のため、前回の試行時刻と前回の成功結果をここに残す。
+        internal const string VerCheckLastAttemptKey   = "DennokoPSDEditor_VerCheck_LastAttempt";
+        internal const string VerCheckCachedLatestKey  = "DennokoPSDEditor_VerCheck_CachedLatest";
+        internal const string VerCheckCachedUrlKey     = "DennokoPSDEditor_VerCheck_CachedUrl";
+        internal const string VerCheckCachedMessageKey = "DennokoPSDEditor_VerCheck_CachedMessage";
 
         // セッションキー。State (比較結果) は保存しない — ローカル版が後から正しく解決され得るため、
         // 表示のたびに「保存した最新版 vs 現在のローカル版」で更新有無を再計算する。
@@ -68,10 +82,49 @@ namespace PSDSimpleEditor
             bool error = SessionState.GetBool(VerCheckErrorKey, false);
             if (done && !error) return;
             if (_checking) return;
+
+            // 間隔内はリクエストを送らず、前回取得できた結果をそのまま表示に使う。
+            // ここで done を立てないと「確認中...」のまま固まってしまう。
+            if (IsInCheckInterval())
+            {
+                ApplyCachedResult();
+                return;
+            }
+
             _checking = true;
+            EditorPrefs.SetString(VerCheckLastAttemptKey, DateTime.UtcNow.ToString("o"));
 
             DennokoVersionChecker.CheckAsync(
                 RepoOwner, RepoName, RepoBranch, VersionFilePath, Current, OnVersionChecked);
+        }
+
+        /// <summary>前回リクエストから CheckIntervalHours 経っていなければ true。</summary>
+        private static bool IsInCheckInterval()
+        {
+            var last = EditorPrefs.GetString(VerCheckLastAttemptKey, string.Empty);
+            if (string.IsNullOrEmpty(last)) return false;
+            if (!DateTime.TryParse(last, CultureInfo.InvariantCulture,
+                    DateTimeStyles.RoundtripKind, out var lastUtc)) return false;
+
+            // 端末時刻が巻き戻された場合に永久に待ち続けないよう、未来の記録は無効扱いにする
+            var elapsed = DateTime.UtcNow - lastUtc.ToUniversalTime();
+            if (elapsed < TimeSpan.Zero) return false;
+
+            return elapsed.TotalHours < CheckIntervalHours;
+        }
+
+        /// <summary>EditorPrefs に残っている前回の取得結果をセッションへ反映する。</summary>
+        private static void ApplyCachedResult()
+        {
+            var latest = EditorPrefs.GetString(VerCheckCachedLatestKey, string.Empty);
+            SessionState.SetBool(VerCheckDoneKey, true);
+            // 前回も取得できていなければエラー表示のまま（次の間隔明けに再試行される）
+            SessionState.SetBool(VerCheckErrorKey, string.IsNullOrEmpty(latest));
+            SessionState.SetString(VerCheckLatestKey, latest);
+            SessionState.SetString(VerCheckUrlKey, EditorPrefs.GetString(VerCheckCachedUrlKey, string.Empty));
+            SessionState.SetString(VerCheckMessageKey, EditorPrefs.GetString(VerCheckCachedMessageKey, string.Empty));
+
+            RefreshOpenWindows();
         }
 
         /// <summary>手動での再取得。前回結果 (成功/失敗・ローカル版キャッシュ) を破棄して再チェックする。</summary>
@@ -81,28 +134,44 @@ namespace PSDSimpleEditor
             _currentCache = null;  // ローカル版も読み直す (version.json を直したケースに対応)
             SessionState.SetBool(VerCheckDoneKey, false);
             SessionState.SetBool(VerCheckErrorKey, false);
+            // 明示的なユーザー操作なので間隔は無視する（抑制対象は自動チェックのみ）
+            EditorPrefs.DeleteKey(VerCheckLastAttemptKey);
             StartCheckBackgroundTask();
         }
 
         private static void OnVersionChecked(DennokoVersionChecker.Result result)
         {
             _checking = false;
+            bool failed = result.State == DennokoVersionChecker.State.Error;
+
             SessionState.SetBool(VerCheckDoneKey, true);
-            SessionState.SetBool(VerCheckErrorKey, result.State == DennokoVersionChecker.State.Error);
+            SessionState.SetBool(VerCheckErrorKey, failed);
             SessionState.SetString(VerCheckLatestKey, result.LatestVersion ?? string.Empty);
             SessionState.SetString(VerCheckUrlKey, result.Url ?? string.Empty);
             SessionState.SetString(VerCheckMessageKey, result.Message ?? string.Empty);
 
-            // すでにエディタウィンドウが開かれている場合は再描画を促す
-            var windows = Resources.FindObjectsOfTypeAll<PSDSimpleEditorWindow>();
-            if (windows != null && windows.Length > 0)
+            // 成功時のみ永続キャッシュを更新する。失敗で上書きすると、間隔内の表示から
+            // 「前回取得できていた最新版」が消えてしまうため。
+            if (!failed)
             {
-                foreach (var w in windows)
+                EditorPrefs.SetString(VerCheckCachedLatestKey, result.LatestVersion ?? string.Empty);
+                EditorPrefs.SetString(VerCheckCachedUrlKey, result.Url ?? string.Empty);
+                EditorPrefs.SetString(VerCheckCachedMessageKey, result.Message ?? string.Empty);
+            }
+
+            RefreshOpenWindows();
+        }
+
+        /// <summary>すでに開かれているウィンドウに取得結果を反映させる。</summary>
+        private static void RefreshOpenWindows()
+        {
+            var windows = Resources.FindObjectsOfTypeAll<PSDSimpleEditorWindow>();
+            if (windows == null) return;
+            foreach (var w in windows)
+            {
+                if (w != null)
                 {
-                    if (w != null)
-                    {
-                        w.LoadVersionResultFromSessionState();
-                    }
+                    w.LoadVersionResultFromSessionState();
                 }
             }
         }

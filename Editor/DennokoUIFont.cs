@@ -85,13 +85,22 @@ namespace PSDSimpleEditor
             if (!_roots.Contains(root))
             {
                 _roots.Add(root);
-                // 再ドック・レイアウト変更・リロード後の再アタッチでも確実に貼り直す
-                root.RegisterCallback<AttachToPanelEvent>(_ => ApplyTo(root));
+                // 再ドック・レイアウト変更・リロード後の再アタッチでも確実に貼り直す。
+                // ⚠ 再アタッチ時は Track で監視リストへ戻すこと。Detach で外したままだと
+                //   以後アトラスが破棄されても自己修復されないウィンドウが残る。
+                root.RegisterCallback<AttachToPanelEvent>(_ => { Track(root); ApplyTo(root); });
                 root.RegisterCallback<DetachFromPanelEvent>(_ => _roots.Remove(root));
             }
 
             HookTick(true);
             ApplyTo(root);
+        }
+
+        /// <summary>自己修復の監視対象に入れる（冪等）。</summary>
+        private static void Track(VisualElement root)
+        {
+            if (!_roots.Contains(root)) _roots.Add(root);
+            HookTick(true);
         }
 
         // ─── 適用 ───────────────────────────────────────────────────────────

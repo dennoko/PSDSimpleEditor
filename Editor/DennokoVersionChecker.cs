@@ -20,6 +20,9 @@ namespace PSDSimpleEditor
     {
         public enum State { Checking, UpToDate, UpdateAvailable, Error }
 
+        /// <summary>応答が無い場合に待ち続けないための上限（秒）。</summary>
+        private const int RequestTimeoutSeconds = 10;
+
         public struct Result
         {
             public State State;
@@ -72,8 +75,13 @@ namespace PSDSimpleEditor
             UnityWebRequest req;
             try
             {
+                // api.github.com ではなく raw を使う。未認証の api.github.com は
+                // IP あたり 60 req/hour と枠が狭く、レート制限に当たりやすいため。
                 var url = $"https://raw.githubusercontent.com/{owner}/{repo}/{branches[index]}/{filePath}";
                 req = UnityWebRequest.Get(url);
+                // UnityWebRequest 既定の User-Agent は 403 の対象になり得るので明示する
+                req.SetRequestHeader("User-Agent", $"{repo}-VersionChecker");
+                req.timeout = RequestTimeoutSeconds;
             }
             catch (Exception e)
             {
@@ -87,6 +95,7 @@ namespace PSDSimpleEditor
             op.completed += _ =>
             {
                 Result result;
+                long httpCode = 0;
                 try
                 {
                     result = BuildResult(req, localVersion);
@@ -98,10 +107,15 @@ namespace PSDSimpleEditor
                 }
                 finally
                 {
+                    httpCode = req.responseCode;
                     req.Dispose();
                 }
 
-                if (result.State == State.Error && index + 1 < branches.Count)
+                // 403 / 429 はブランチを変えても解消せず、リクエストを増やして
+                // レート制限を悪化させるだけなのでフォールバックしない
+                bool rateLimited = httpCode == 403 || httpCode == 429;
+
+                if (result.State == State.Error && !rateLimited && index + 1 < branches.Count)
                 {
                     // 次の候補ブランチへフォールバック
                     TryBranch(owner, repo, branches, index + 1, filePath, localVersion, onResult);
@@ -121,11 +135,14 @@ namespace PSDSimpleEditor
 #else
             bool hasError = req.isNetworkError || req.isHttpError;
 #endif
-            // 失敗は必ず一度警告する (チェックはセッション1回のみ)。URL・httpCode・error が
-            // 「最新情報を取得できません」の切り分け材料になる (owner/repo/branch・push 有無・回線)。
+            // 失敗は必ず一度警告する。URL・httpCode・error・body が「最新情報を取得できません」の
+            // 切り分け材料になる（owner/repo/branch・push 有無・回線・レート制限）。
             if (hasError)
             {
-                Debug.LogWarning($"[DennokoVersionChecker] 取得失敗: url={url} httpCode={req.responseCode} error={req.error}");
+                // 403 / 429 は本文に理由（レート制限か否か）が入るので一緒に出す
+                var body = req.downloadHandler != null ? req.downloadHandler.text : null;
+                if (!string.IsNullOrEmpty(body) && body.Length > 300) body = body.Substring(0, 300) + "...";
+                Debug.LogWarning($"[DennokoVersionChecker] 取得失敗: url={url} httpCode={req.responseCode} error={req.error} body={body}");
                 return Error(localVersion);
             }
 
