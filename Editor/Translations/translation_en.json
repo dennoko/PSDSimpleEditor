@@ -1,5 +1,6 @@
 {
   "items": [
+    { "key": "LayerVisibility", "value": "Show / hide layer" },
     { "key": "WindowTitle", "value": "Dennoko PSD Editor" },
     { "key": "PsdOpenTitle", "value": "Open PSD File" },
     { "key": "Browse", "value": "Browse" },

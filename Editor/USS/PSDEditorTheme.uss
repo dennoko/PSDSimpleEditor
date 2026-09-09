@@ -1,635 +1,165 @@
-/* dennokoworks フローティングデザインスキーマに基づく USS テーマ定義 */
-
-:root {
-    --surface-0: #121212;
-    --surface-1: #1e1e1e;
-    --surface-2: #2c2c2c;
-    --outline: #3a3a3a;
-    --text-primary: #ffffff;
-    --text-secondary: #cccccc;
-    --text-tertiary: #aaaaaa;
-    --text-disabled: #555555;
-    --accent: #ffffff;
-    --semantic-success: #4caf50;
-    --semantic-error: #ff6565;
-    --semantic-info: #64b5f6;
-    --input-outline: #5a5a5a;
-    --surface-hover: #3e3e3e;
-    --surface-active: #4e4e4e;
-}
-
-/* ── Container ──────────────────────────────────────────────────── */
-
+﻿/* Dark studio. DESIGN-apple.md: quiet surfaces, generous rhythm, one action blue.
+   USS owns the shell; PSDEditorTheme.cs mirrors these colors for IMGUI controls. */
 .root {
+    --surface-0: #1d1d1f;
+    --surface-1: #252527;
+    --surface-2: #2e2e30;
+    --outline: #3b3b3e;
+    --text-primary: #f5f5f7;
+    --text-secondary: #d2d2d7;
+    --text-tertiary: #a1a1a6;
+    --text-disabled: #737378;
+    --accent: #2997ff;
+    --action: #0071e3;
+    --action-hover: #1482ed;
+    --action-pressed: #0066cc;
+    --selection: #243b52;
+    --semantic-error: #ff8585;
+    --surface-hover: #38383b;
+    --surface-active: #424246;
     background-color: var(--surface-0);
-    flex-grow: 1;
-    padding: 0;
-    margin: 0;
-}
-
-/* 固定サイズを保つカード。ウィンドウ縮小時は .main-area 側だけが縮むようにする
-   (伸縮させたい .empty-state 側で flex-shrink を戻している) */
-.card {
-    background-color: var(--surface-1);
-    border-color: var(--outline);
-    border-width: 1px;
-    border-radius: 4px;
-    padding: 10px 12px;
-    margin: 6px 8px;
-    flex-shrink: 0;
-}
-
-.card-outer {
-    background-color: var(--surface-1);
-    border-color: var(--outline);
-    border-width: 1px;
-    border-radius: 4px;
-    padding: 0;
-    margin: 6px 8px;
-}
-
-.panel {
-    background-color: var(--surface-1);
-    border-color: var(--outline);
-    border-width: 1px;
-    border-radius: 4px;
-    padding: 0;
-    margin: 0;
-}
-
-.toolbar-style {
-    background-color: var(--surface-2);
-    padding: 5px 8px;
-    flex-direction: row;
-    align-items: center;
-    flex-shrink: 0;
-}
-
-.separator {
-    background-color: var(--outline);
-    height: 1px;
-    margin: 4px 0;
-    flex-shrink: 0;
-}
-
-/* ── Typography ─────────────────────────────────────────────────── */
-
-.title {
-    -unity-font-style: bold;
-    font-size: 14px;
-    color: var(--text-primary);
-    -unity-text-align: middle-left;
-}
-
-.section-header {
-    -unity-font-style: bold;
-    font-size: 10px;
-    color: var(--text-tertiary);
-    -unity-text-align: middle-left;
-}
-
-.secondary-text {
-    font-size: 11px;
     color: var(--text-secondary);
-    white-space: normal;
-}
-
-.caption {
-    font-size: 9px;
-    color: var(--text-primary);
-    -unity-text-align: middle-left;
-}
-
-.centered-caption {
-    font-size: 10px;
-    color: var(--text-tertiary);
-    -unity-text-align: middle-center;
-    white-space: normal;
-}
-
-.control-label {
-    font-size: 10px;
-    color: var(--text-primary);
-    -unity-text-align: middle-left;
-}
-
-.layer-name {
-    font-size: 11px;
-    color: var(--text-primary);
-    -unity-text-align: middle-left;
-    overflow: hidden;
+    font-size: 12px;
     flex-grow: 1;
-    flex-shrink: 1;
+    min-height: 0;
 }
-
-/* ── Layout (旧 C# インライン style から移設) ─────────────────────── */
-
-/* 汎用: 余白を埋める / スペーサー */
-.grow {
-    flex-grow: 1;
-}
-
-/* ヘッダー (タイトル行) */
+/* Base text first, so semantic labels retain their own hierarchy. */
+.root .unity-text-element { color: var(--text-secondary); }
+.grow { flex-grow: 1; min-width: 0; min-height: 0; }
 .header {
     flex-direction: row;
     align-items: center;
-    padding: 8px 12px;
+    background-color: var(--surface-0);
+    padding: 10px 16px;
     flex-shrink: 0;
 }
-
-/* ヘッダー左側: タイトル + バージョンをまとめる行 */
-.header-titlegroup {
-    flex-direction: row;
-    align-items: center;
-}
-
-/* バージョン表記 (タイトル横の小さな補足テキスト) */
-.version-label {
-    font-size: 10px;
-    margin-left: 6px;
-    color: var(--text-tertiary);
-    -unity-text-align: middle-left;
-}
-/* 更新あり (目立たせるため鮮やかな緑) */
-.version-label--update {
-    color: var(--semantic-success);
-    -unity-font-style: bold;
-}
-/* 最新版の取得に失敗 */
-.version-label--error {
-    color: var(--semantic-error);
-}
-
-/* 手動リロードボタン (バージョン表記の右) */
-.root .version-reload-button {
-    background-color: transparent;
-    border-width: 0;
-    width: 18px;
-    height: 18px;
-    margin-left: 4px;
-    padding: 0;
-    font-size: 12px;
-    color: var(--text-tertiary);
-}
-.root .version-reload-button:hover {
-    color: var(--text-primary);
-}
-
-/* 設定カード内の 1 行 (ラベル + 入力 + ボタン) */
-.settings-row {
-    flex-direction: row;
-    align-items: center;
-}
-
-.settings-label {
-    width: 68px;
-}
-
-.settings-label-wide {
-    width: 108px;
-}
-
-/* テキスト入力: width 0 + flex-grow で行内の残り幅いっぱいに広げる */
-.settings-input {
-    flex-grow: 1;
-    flex-shrink: 1;
-    width: 0;
-}
-
-.settings-object-input {
-    flex-grow: 1;
-    flex-shrink: 1;
-    min-width: 100px;
-}
-
-.settings-slot-label {
-    width: 56px;
-    margin-left: 8px;
-}
-
-.settings-slot-input {
-    flex-grow: 1;
-    flex-shrink: 1;
-    min-width: 60px;
-}
-
-.settings-button-icon {
-    width: 22px;
-    padding: 2px 4px;
-    margin-left: 2px;
-}
-
-.settings-toggle {
-    margin-left: 8px;
-}
-
-.settings-button {
-    width: 60px;
-}
-
-.settings-button-wide {
-    width: 72px;
-}
-
-/* メインエリア / 空状態 */
-.main-area {
-    flex-grow: 1;
-    padding-left: 8px;
-    padding-right: 8px;
-}
-
-/* 空状態カードはメインエリアを埋める側なので .card の flex-shrink: 0 を戻す */
-.empty-state {
-    align-items: center;
-    justify-content: center;
-    flex-grow: 1;
-    flex-shrink: 1;
-    margin: 20px;
-}
-
-.empty-state-separator {
-    width: 200px;
-}
-
-/* スプリットビュー左右ペイン */
-.split-view {
-    flex-grow: 1;
-}
-
-.layer-panel {
-    flex-grow: 1;
-    min-width: 320px;
-}
-
-.preview-panel {
-    flex-grow: 1;
-    min-width: 400px;
-}
-
-.layer-tree-scroll {
-    flex-grow: 1;
-}
-
-.layer-tree-container {
-    padding-left: 8px;
-    padding-right: 8px;
-}
-
-/* 下部バー (情報 + 形式 + 書き出し) */
-.bottom-bar {
+.header-titlegroup { flex-direction: row; align-items: center; flex-shrink: 1; min-width: 0; }
+.root .title { font-size: 17px; -unity-font-style: bold; color: var(--text-primary); }
+.root .version-label { font-size: 10px; margin-left: 10px; color: var(--text-tertiary); }
+.root .version-label--update { color: var(--accent); }
+.root .version-label--error { color: var(--semantic-error); }
+.root .section-header { font-size: 13px; -unity-font-style: bold; color: var(--text-primary); }
+.root .caption, .root .secondary-text { font-size: 11px; color: var(--text-tertiary); }
+.root .caption { overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
+.root .control-label { font-size: 11px; color: var(--text-secondary); -unity-text-align: middle-left; }
+.root .centered-caption { font-size: 12px; color: var(--text-tertiary); white-space: normal; -unity-text-align: middle-center; }
+.document-bar { background-color: var(--surface-1); padding: 10px 16px 6px; flex-shrink: 0; }
+.settings-row, .export-actions { flex-direction: row; align-items: center; min-height: 32px; }
+.settings-label { width: 54px; flex-shrink: 0; }
+.settings-input { flex-grow: 1; flex-shrink: 1; width: 0; min-width: 40px; }
+.settings-object-input { flex-grow: 1; flex-shrink: 1; width: 0; min-width: 120px; }
+.settings-slot-label { width: 65px; margin-left: 12px; flex-shrink: 0; }
+.settings-slot-input { flex-grow: 1; flex-shrink: 1; width: 0; min-width: 80px; }
+.settings-button { min-width: 60px; flex-shrink: 0; }
+.settings-button-wide { min-width: 88px; flex-shrink: 0; }
+.settings-toggle { margin-left: 12px; flex-shrink: 0; }
+.material-settings { margin: 4px 0 0; }
+.material-settings > .unity-foldout__toggle { height: 26px; margin: 0; }
+.material-settings > .unity-foldout__content { margin-left: 0; padding: 4px 0 6px; }
+.main-area { flex-grow: 1; min-height: 0; }
+.split-view { flex-grow: 1; min-height: 0; }
+.panel { padding: 0; margin: 0; min-height: 0; overflow: hidden; }
+.layer-panel { background-color: var(--surface-1); min-width: 340px; }
+.preview-panel { background-color: var(--surface-0); flex-grow: 1; min-width: 280px; }
+.toolbar-style {
+    background-color: var(--surface-1);
     flex-direction: row;
     align-items: center;
     flex-shrink: 0;
+    min-height: 44px;
+    padding: 6px 12px;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--outline);
 }
-
-.format-label {
-    width: 30px;
-}
-
-.format-field {
-    width: 80px;
-}
-
-.export-button {
-    width: 120px;
-}
-
-/* ── Buttons ────────────────────────────────────────────────────── */
-
-/* Unity ビルトインテーマ (Personal Light 等) のボタン装飾を遮断するベースリセット。
-   以下の .button-* は .root 起点の子孫セレクタとして詳細度を確保し、確実にこちらを勝たせる。 */
+.preview-panel > .toolbar-style { background-color: var(--surface-0); }
+.layer-tree-scroll { flex-grow: 1; min-height: 0; }
+.layer-tree-container { padding: 8px; }
+.root .unity-two-pane-split-view__dragline { background-color: var(--outline); }
+.root .unity-two-pane-split-view__dragline:hover { background-color: var(--accent); }
+.empty-state { flex-grow: 1; min-height: 0; align-items: center; justify-content: center; padding: 16px; }
+.root .empty-state .title { font-size: 24px; margin-bottom: 12px; white-space: normal; -unity-text-align: middle-center; }
+.root .empty-open-button { margin-top: 20px; padding: 0 24px; height: 36px; }
+.bottom-bar { background-color: var(--surface-1); padding: 8px 16px; flex-shrink: 0; border-top-width: 1px; border-top-color: var(--outline); }
+.export-settings-row { margin-bottom: 4px; }
+.export-actions { min-height: 36px; }
+.format-label { width: 38px; margin-left: 12px; }
+.format-field { width: 80px; flex-shrink: 0; }
+.export-button { min-width: 120px; margin-left: 12px; }
+/* Control dimensions and focus are consistent across the document and export bars. */
 .root .unity-button {
     background-color: var(--surface-2);
-    border-color: var(--outline);
+    border-color: transparent;
     border-width: 1px;
-    border-radius: 2px;
+    border-radius: 8px;
     color: var(--text-primary);
-}
-.root .unity-button:hover {
-    background-color: var(--surface-hover);
-}
-.root .unity-button:active {
-    background-color: var(--surface-active);
-}
-.root .unity-button:disabled {
-    background-color: var(--surface-1);
-    color: var(--text-disabled);
-}
-
-.root .button-primary {
-    background-color: var(--surface-2);
-    border-color: var(--outline);
-    border-width: 1px;
-    color: var(--text-primary);
-    border-radius: 2px;
     height: 28px;
-    -unity-font-style: bold;
-    padding: 4px 10px;
-    -unity-text-align: middle-center;
-}
-.root .button-primary:hover {
-    background-color: var(--surface-hover);
-}
-.root .button-primary:active {
-    background-color: var(--surface-active);
-}
-
-.root .button-secondary {
-    background-color: var(--surface-1);
-    border-color: var(--outline);
-    border-width: 1px;
-    color: var(--text-secondary);
-    border-radius: 2px;
-    height: 26px;
-    padding: 4px 10px;
-    -unity-text-align: middle-center;
-}
-.root .button-secondary:hover {
-    background-color: var(--surface-2);
-    color: var(--text-primary);
-}
-.root .button-secondary:active {
-    background-color: var(--surface-hover);
-    color: var(--text-primary);
-}
-
-.root .button-tool {
-    background-color: var(--surface-2);
-    border-color: var(--outline);
-    border-width: 1px;
-    color: var(--text-secondary);
-    border-radius: 2px;
-    height: 20px;
-    padding: 2px 8px;
-    -unity-text-align: middle-center;
-}
-.root .button-tool:hover {
-    background-color: var(--surface-hover);
-    color: var(--text-primary);
-}
-.root .button-tool:active {
-    background-color: var(--surface-active);
-    color: var(--text-primary);
-}
-
-/* アクティブ (選択中) 状態。
-   USS に !important は存在せず、書くと宣言そのものが破棄されるため詳細度で解決する。
-   .root .button-tool:hover (0,3,0) に勝つよう .unity-button を連結して (0,3,0) にし、
-   同数詳細度は後勝ちになるので必ず .button-tool より後方に定義する。
-   背景の明度差だけでは選択中が判別しづらいので border を semantic-info の青にする。
-   :hover / :active でも border-color を再指定しないと汎用の accent 白枠に戻る。 */
-.root .unity-button.button-tool-active {
-    background-color: var(--surface-hover);
-    color: var(--text-primary);
-    border-color: var(--semantic-info);
-    -unity-font-style: bold;
-}
-.root .unity-button.button-tool-active:hover {
-    background-color: var(--surface-active);
-    color: var(--text-primary);
-    border-color: var(--semantic-info);
-}
-.root .unity-button.button-tool-active:active {
-    background-color: var(--surface-active);
-    color: var(--text-primary);
-    border-color: var(--semantic-info);
-}
-
-.root .button-mini {
-    background-color: var(--surface-2);
-    border-color: var(--outline);
-    border-width: 1px;
-    color: var(--text-tertiary);
-    border-radius: 2px;
-    height: 18px;
-    padding: 1px 6px;
-    font-size: 10px;
-    -unity-text-align: middle-center;
-}
-.root .button-mini:hover {
-    background-color: var(--surface-hover);
-    color: var(--text-secondary);
-}
-.root .button-mini:active {
-    background-color: var(--surface-active);
-    color: var(--text-primary);
-}
-
-.root .foldout-button {
-    background-color: transparent;
-    border-width: 0;
-    color: var(--text-primary);
-    font-size: 14px;
-    margin: 0;
-    padding: 0;
-    width: 18px;
-    height: 20px;
-}
-
-.root .foldout-label {
-    background-color: transparent;
-    border-width: 0;
-    color: var(--text-primary);
+    margin: 0 0 0 6px;
+    padding: 0 12px;
     font-size: 11px;
-    margin: 0;
-    padding: 0 2px;
-    -unity-text-align: middle-left;
-}
-
-/* ── Layer Tree ─────────────────────────────────────────────────── */
-
-.layer-leaf-header {
-    flex-direction: row;
-    align-items: center;
-}
-
-/* グループ行の ▾/▸ ボタン幅ぶんのインデント合わせ */
-.foldout-spacer {
-    width: 18px;
-}
-
-.blend-dropdown {
-    width: 74px;
-}
-
-/* レイヤー詳細コントロール (IMGUIContainer) */
-.layer-controls {
-    margin-top: 4px;
-}
-
-.layer-leaf-card {
-    background-color: var(--surface-1);
-    border-color: var(--outline);
-    border-width: 1px;
-    padding: 6px 8px;
-    margin: 3px 0;
-    border-radius: 4px;
-}
-
-/* 複数選択中のレイヤー行 (カード全体 = ヘッダ + IMGUI コントロール部をハイライト) */
-.layer-leaf-card.layer-selected {
-    background-color: var(--surface-2);
-    border-color: var(--accent);
-}
-
-/* 配下リーフが全選択されているフォルダ行のハイライト */
-.layer-group-outer.layer-selected {
-    border-color: var(--accent);
-}
-.layer-group-outer.layer-selected > .layer-group-header {
-    background-color: var(--surface-2);
-}
-
-/* レイヤーパネルヘッダの選択数表示 */
-.selection-count {
-    font-size: 10px;
-    color: var(--text-secondary);
-    -unity-text-align: middle-right;
-    margin-right: 4px;
-}
-
-/* 選択中の操作補助文 */
-.selection-hint {
-    font-size: 9px;
-    color: var(--text-tertiary);
-    -unity-text-align: middle-right;
-    margin-right: 6px;
-}
-
-.layer-group-outer {
-    background-color: var(--surface-1);
-    border-color: var(--outline);
-    border-width: 1px;
-    padding: 0;
-    margin: 4px 0;
-    border-radius: 4px;
-}
-
-.layer-group-header {
-    background-color: var(--surface-2);
-    border-color: var(--outline);
-    border-bottom-width: 1px;
-    border-top-width: 0;
-    border-left-width: 0;
-    border-right-width: 0;
-    padding: 5px 8px;
-    margin: 0;
-    flex-direction: row;
-    align-items: center;
-}
-
-.layer-group-body {
-    padding: 8px 8px 8px 10px;
-    margin: 0;
-}
-
-/* ── Status Bar ─────────────────────────────────────────────────── */
-
-.status-bar {
-    border-width: 1px;
-    border-radius: 4px;
-    padding: 6px 10px;
-    margin: 4px 8px 6px 8px;
-    font-size: 11px;
-    white-space: normal;
-    -unity-text-align: middle-left;
+    -unity-text-align: middle-center;
     flex-shrink: 0;
 }
-
-.status-info {
-    background-color: var(--surface-1);
-    border-color: var(--outline);
-    color: var(--text-secondary);
-}
-
-.status-success {
-    background-color: rgba(76, 175, 80, 0.15);
-    border-color: var(--outline);
-    color: var(--semantic-success);
-}
-
-.status-error {
-    background-color: rgba(155, 27, 48, 0.25);
-    border-color: var(--outline);
-    color: var(--semantic-error);
-}
-
-/* ── Built-in UI Toolkit Controls Styling ────────────────────────── */
-
-/* テキスト要素全般のライトテーマ黒文字化を遮断 (.root 起点で優先度を確保) */
-.root .unity-text-element {
-    color: var(--text-secondary);
-}
-
-/* Text Fields */
+.root .unity-button:hover { background-color: var(--surface-hover); }
+.root .unity-button:active { background-color: var(--surface-active); }
+.root .unity-button:focus { border-color: var(--accent); }
+.root .button-primary { border-radius: 18px; background-color: var(--action); color: var(--text-primary); height: 32px; padding: 0 18px; }
+.root .button-primary:hover { background-color: var(--action-hover); }
+.root .button-primary:active { background-color: var(--action-pressed); }
+.root .button-tool { color: var(--text-secondary); }
+.root .unity-button.button-tool-active { background-color: var(--selection); border-color: var(--accent); color: var(--accent); }
+.root .unity-button.button-tool-active:hover { background-color: var(--surface-active); }
+.root .button-mini { height: 24px; padding: 0 8px; font-size: 10px; }
+.root .settings-button-icon { width: 28px; padding: 0; margin-left: 4px; }
+.root .version-reload-button { background-color: transparent; color: var(--text-tertiary); width: 24px; height: 24px; padding: 0; margin-left: 4px; font-size: 14px; }
+.root .foldout-button { background-color: transparent; width: 22px; height: 28px; padding: 0; margin: 0; font-size: 14px; }
+.foldout-spacer { width: 22px; flex-shrink: 0; }
+.layer-leaf-header, .layer-group-header { flex-direction: row; align-items: center; min-height: 32px; }
+.root .layer-name { font-size: 12px; color: var(--text-primary); flex-grow: 1; flex-shrink: 1; min-width: 24px; overflow: hidden; text-overflow: ellipsis; -unity-text-align: middle-left; }
+.blend-dropdown { width: 96px; flex-shrink: 0; }
+.layer-leaf-card { background-color: var(--surface-1); border-width: 1px; border-color: transparent; border-radius: 8px; padding: 4px 6px; margin: 2px 0; }
+.layer-leaf-card:hover { border-color: var(--outline); }
+.layer-group-outer { border-left-width: 1px; border-left-color: var(--outline); margin: 4px 0; }
+.layer-group-header { background-color: var(--surface-2); padding: 4px 6px; border-radius: 8px; }
+.layer-group-body { padding: 4px 0 4px 8px; }
+.layer-controls { margin: 4px 0; }
+.layer-leaf-card.layer-selected { background-color: var(--selection); border-color: var(--accent); }
+.layer-group-outer.layer-selected { border-left-color: var(--accent); }
+.layer-group-outer.layer-selected > .layer-group-header { background-color: var(--selection); }
+.root .selection-count { font-size: 11px; color: var(--accent); margin-left: 6px; }
+.root .selection-hint { font-size: 10px; color: var(--text-tertiary); margin-left: 6px; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; }
+.status-bar { background-color: var(--surface-0); padding: 4px 16px; min-height: 24px; font-size: 11px; white-space: normal; flex-shrink: 0; }
+.root .status-info { color: var(--text-tertiary); }
+.root .status-success { color: var(--accent); }
+.root .status-error { color: var(--semantic-error); }
+.root .unity-base-field { margin-top: 0; margin-bottom: 0; }
 .root .unity-text-field__input,
-.root .unity-text-field__input .unity-text-element {
-    background-color: var(--surface-2);
-    border-color: var(--input-outline);
-    border-width: 1px;
-    border-radius: 3px;
-    color: var(--text-primary);
-    padding: 2px 4px;
-    selection-color: rgba(255, 255, 255, 0.25);
-    cursor: text;
-}
-.root .unity-text-field__input:hover {
-    border-color: var(--outline);
-}
-.root .unity-text-field__input:focus {
-    border-color: var(--accent);
-}
-
-/* Object Fields */
 .root .unity-object-field__input,
-.root .unity-object-field__input .unity-label,
-.root .unity-object-field__input .unity-object-field-display__label,
-.root .unity-object-field__input .unity-text-element {
-    background-color: var(--surface-2);
-    border-color: var(--input-outline);
-    border-width: 1px;
-    border-radius: 3px;
-    color: var(--text-primary);
-    padding: 2px 4px;
-}
-.root .unity-object-field__selector {
-    background-color: var(--surface-1);
-    border-left-color: var(--input-outline);
-    border-left-width: 1px;
-}
-
-/* Dropdowns / Popups */
-.root .unity-base-popup-field__input,
-.root .unity-base-popup-field__input .unity-base-popup-field__text,
-.root .unity-base-popup-field__input .unity-text-element {
-    background-color: var(--surface-2);
-    border-color: var(--input-outline);
-    border-width: 1px;
-    border-radius: 3px;
-    color: var(--text-primary);
-    padding: 2px 6px;
-}
-.root .unity-base-popup-field__arrow {
-    -unity-background-image-tint-color: var(--text-primary);
-}
-
-/* Toggles */
-.root .unity-toggle__checkmark {
-    background-color: var(--surface-2);
-    border-color: var(--input-outline);
-    border-width: 1px;
-    border-radius: 2px;
-    width: 16px;
-    height: 16px;
-}
-.root .unity-toggle__checkmark:hover {
+.root .unity-base-popup-field__input {
+    background-color: var(--surface-0);
     border-color: var(--outline);
+    border-width: 1px;
+    border-radius: 8px;
+    color: var(--text-primary);
+    min-height: 28px;
+    padding: 3px 8px;
 }
-.root .unity-toggle__checkmark:checked {
-    background-color: var(--surface-1);
-    border-color: var(--accent);
-}
-
-.unity-disabled {
-    opacity: 0.5;
-}
+.root .unity-text-field__input { --unity-selection-color: var(--selection); --unity-cursor-color: var(--text-primary); }
+.root .unity-text-field__input:focus,
+.root .unity-object-field__input:focus,
+.root .unity-base-popup-field__input:focus { border-color: var(--accent); }
+/* Style only the input surface: nested labels must not acquire another border. */
+.root .unity-base-popup-field__text,
+.root .unity-object-field-display__label { color: var(--text-primary); }
+.root .unity-base-popup-field__arrow,
+.root .unity-foldout__arrow { -unity-background-image-tint-color: var(--text-secondary); }
+.root .unity-object-field__selector { background-color: var(--surface-2); border-radius: 4px; }
+.root .unity-toggle__checkmark { background-color: var(--surface-0); border-width: 1px; border-color: var(--outline); border-radius: 4px; width: 16px; height: 16px; -unity-background-image-tint-color: var(--text-primary); }
+.root .unity-toggle__input:checked > .unity-toggle__checkmark { background-color: var(--action); border-color: var(--action); }
+.root .unity-toggle:focus > .unity-toggle__input > .unity-toggle__checkmark { border-color: var(--accent); }
+.root .unity-scroller--vertical { width: 10px; }
+.root .unity-scroller--vertical .unity-scroller__low-button,
+.root .unity-scroller--vertical .unity-scroller__high-button { display: none; }
+.root .unity-scroller .unity-base-slider__tracker { background-color: transparent; }
+.root .unity-scroller .unity-base-slider__dragger { background-color: var(--surface-active); border-width: 0; border-radius: 8px; }
+.root .unity-disabled { opacity: 0.5; }
+.root .unity-button:disabled { background-color: var(--surface-2); color: var(--text-disabled); border-color: transparent; }

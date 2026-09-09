@@ -4,8 +4,7 @@ using UnityEditor;
 namespace PSDSimpleEditor
 {
     /// <summary>
-    /// dennokoworks フローティングデザインスキーマに基づくテーマ定義。
-    /// (.claude/skills/dennokoworks_color_schema の UniTexTheme テンプレートを PSD Simple Editor 用に移植。)
+    /// USS のダークスタジオテーマに合わせた IMGUI 用パレットとスタイル。
     /// OnGUI の先頭で Initialize() → PushEditorTheme() を呼び、finally で PopEditorTheme() を呼ぶ。
     ///
     /// テンプレート標準スタイルに加え、レイヤーツリーの入れ子表現用スタイル
@@ -19,27 +18,27 @@ namespace PSDSimpleEditor
         // ─── Colors ──────────────────────────────────────────────────────────
 
         // theme.surface (Neutral Layer)
-        public static readonly Color Surface0 = Hex(0x121212); // app background
-        public static readonly Color Surface1 = Hex(0x1e1e1e); // cards, inputs
-        public static readonly Color Surface2 = Hex(0x2c2c2c); // hover, toolbar
+        public static readonly Color Surface0 = Hex(0x1d1d1f); // app background
+        public static readonly Color Surface1 = Hex(0x252527); // cards, inputs
+        public static readonly Color Surface2 = Hex(0x2e2e30); // hover, toolbar
 
         // theme.outline
-        public static readonly Color Outline = Hex(0x3a3a3a);
+        public static readonly Color Outline = Hex(0x3b3b3e);
 
         // theme.typography
-        public static readonly Color TextPrimary   = Hex(0xffffff);
-        public static readonly Color TextSecondary = Hex(0xcccccc);
-        public static readonly Color TextTertiary  = Hex(0xaaaaaa);
-        public static readonly Color TextDisabled  = Hex(0x555555);
+        public static readonly Color TextPrimary   = Hex(0xf5f5f7);
+        public static readonly Color TextSecondary = Hex(0xd2d2d7);
+        public static readonly Color TextTertiary  = Hex(0xa1a1a6);
+        public static readonly Color TextDisabled  = Hex(0x737378);
 
         // theme.semantic
         public static readonly Color SemanticError   = Hex(0x9b1b30);
         public static readonly Color SemanticWarning = Hex(0xffb74d);
-        public static readonly Color SemanticSuccess = Hex(0x4caf50);
-        public static readonly Color SemanticInfo    = Hex(0x64b5f6);
+        public static readonly Color SemanticSuccess = Hex(0x2997ff);
+        public static readonly Color SemanticInfo    = Hex(0x2997ff);
 
         // theme.interaction
-        public static readonly Color Accent       = Color.white;
+        public static readonly Color Accent       = Hex(0x2997ff);
         public static readonly Color HoverOverlay = new Color(1f, 1f, 1f, 0.05f);
 
         // ─── Cached Textures ─────────────────────────────────────────────────
@@ -118,7 +117,7 @@ namespace PSDSimpleEditor
             if (!_texCard)        _texCard        = MakeBorderedTex(Surface1, Outline, 64);
             if (!_texAccentCard)  _texAccentCard  = MakeBorderedTex(Surface2, Outline, 64);
             if (!_texGroupHeader) _texGroupHeader = MakeBorderedTex(Surface2, Outline, 64);
-            if (!_texSearchField) _texSearchField = MakeBorderedTex(Surface2, Hex(0x5a5a5a), 64);
+            if (!_texSearchField) _texSearchField = MakeBorderedTex(Surface0, Outline, 64);
         }
 
         private static void BuildStyles()

@@ -85,6 +85,7 @@ namespace PSDSimpleEditor
 
             // Visibility toggle
             var visibilityToggle = new Toggle();
+            visibilityToggle.tooltip = PSDTranslation.Get("LayerVisibility", "レイヤーの表示 / 非表示");
             visibilityToggle.value = layer.UI.Visible;
             visibilityToggle.RegisterValueChangedCallback(evt => {
                 RegisterUndo("Toggle Visibility");
@@ -98,6 +99,7 @@ namespace PSDSimpleEditor
             // Label
             string labelText = BuildLayerLabel(layer, true);
             var label = new Label(labelText);
+            label.tooltip = labelText;
             label.AddToClassList("layer-name");
             header.Add(label);
 
@@ -187,6 +189,7 @@ namespace PSDSimpleEditor
 
             // Visibility toggle
             var visibilityToggle = new Toggle();
+            visibilityToggle.tooltip = PSDTranslation.Get("LayerVisibility", "レイヤーの表示 / 非表示");
             visibilityToggle.value = layer.UI.Visible;
             visibilityToggle.RegisterValueChangedCallback(evt => {
                 RegisterUndo("Toggle Visibility");
@@ -200,6 +203,7 @@ namespace PSDSimpleEditor
             // Label
             string labelText = BuildLayerLabel(layer, false);
             var label = new Label(labelText);
+            label.tooltip = labelText;
             label.AddToClassList("layer-name");
             header.Add(label);
 
