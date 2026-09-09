@@ -561,59 +561,86 @@
     color: var(--text-secondary);
 }
 
-/* Text Fields */
-.root .unity-text-field__input,
-.root .unity-text-field__input .unity-text-element {
+/* ─── Input Fields (Skill-compliant) ─────────────────────────────── */
+
+/* ボックススタイル (背景・枠・パディング) は外側の __input のみに適用する */
+.root .unity-base-field__input {
     background-color: var(--surface-2);
     border-color: var(--input-outline);
     border-width: 1px;
     border-radius: 3px;
     color: var(--text-primary);
     padding: 2px 4px;
-    selection-color: rgba(255, 255, 255, 0.25);
-    cursor: text;
 }
-.root .unity-text-field__input:hover {
+
+/* 内側のテキスト要素には color のみを適用する。
+   ⚠ ボックススタイルを内側にも掛けるとフィールド内部に二重の枠・
+   二重のパディングが生まれてレイアウトが崩れるため、枠線・背景・パディングは除外する。 */
+.root .unity-base-field__input .unity-text-element,
+.root .unity-object-field__input .unity-label,
+.root .unity-object-field__input .unity-object-field-display__label,
+.root .unity-base-popup-field__input .unity-base-popup-field__text {
+    color: var(--text-primary);
+}
+
+.root .unity-base-field:hover .unity-base-field__input {
     border-color: var(--outline);
 }
-.root .unity-text-field__input:focus {
+
+.root .unity-base-field:focus .unity-base-field__input,
+.root .unity-base-field__input:focus {
     border-color: var(--accent);
 }
 
-/* Object Fields */
-.root .unity-object-field__input,
-.root .unity-object-field__input .unity-label,
-.root .unity-object-field__input .unity-object-field-display__label,
-.root .unity-object-field__input .unity-text-element {
-    background-color: var(--surface-2);
-    border-color: var(--input-outline);
-    border-width: 1px;
-    border-radius: 3px;
-    color: var(--text-primary);
-    padding: 2px 4px;
+/* Text Fields: キャレットと選択色 */
+.root .unity-text-field__input {
+    selection-color: rgba(255, 255, 255, 0.25);
+    cursor: text;
 }
+.root .unity-base-text-field__input {
+    --unity-cursor-color: var(--text-primary);
+    --unity-selection-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Object Fields: ピッカーボタン */
 .root .unity-object-field__selector {
     background-color: var(--surface-1);
     border-left-color: var(--input-outline);
     border-left-width: 1px;
 }
 
-/* Dropdowns / Popups */
-.root .unity-base-popup-field__input,
-.root .unity-base-popup-field__input .unity-base-popup-field__text,
-.root .unity-base-popup-field__input .unity-text-element {
-    background-color: var(--surface-2);
-    border-color: var(--input-outline);
-    border-width: 1px;
-    border-radius: 3px;
-    color: var(--text-primary);
+/* Dropdowns / Popups: パディング調整と矢印 */
+.root .unity-base-popup-field__input {
     padding: 2px 6px;
 }
 .root .unity-base-popup-field__arrow {
+    background-image: resource("d_dropdown");
     -unity-background-image-tint-color: var(--text-primary);
 }
 
-/* Toggles */
+/* ─── Toggles (Skill-compliant) ──────────────────────────────────── */
+
+/* Toggle の入力コンテナ (.unity-toggle__input) は .unity-base-field__input でもあるため、
+   上記入力フィールド装飾を打ち消して余計な囲み枠線が付かないようにする。 */
+.root .unity-toggle .unity-base-field__input,
+.root .unity-toggle:hover .unity-base-field__input,
+.root .unity-toggle:focus .unity-base-field__input,
+.root .unity-toggle .unity-base-field__input:focus {
+    background-color: transparent;
+    border-color: transparent;
+    border-width: 0;
+    padding: 0;
+}
+
+.root .unity-toggle .unity-toggle__text {
+    background-color: transparent;
+    border-color: transparent;
+    border-width: 0;
+    border-radius: 0;
+    padding: 0;
+    margin-left: 4px;
+}
+
 .root .unity-toggle__checkmark {
     background-color: var(--surface-2);
     border-color: var(--input-outline);
